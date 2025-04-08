@@ -1,4 +1,4 @@
-import DummyTimeManager from './DummyTimeManager';
+import TimeManager from './TimeManager';
 
 // Define interface for visual objects to be rendered
 export interface VisualObject3D {
@@ -11,15 +11,15 @@ export interface VisualObject3D {
 }
 
 class VisualizerManager {
-  private timeManager: DummyTimeManager;
+  private timeManager: TimeManager;
   
-  constructor() {
-    this.timeManager = new DummyTimeManager();
+  constructor(timeManager: TimeManager) {
+    this.timeManager = timeManager;
   }
   
   // Get all visual objects to render at current time
   getVisualObjects(): VisualObject3D[] {
-    const time = this.timeManager.getTime();
+    const time = this.timeManager.getCurrentBeat();
     const objects: VisualObject3D[] = [];
     
     // Create a cube with oscillating properties
@@ -42,19 +42,9 @@ class VisualizerManager {
     return objects;
   }
   
-  // Get the current time
-  getCurrentTime(): number {
-    return this.timeManager.getTime();
-  }
-  
   // Get the current beat
   getCurrentBeat(): number {
     return this.timeManager.getCurrentBeat();
-  }
-  
-  // Reset the time
-  reset(): void {
-    this.timeManager.reset();
   }
 }
 

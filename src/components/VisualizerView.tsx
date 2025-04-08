@@ -6,28 +6,8 @@ import * as THREE from 'three';
 import useStore from '../store/store';
 import VisualizerManager, { VisualObject3D } from '../lib/VisualizerManager';
 
-// Initialize the visualizer manager as a singleton
-const visualizerManager = new VisualizerManager();
-
-// Component for a single visual object
-const VisualObject: React.FC<{ object: VisualObject3D }> = ({ object }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  
-  return (
-    <mesh
-      ref={meshRef}
-      position={object.position}
-      rotation={object.rotation as any}
-      scale={object.scale}
-    >
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color={object.color} />
-    </mesh>
-  );
-};
-
 // Scene component that handles animation and object rendering
-const Scene: React.FC = () => {
+const Scene: React.FC<{ visualizerManager: VisualizerManager }> = ({ visualizerManager }) => {
   const [objects, setObjects] = useState<VisualObject3D[]>([]);
   
   // Update objects on each frame
@@ -51,11 +31,29 @@ const Scene: React.FC = () => {
   );
 };
 
+// Component for a single visual object
+const VisualObject: React.FC<{ object: VisualObject3D }> = ({ object }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  
+  return (
+    <mesh
+      ref={meshRef}
+      position={object.position}
+      rotation={object.rotation as any}
+      scale={object.scale}
+    >
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color={object.color} />
+    </mesh>
+  );
+};
+
 // Main VisualizerView component
 const VisualizerView: React.FC = () => {
+  const { timeManager, currentBeat } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [beat, setBeat] = useState(0);
+  const [visualizerManager] = useState(() => new VisualizerManager(timeManager));
   
   // Update dimensions on resize
   useEffect(() => {
@@ -73,22 +71,13 @@ const VisualizerView: React.FC = () => {
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
   
-  // Update the current beat from the visualizer manager
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setBeat(Math.round(visualizerManager.getCurrentBeat() * 100) / 100);
-    }, 100);
-    
-    return () => clearInterval(interval);
-  }, []);
-  
   return (
     <div className="visualizer-view" ref={containerRef} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <h2 style={{ padding: '10px', margin: 0 }}>Visualizer View (Beat: {beat})</h2>
+      <h2 style={{ padding: '10px', margin: 0 }}>Visualizer View (Beat: {currentBeat.toFixed(2)})</h2>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {dimensions.width > 0 && dimensions.height > 0 && (
           <Canvas style={{ background: '#000' }}>
-            <Scene />
+            <Scene visualizerManager={visualizerManager} />
           </Canvas>
         )}
       </div>
