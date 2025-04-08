@@ -55,6 +55,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
   // Handle mouse events for note operations
   useEffect(() => {
     const handleMouseUp = () => {
+      setDragNoteId(null);
       setDragOperation('none');
     };
     

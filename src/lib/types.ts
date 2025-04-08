@@ -16,6 +16,7 @@ export interface MIDIBlock {
 export interface VisualObjectProperties {
   // Basic properties
   color: string;
+  opacity?: number;
   
   // Legacy property for simple 2D objects
   size?: number;
