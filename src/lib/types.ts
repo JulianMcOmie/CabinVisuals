@@ -1,4 +1,5 @@
 export interface MIDINote {
+  id: string;
   startBeat: number;
   duration: number;
   velocity: number;

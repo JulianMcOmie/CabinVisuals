@@ -31,6 +31,27 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
   const [dragDuration, setDragDuration] = useState(0);
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
   
+  // Ensure all notes have IDs
+  useEffect(() => {
+    // Check if any notes are missing IDs
+    const hasNotesWithoutIds = block.notes.some(note => !note.id);
+    
+    if (hasNotesWithoutIds) {
+      // Create a new block with IDs for all notes
+      const updatedBlock = { ...block };
+      updatedBlock.notes = block.notes.map(note => {
+        if (note.id) return note;
+        return {
+          ...note,
+          id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+        };
+      });
+      
+      // Update the block in the store
+      updateMidiBlock(track.id, updatedBlock);
+    }
+  }, [block, track.id, updateMidiBlock]);
+
   // Handle mouse events for note operations
   useEffect(() => {
     const handleMouseUp = () => {
@@ -38,7 +59,19 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     };
     
     const handleMouseMove = (e: MouseEvent) => {
-      if (dragOperation === 'none' || !dragNoteId || !notesContainerRef.current) return;
+      if (dragOperation === 'none' || !dragNoteId || !notesContainerRef.current) {
+        if (dragOperation === 'none') {
+          console.log('returning because dragOperation is none');
+        }
+        if (!dragNoteId) {
+          console.log('returning because dragNoteId is null');
+        }
+        if (!notesContainerRef.current) {
+          console.log('returning because notesContainerRef.current is null');
+        }
+
+        return;
+      }
       
       const containerRect = notesContainerRef.current.getBoundingClientRect();
       const deltaX = e.clientX - dragStartX;
@@ -51,10 +84,8 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
       // Create updated block with modified note
       const updatedBlock = { ...block };
       
-      // Find the note being edited
-      const noteIndex = updatedBlock.notes.findIndex(note => 
-        `note-${updatedBlock.id}-${note.startBeat}-${note.pitch}` === dragNoteId
-      );
+      // Find the note being edited using its ID
+      const noteIndex = updatedBlock.notes.findIndex(note => note.id === dragNoteId);
       
       if (noteIndex === -1) return;
       
@@ -111,10 +142,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     updateMidiBlock
   ]);
   
-  // Get the ID for a note (used for drag operations)
-  const getNoteId = (note: MIDINote): string => {
-    return `note-${block.id}-${note.startBeat}-${note.pitch}`;
-  };
+
   
   // Handle starting to drag a note
   const handleNoteMouseDown = (e: React.MouseEvent, note: MIDINote, operation: 'start' | 'end' | 'move') => {
@@ -122,14 +150,19 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     setDragOperation(operation);
     setDragStartX(e.clientX);
     setDragStartY(e.clientY);
-    setDragNoteId(getNoteId(note));
+    setDragNoteId(note.id);
     setDragStartBeat(note.startBeat);
     setDragDuration(note.duration);
   };
   
   // Add a new note on click
   const handleCanvasClick = (e: React.MouseEvent) => {
-    if (!notesContainerRef.current) return;
+    // Don't create a note if we just finished dragging
+    if (dragNoteId || !notesContainerRef.current) 
+    {
+        setDragNoteId(null);
+        return;
+    }
     
     const containerRect = notesContainerRef.current.getBoundingClientRect();
     const x = e.clientX - containerRect.left;
@@ -145,8 +178,9 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     // Ensure pitch is valid
     if (pitch < 0 || pitch > 127) return;
     
-    // Create a new note
+    // Create a new note with a unique ID
     const newNote: MIDINote = {
+      id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       startBeat: beat,
       duration: 1, // Default to 1 beat
       velocity: 100, // Default velocity
@@ -287,7 +321,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
               
               return (
                 <div 
-                  key={getNoteId(note)}
+                  key={note.id}
                   style={{
                     position: 'absolute',
                     left: `${noteX}px`,

@@ -111,7 +111,7 @@ class BasicSynthesizer extends Synthesizer {
             objects.push({
               type: 'cube',
               properties: {
-                position: [normalizedPitch, 0, 0],
+                position: [0, 0, 0],
                 rotation: [time * 0.2, time * 0.3, 0],
                 scale: [objectSize, objectSize, objectSize],
                 color: color
