@@ -1,34 +1,30 @@
 'use client';
 
 import React from 'react';
-import TrackListView from '../src/components/TrackListView';
 import TimelineView from '../src/components/TimelineView';
 import VisualizerView from '../src/components/VisualizerView';
-import TransportControls from '../src/components/TransportControls';
+import PlaybarView from '../src/components/PlaybarView';
+import DetailView from '../src/components/DetailView';
 
 export default function Home() {
   return (
     <main className="main-container">
-      <div className="app-header">
-        <h1>Visual DAW</h1>
+      <div className="playbar-container">
+        <PlaybarView />
       </div>
       
-      <div className="app-layout">
+      <div className="content-container">
         <div className="top-section">
-          <div className="track-list-container">
-            <TrackListView />
+          <div className="detail-container">
+            <DetailView />
           </div>
-          <div className="timeline-container">
-            <TimelineView />
+          <div className="visualizer-container">
+            <VisualizerView />
           </div>
-        </div>
-        
-        <div className="middle-section">
-          <TransportControls />
         </div>
         
         <div className="bottom-section">
-          <VisualizerView />
+          <TimelineView />
         </div>
       </div>
       
@@ -37,44 +33,46 @@ export default function Home() {
           display: flex;
           flex-direction: column;
           height: 100vh;
-          padding: 20px;
+          width: 100vw;
         }
         
-        .app-layout {
+        .playbar-container {
+          height: 80px;
+          width: 100%;
+          border-bottom: 1px solid #ccc;
+        }
+        
+        .content-container {
           display: flex;
           flex-direction: column;
           flex: 1;
-          gap: 20px;
+          width: 100%;
         }
         
         .top-section {
           display: flex;
-          flex: 1;
-          gap: 20px;
+          height: 50%;
+          width: 100%;
         }
         
-        .track-list-container {
-          width: 300px;
-          border: 1px solid #ccc;
-          padding: 10px;
+        .detail-container {
+          width: 30%;
+          border-right: 1px solid #ccc;
+          height: 100%;
+          overflow: auto;
         }
         
-        .timeline-container {
-          flex: 1;
-          border: 1px solid #ccc;
-          padding: 10px;
-        }
-        
-        .middle-section {
-          height: 80px;
-          border: 1px solid #ccc;
-          padding: 10px;
+        .visualizer-container {
+          width: 70%;
+          height: 100%;
+          overflow: hidden;
         }
         
         .bottom-section {
-          flex: 1;
-          border: 1px solid #ccc;
-          padding: 10px;
+          height: 50%;
+          width: 100%;
+          border-top: 1px solid #ccc;
+          overflow: auto;
         }
       `}</style>
     </main>

@@ -5,7 +5,22 @@ import useStore from '../store/store';
 
 const VisualizerView: React.FC = () => {
   const { timeManager, trackManager, currentBeat } = useStore();
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Adjust canvas to fit container
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      if (containerRef.current && canvasRef.current) {
+        canvasRef.current.width = containerRef.current.offsetWidth;
+        canvasRef.current.height = containerRef.current.offsetHeight;
+      }
+    };
+    
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    return () => window.removeEventListener('resize', updateCanvasSize);
+  }, []);
   
   // TODO: Implement animation frame for visualization
   useEffect(() => {
@@ -32,15 +47,16 @@ const VisualizerView: React.FC = () => {
   }, [currentBeat]);
   
   return (
-    <div className="visualizer-view">
+    <div className="visualizer-view" ref={containerRef} style={{ width: '100%', height: '100%' }}>
       <h2>Visualizer View</h2>
       <canvas 
         ref={canvasRef} 
-        width={800} 
-        height={600}
-        style={{ border: '1px solid #333', background: '#000' }}
+        style={{ 
+          width: '100%', 
+          height: 'calc(100% - 40px)', 
+          background: '#000' 
+        }}
       />
-      <p>TODO: Implement actual visualization of generated visual objects</p>
     </div>
   );
 };
