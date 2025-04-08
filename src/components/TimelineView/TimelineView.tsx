@@ -10,13 +10,14 @@ import { Track } from '../../lib/types';
 
 // Fixed height for each track
 const TRACK_HEIGHT = 50;
+const PIXELS_PER_BEAT = 25; // From TrackTimelineView
 
 // Color constants
 const SIDEBAR_BG_COLOR = '#1a1a1a';
 const HEADER_BG_COLOR = 'black';
 
 const TimelineView: React.FC = () => {
-  const { currentBeat, trackManager, addTrack, selectTrack } = useStore();
+  const { currentBeat, trackManager, addTrack, selectTrack, seekTo } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const [trackHeight, setTrackHeight] = useState(TRACK_HEIGHT);
 
@@ -33,8 +34,11 @@ const TimelineView: React.FC = () => {
     addTrack(newTrack);
     selectTrack(newTrack.id);
   };
+  
+  // Calculate playhead position
+  const playheadPosition = currentBeat * PIXELS_PER_BEAT + 200; // Add 200px for instrument sidebar
 
-  // Get tracks from track manager - fallback to example tracks if none exist
+  // Get tracks from track manager
   const tracks = trackManager?.getTracks() || [];
 
   return (
@@ -164,6 +168,18 @@ const TimelineView: React.FC = () => {
               </div>
             )}
           </div>
+          
+          {/* Playhead - positioned absolutely within the scrollable area */}
+          <div className="playhead" style={{
+            position: 'absolute',
+            top: '40px', // Start below the measures header
+            left: `${playheadPosition}px`,
+            width: '2px',
+            height: 'calc(100% - 40px)', // Extend full height below header
+            backgroundColor: 'red',
+            zIndex: 4, // Ensure it's above other elements
+            pointerEvents: 'none' // Make it non-interactive
+          }} />
         </div>
       </div>
       

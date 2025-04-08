@@ -78,45 +78,58 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
       
       // Get current note
       const note = { ...updatedBlock.notes[noteIndex] };
-      
+      const blockDuration = block.endBeat - block.startBeat; // Duration of the block
+
       // Update the note based on drag operation
       if (dragOperation === 'start') {
-        // For start resize, still use delta approach
+        // Calculate change based on delta
         const deltaX = e.clientX - dragStartX;
         const beatChange = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
         
-        // Resize start (don't move beyond end)
-        const newStartBeat = Math.max(
-          block.startBeat,
-          Math.min(dragStartBeat + note.duration - GRID_SNAP, dragStartBeat + beatChange)
+        // Calculate new relative start beat
+        const newRelativeStartBeat = dragStartBeat + beatChange;
+
+        // Clamp the new relative start beat (0 to current end - min duration)
+        const clampedNewRelativeStartBeat = Math.max(
+          0,
+          Math.min(dragStartBeat + note.duration - GRID_SNAP, newRelativeStartBeat)
         );
-        note.duration = note.startBeat + note.duration - newStartBeat;
-        note.startBeat = newStartBeat;
+
+        // Update relative start beat and duration
+        note.duration = (dragStartBeat + note.duration) - clampedNewRelativeStartBeat;
+        note.startBeat = clampedNewRelativeStartBeat;
+
       } else if (dragOperation === 'end') {
-        // For end resize, still use delta approach
+        // For end resize, use delta from initial relative drag state
         const deltaX = e.clientX - dragStartX;
         const beatChange = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
         
-        // Resize end (ensure minimum duration)
-        note.duration = Math.max(GRID_SNAP, dragDuration + beatChange);
-      } else if (dragOperation === 'move') {
-        // For move, use absolute cursor position
+        // Calculate new relative duration
+        const newDuration = dragDuration + beatChange;
         
-        // Calculate current mouse position relative to container
+        // Ensure minimum duration and clamp within block boundaries
+        note.duration = Math.min(blockDuration - note.startBeat, Math.max(GRID_SNAP, newDuration));
+
+      } else if (dragOperation === 'move') {
+        // For move, use absolute cursor position to find target absolute beat
         const mouseX = e.clientX - containerRect.left;
         const mouseY = e.clientY - containerRect.top;
         
-        // Convert to beat and pitch, snap to grid
-        const beat = Math.round(mouseX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
+        // Convert to absolute beat and pitch, snap to grid
+        const targetAbsoluteBeat = Math.round(mouseX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
         const pitch = KEY_COUNT - Math.round(mouseY / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
         
-        // Calculate offset from mouse position to note start (preserve the grab point)
-        const offsetBeats = dragStartBeat - (Math.round((dragStartX - containerRect.left) / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat);
-        
-        // Apply the position with constraints
+        // Calculate offset from where the drag started (using relative start beat)
+        const dragStartAbsoluteBeat = block.startBeat + dragStartBeat; 
+        const targetStartAbsoluteBeat = targetAbsoluteBeat; // In this new model, target == where mouse is
+
+        // Calculate the new relative start beat
+        const newRelativeStartBeat = targetStartAbsoluteBeat - block.startBeat;
+
+        // Apply the position with constraints (relative to block: 0 to blockDuration - noteDuration)
         note.startBeat = Math.max(
-          block.startBeat,
-          Math.min(block.endBeat - note.duration, beat + offsetBeats)
+          0, 
+          Math.min(blockDuration - note.duration, newRelativeStartBeat)
         );
         note.pitch = Math.max(0, Math.min(127, pitch));
       }
@@ -142,7 +155,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     dragStartX, 
     dragStartY, 
     dragNoteId, 
-    dragStartBeat, 
+    dragStartBeat, // Should be relative now 
     dragDuration, 
     updateMidiBlock
   ]);
@@ -156,6 +169,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     setDragStartX(e.clientX);
     setDragStartY(e.clientY);
     setDragNoteId(note.id);
+    // Store the RELATIVE start beat
     setDragStartBeat(note.startBeat);
     setDragDuration(note.duration);
   };
@@ -173,20 +187,24 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     const x = e.clientX - containerRect.left;
     const y = e.clientY - containerRect.top;
     
-    // Convert to beat and pitch
-    const beat = Math.floor(x / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
+    // Convert to absolute beat and pitch
+    const absoluteBeat = Math.floor(x / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
     const pitch = KEY_COUNT - Math.floor(y / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
     
-    // Ensure beat is within block boundaries
-    if (beat < block.startBeat || beat >= block.endBeat) return;
+    // Calculate relative beat for the note
+    const relativeBeat = absoluteBeat - block.startBeat;
+    const blockDuration = block.endBeat - block.startBeat;
+
+    // Ensure relative beat is within block boundaries [0, blockDuration)
+    if (relativeBeat < 0 || relativeBeat >= blockDuration) return;
     
     // Ensure pitch is valid
     if (pitch < 0 || pitch > 127) return;
     
-    // Create a new note with a unique ID
+    // Create a new note with a unique ID and RELATIVE startBeat
     const newNote: MIDINote = {
       id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      startBeat: beat,
+      startBeat: relativeBeat,
       duration: 1, // Default to 1 beat
       velocity: 100, // Default velocity
       pitch
@@ -205,11 +223,9 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Create updated block without the note
+    // Filter using note.id as it's the unique identifier
     const updatedBlock = { ...block };
-    updatedBlock.notes = block.notes.filter(n => 
-      n.startBeat !== note.startBeat || n.pitch !== note.pitch
-    );
+    updatedBlock.notes = block.notes.filter(n => n.id !== note.id);
     
     // Update the block in the store
     updateMidiBlock(track.id, updatedBlock);
@@ -320,7 +336,11 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
             
             {/* Render notes */}
             {block.notes.map(note => {
-              const noteX = (note.startBeat - block.startBeat) * PIXELS_PER_BEAT;
+              // Calculate absolute start beat for rendering position
+              const noteAbsoluteStartBeat = block.startBeat + note.startBeat;
+              
+              // Position calculation uses absolute start beat
+              const noteX = (noteAbsoluteStartBeat - block.startBeat) * PIXELS_PER_BEAT;
               const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
               const noteWidth = note.duration * PIXELS_PER_BEAT;
               

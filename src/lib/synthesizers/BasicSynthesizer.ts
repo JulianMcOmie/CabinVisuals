@@ -82,16 +82,25 @@ class BasicSynthesizer extends Synthesizer {
     
     // Process all MIDI blocks
     midiBlocks.forEach(block => {
-      if (time >= block.startBeat && time <= block.endBeat) {
+      // Calculate the absolute start and end beat of the block
+      const blockAbsoluteStartBeat = block.startBeat;
+      const blockAbsoluteEndBeat = block.endBeat; // Not strictly needed for note calc, but good for clarity
+
+      // Check if the current time is within the block's absolute range
+      // Note: We might need a wider check if notes can extend past block boundaries due to release
+      // For now, we'll check based on block beats, the note check handles the release time.
+      if (time >= blockAbsoluteStartBeat && time <= blockAbsoluteEndBeat + (this.adsr.release * bpm / 60)) {
+        
         // Process all notes in the block
         block.notes.forEach(note => {
-          const noteStartTime = note.startBeat;
-          const noteEndTime = note.startBeat + note.duration;
+          // Calculate absolute start and end time of the note
+          const noteAbsoluteStartBeat = blockAbsoluteStartBeat + note.startBeat;
+          const noteAbsoluteEndBeat = noteAbsoluteStartBeat + note.duration;
           
-          // Check if the current time is within the note (plus release time)
-          if (time >= noteStartTime && time <= noteEndTime + (this.adsr.release * bpm / 60)) {
-            // Calculate amplitude based on ADSR envelope
-            const amplitude = this.calculateAmplitude(time, noteStartTime, noteEndTime, bpm);
+          // Check if the current time is within the note's absolute range (plus release time)
+          if (time >= noteAbsoluteStartBeat && time <= noteAbsoluteEndBeat + (this.adsr.release * bpm / 60)) {
+            // Calculate amplitude based on ADSR envelope using absolute times
+            const amplitude = this.calculateAmplitude(time, noteAbsoluteStartBeat, noteAbsoluteEndBeat, bpm);
             
             // Skip rendering if amplitude is too low
             if (amplitude < 0.01) return;
