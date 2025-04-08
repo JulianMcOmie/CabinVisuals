@@ -6,34 +6,32 @@ import InstrumentView from './InstrumentView';
 import TrackTimelineView from './TrackTimelineView';
 import MeasuresHeader from './MeasuresHeader';
 import BasicSynthesizer from '../../lib/synthesizers/BasicSynthesizer';
+import { Track } from '../../lib/types';
 
 // Fixed height for each track
 const TRACK_HEIGHT = 50;
 
 const TimelineView: React.FC = () => {
-  const { currentBeat, trackManager, addTrack } = useStore();
+  const { currentBeat, trackManager, addTrack, selectTrack } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const [trackHeight, setTrackHeight] = useState(TRACK_HEIGHT);
 
   // Handle adding a new track
   const handleAddTrack = () => {
     const trackNumber = trackManager?.getTracks().length + 1 || 1;
-    addTrack({
+    const newTrack: Track = {
       id: `track-${Date.now()}`,
       name: `Track ${trackNumber}`,
       midiBlocks: [],
       synthesizer: new BasicSynthesizer()
-    });
+    };
+    
+    addTrack(newTrack);
+    selectTrack(newTrack.id);
   };
 
   // Get tracks from track manager - fallback to example tracks if none exist
-  const tracks = trackManager?.getTracks() || [
-    { id: 'track1', name: 'Synth Lead' },
-    { id: 'track2', name: 'Bass' },
-    { id: 'track3', name: 'Drums' },
-    { id: 'track4', name: 'Pad' },
-    { id: 'track5', name: 'FX' },
-  ];
+  const tracks = trackManager?.getTracks() || [];
 
   return (
     <div className="timeline-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -136,6 +134,17 @@ const TimelineView: React.FC = () => {
                 </div>
               </div>
             ))}
+            
+            {/* Show message when no tracks exist */}
+            {tracks.length === 0 && (
+              <div style={{
+                padding: '20px 0 0 220px',
+                color: 'white',
+                fontStyle: 'italic'
+              }}>
+                Click the + button to add a track
+              </div>
+            )}
           </div>
         </div>
       </div>

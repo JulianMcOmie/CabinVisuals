@@ -20,6 +20,9 @@ interface AppState {
   selectBlock: (blockId: string | null) => void;
   addTrack: (track: Track) => void;
   removeTrack: (trackId: string) => void;
+  addMidiBlock: (trackId: string, block: MIDIBlock) => void;
+  updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
+  removeMidiBlock: (trackId: string, blockId: string) => void;
   updateCurrentBeat: (beat: number) => void;
   play: () => void;
   pause: () => void;
@@ -62,6 +65,38 @@ const useStore = create<AppState>((set, get) => {
       const { trackManager } = get();
       trackManager.removeTrack(trackId);
       set({ trackManager });
+    },
+    
+    addMidiBlock: (trackId: string, block: MIDIBlock) => {
+      const { trackManager } = get();
+      const track = trackManager.getTrack(trackId);
+      
+      if (track) {
+        track.midiBlocks = [...track.midiBlocks, block];
+        set({ trackManager });
+      }
+    },
+    
+    updateMidiBlock: (trackId: string, updatedBlock: MIDIBlock) => {
+      const { trackManager } = get();
+      const track = trackManager.getTrack(trackId);
+      
+      if (track) {
+        track.midiBlocks = track.midiBlocks.map(block => 
+          block.id === updatedBlock.id ? updatedBlock : block
+        );
+        set({ trackManager });
+      }
+    },
+    
+    removeMidiBlock: (trackId: string, blockId: string) => {
+      const { trackManager } = get();
+      const track = trackManager.getTrack(trackId);
+      
+      if (track) {
+        track.midiBlocks = track.midiBlocks.filter(block => block.id !== blockId);
+        set({ trackManager, selectedBlockId: null });
+      }
     },
     
     updateCurrentBeat: (beat: number) => set({ currentBeat: beat }),
