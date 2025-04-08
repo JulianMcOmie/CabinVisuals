@@ -14,12 +14,8 @@ const MeasuresHeader: React.FC = () => {
       display: 'flex',
       height: '40px',
       borderBottom: '1px solid #ccc',
-      position: 'sticky',
-      top: 0,
-      left: 0,
-      right: 0,
       backgroundColor: 'black',
-      zIndex: 1
+      width: '3200px' // Match the width of the timeline content
     }}>
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
         {Array.from({ length: 8 }).map((_, i) => (
