@@ -60,16 +60,6 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     
     const handleMouseMove = (e: MouseEvent) => {
       if (dragOperation === 'none' || !dragNoteId || !notesContainerRef.current) {
-        if (dragOperation === 'none') {
-          console.log('returning because dragOperation is none');
-        }
-        if (!dragNoteId) {
-          console.log('returning because dragNoteId is null');
-        }
-        if (!notesContainerRef.current) {
-          console.log('returning because notesContainerRef.current is null');
-        }
-
         return;
       }
       

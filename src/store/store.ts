@@ -88,18 +88,39 @@ const useStore = create<AppState>((set, get) => {
     
     selectBlock: (blockId: string | null) => {
       set({ selectedBlockId: blockId });
-      
-      // Update selected block object
+
       if (blockId) {
-        const { trackManager, selectedTrackId } = get();
-        if (selectedTrackId) {
-          const track = trackManager.getTrack(selectedTrackId);
-          if (track) {
-            const block = track.midiBlocks.find(b => b.id === blockId);
-            set({ selectedBlock: block || null });
+        const { trackManager } = get();
+        const allTracks = trackManager.getTracks();
+        let foundTrack: Track | null = null;
+        let foundBlock: MIDIBlock | null = null;
+
+        for (const track of allTracks) {
+          const block = track.midiBlocks.find((b: MIDIBlock) => b.id === blockId);
+          if (block) {
+            foundTrack = track;
+            foundBlock = block;
+            break; // Stop searching once found
           }
         }
+
+        if (foundTrack && foundBlock) {
+          // Set both the selected track and block
+          set({
+            selectedTrackId: foundTrack.id,
+            selectedTrack: foundTrack,
+            selectedBlock: foundBlock
+          });
+        } else {
+          // If block not found in any track, clear selection (including track)
+          set({
+            selectedTrackId: null,
+            selectedTrack: null,
+            selectedBlock: null
+          });
+        }
       } else {
+        // If blockId is null, just clear the block selection
         set({ selectedBlock: null });
       }
     },

@@ -6,6 +6,9 @@ import MidiEditor from './MidiEditor';
 
 const DetailView: React.FC = () => {
   const { selectedTrack, selectedBlock } = useStore();
+
+  console.log('selectedBlock', selectedBlock);
+  console.log('selectedTrack', selectedTrack);
   
   return (
     <div className="detail-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
