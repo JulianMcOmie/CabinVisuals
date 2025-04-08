@@ -1,62 +1,97 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import useStore from '../store/store';
+import VisualizerManager, { VisualObject3D } from '../lib/VisualizerManager';
 
-const VisualizerView: React.FC = () => {
-  const { timeManager, trackManager, currentBeat } = useStore();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+// Initialize the visualizer manager as a singleton
+const visualizerManager = new VisualizerManager();
+
+// Component for a single visual object
+const VisualObject: React.FC<{ object: VisualObject3D }> = ({ object }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
   
-  // Adjust canvas to fit container
+  return (
+    <mesh
+      ref={meshRef}
+      position={object.position}
+      rotation={object.rotation as any}
+      scale={object.scale}
+    >
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color={object.color} />
+    </mesh>
+  );
+};
+
+// Scene component that handles animation and object rendering
+const Scene: React.FC = () => {
+  const [objects, setObjects] = useState<VisualObject3D[]>([]);
+  
+  // Update objects on each frame
+  useFrame(() => {
+    setObjects(visualizerManager.getVisualObjects());
+  });
+  
+  return (
+    <>
+      {/* Add ambient light */}
+      <ambientLight intensity={0.5} />
+      
+      {/* Add directional light */}
+      <directionalLight position={[10, 10, 5]} intensity={1} />
+      
+      {/* Render all visual objects */}
+      {objects.map(obj => (
+        <VisualObject key={obj.id} object={obj} />
+      ))}
+    </>
+  );
+};
+
+// Main VisualizerView component
+const VisualizerView: React.FC = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [beat, setBeat] = useState(0);
+  
+  // Update dimensions on resize
   useEffect(() => {
-    const updateCanvasSize = () => {
-      if (containerRef.current && canvasRef.current) {
-        canvasRef.current.width = containerRef.current.offsetWidth;
-        canvasRef.current.height = containerRef.current.offsetHeight;
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight - 40 // Account for header
+        });
       }
     };
     
-    updateCanvasSize();
-    window.addEventListener('resize', updateCanvasSize);
-    return () => window.removeEventListener('resize', updateCanvasSize);
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
   }, []);
   
-  // TODO: Implement animation frame for visualization
+  // Update the current beat from the visualizer manager
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const interval = setInterval(() => {
+      setBeat(Math.round(visualizerManager.getCurrentBeat() * 100) / 100);
+    }, 100);
     
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    // TODO: Set up frame animation for visualization
-    // TODO: Get visual objects from trackManager.getObjectsAtTime
-    // TODO: Render the objects on canvas
-    
-    // This is just a placeholder showing that the canvas works
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#333';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.fillStyle = '#fff';
-    ctx.font = '24px Arial';
-    ctx.fillText('Visualizer View', 20, 50);
-    ctx.fillText(`Current Beat: ${currentBeat}`, 20, 100);
-    
-  }, [currentBeat]);
+    return () => clearInterval(interval);
+  }, []);
   
   return (
-    <div className="visualizer-view" ref={containerRef} style={{ width: '100%', height: '100%' }}>
-      <h2>Visualizer View</h2>
-      <canvas 
-        ref={canvasRef} 
-        style={{ 
-          width: '100%', 
-          height: 'calc(100% - 40px)', 
-          background: '#000' 
-        }}
-      />
+    <div className="visualizer-view" ref={containerRef} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <h2 style={{ padding: '10px', margin: 0 }}>Visualizer View (Beat: {beat})</h2>
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        {dimensions.width > 0 && dimensions.height > 0 && (
+          <Canvas style={{ background: '#000' }}>
+            <Scene />
+          </Canvas>
+        )}
+      </div>
     </div>
   );
 };
