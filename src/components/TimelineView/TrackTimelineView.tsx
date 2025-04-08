@@ -188,8 +188,9 @@ const TrackTimelineView: React.FC<TrackTimelineViewProps> = ({ track }) => {
       className="track-timeline-view" 
       style={{
         height: '100%',
-        borderBottom: '1px solid #ccc',
-        position: 'relative'
+        borderBottom: '1px solid #333',
+        position: 'relative',
+        backgroundColor: '#222'
       }}
       onDoubleClick={handleDoubleClick}
       onContextMenu={(e) => {

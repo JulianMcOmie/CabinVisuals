@@ -2,6 +2,7 @@
 
 import React from 'react';
 import useStore from '../store/store';
+import MidiEditor from './MidiEditor';
 
 const DetailView: React.FC = () => {
   const { selectedTrackId, selectedBlockId } = useStore();
@@ -9,20 +10,19 @@ const DetailView: React.FC = () => {
   return (
     <div className="detail-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <h2 style={{ padding: '10px', margin: 0 }}>Detail View</h2>
-      <div className="detail-container" style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
-        <p>TODO: Implement synthesizer settings panel</p>
-        <p>TODO: Implement MIDI editor</p>
-        <p>TODO: Implement property controls</p>
-        {selectedTrackId && <p>Selected track: {selectedTrackId}</p>}
-        {selectedBlockId && <p>Selected block: {selectedBlockId}</p>}
-        
-        {/* Adding extra content to demonstrate scrolling */}
-        <div style={{ height: '800px' }}>
-          <p>Scroll area</p>
-          <div style={{ marginTop: '400px' }}>
-            <p>Scrolled content</p>
+      <div className="detail-container" style={{ flex: 1, overflowY: 'auto', padding: 0, backgroundColor: '#222' }}>
+        {selectedBlockId ? (
+          <MidiEditor selectedBlockId={selectedBlockId} />
+        ) : selectedTrackId ? (
+          <div style={{ padding: '20px', color: '#ddd' }}>
+            <p>Track selected: {selectedTrackId}</p>
+            <p>Select a MIDI block to edit</p>
           </div>
-        </div>
+        ) : (
+          <div style={{ padding: '20px', color: '#ddd' }}>
+            <p>Select a track or MIDI block to edit</p>
+          </div>
+        )}
       </div>
     </div>
   );

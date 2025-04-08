@@ -11,6 +11,10 @@ import { Track } from '../../lib/types';
 // Fixed height for each track
 const TRACK_HEIGHT = 50;
 
+// Color constants
+const SIDEBAR_BG_COLOR = '#1a1a1a';
+const HEADER_BG_COLOR = 'black';
+
 const TimelineView: React.FC = () => {
   const { currentBeat, trackManager, addTrack, selectTrack } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
@@ -51,9 +55,9 @@ const TimelineView: React.FC = () => {
           justifyContent: 'space-between',
           padding: '0 10px',
           fontWeight: 'bold',
-          borderBottom: '1px solid #ccc',
-          borderRight: '1px solid #ccc',
-          backgroundColor: 'black',
+          borderBottom: '1px solid #333',
+          borderRight: '1px solid #333',
+          backgroundColor: SIDEBAR_BG_COLOR,
           zIndex: 3,
           color: 'white',
           boxSizing: 'border-box'
@@ -83,16 +87,29 @@ const TimelineView: React.FC = () => {
             flex: 1, 
             overflowY: 'auto',
             overflowX: 'auto',
-            position: 'relative'
+            position: 'relative',
+            backgroundColor: '#111'
           }}
         >
+          {/* Fixed sidebar background that extends full height */}
+          <div style={{
+            position: 'absolute',
+            left: 0,
+            top: '40px', // Start below the header
+            bottom: 0,
+            width: '200px',
+            backgroundColor: SIDEBAR_BG_COLOR,
+            borderRight: '1px solid #333',
+            zIndex: 0
+          }} />
+          
           {/* Measures header - sticky at top */}
           <div style={{ 
             position: 'sticky', 
             top: 0, 
             paddingLeft: '200px', // Space for instrument column
             zIndex: 2,
-            backgroundColor: 'black'
+            backgroundColor: HEADER_BG_COLOR
           }}>
             <MeasuresHeader />
           </div>
@@ -101,7 +118,8 @@ const TimelineView: React.FC = () => {
           <div style={{ 
             width: '3200px', // Width to accommodate all measures
             minHeight: '100%',
-            paddingTop: '0' // No need for padding as header is sticky
+            paddingTop: '0', // No need for padding as header is sticky
+            position: 'relative'
           }}>
             {/* Track rows */}
             {tracks.map(track => (
@@ -121,8 +139,8 @@ const TimelineView: React.FC = () => {
                   width: '200px',
                   height: '100%',
                   zIndex: 1,
-                  backgroundColor: 'black',
-                  borderRight: '1px solid #ccc',
+                  backgroundColor: SIDEBAR_BG_COLOR,
+                  borderRight: '1px solid #333',
                   boxSizing: 'border-box'
                 }}>
                   <InstrumentView track={track} />
@@ -150,11 +168,11 @@ const TimelineView: React.FC = () => {
       </div>
       
       {/* Current beat indicator */}
-      <div style={{ padding: '5px 10px', borderTop: '1px solid #ccc' }}>
+      <div style={{ padding: '5px 10px', borderTop: '1px solid #333', backgroundColor: '#111', color: 'white' }}>
         Current beat: {currentBeat}
       </div>
     </div>
   );
 };
 
-export default TimelineView; 
+export default TimelineView;

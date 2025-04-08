@@ -9,10 +9,10 @@ const InstrumentView: React.FC<InstrumentViewProps> = ({ track }) => {
     <div className="instrument-view" style={{
       padding: '0 10px',
       height: '100%',
-      borderBottom: '1px solid #ccc',
+      borderBottom: '1px solid #333',
       display: 'flex',
       alignItems: 'center',
-      color: 'white'
+      color: '#ddd'
     }}>
       <div>{track.name || 'Untitled Track'}</div>
     </div>
