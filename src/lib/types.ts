@@ -13,8 +13,17 @@ export interface MIDIBlock {
 }
 
 export interface VisualObjectProperties {
-  size: number;
+  // Basic properties
   color: string;
+  
+  // Legacy property for simple 2D objects
+  size?: number;
+  
+  // 3D properties
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+  
   // Expandable with more properties later
 }
 

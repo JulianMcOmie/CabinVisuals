@@ -50,10 +50,10 @@ const VisualObject: React.FC<{ object: VisualObject3D }> = ({ object }) => {
 
 // Main VisualizerView component
 const VisualizerView: React.FC = () => {
-  const { timeManager, currentBeat } = useStore();
+  const { timeManager, trackManager, currentBeat } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [visualizerManager] = useState(() => new VisualizerManager(timeManager));
+  const [visualizerManager] = useState(() => new VisualizerManager(timeManager, trackManager));
   
   // Update dimensions on resize
   useEffect(() => {
