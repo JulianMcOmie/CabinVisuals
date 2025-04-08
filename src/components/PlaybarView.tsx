@@ -7,19 +7,21 @@ const PlaybarView: React.FC = () => {
   const { play, pause, stop, currentBeat } = useStore();
   
   return (
-    <div className="playbar-view">
-      <h2>Playbar</h2>
-      <div className="controls-container">
+    <div className="playbar-view" style={{ height: '100%', padding: '0 15px', display: 'flex', alignItems: 'center' }}>
+      <h2 style={{ marginRight: '20px' }}>Playbar</h2>
+      <div className="controls-container" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
         <button onClick={play}>Play</button>
         <button onClick={pause}>Pause</button>
         <button onClick={stop}>Stop</button>
         <div>
           <label>Current Beat: {currentBeat}</label>
         </div>
-        <p>TODO: Implement BPM control</p>
-        <p>TODO: Implement time signature control</p>
-        <p>TODO: Implement loop control</p>
-        <p>TODO: Implement seek bar</p>
+        <div style={{ display: 'flex', gap: '15px' }}>
+          <p style={{ margin: 0 }}>TODO: BPM</p>
+          <p style={{ margin: 0 }}>TODO: Time Sig</p>
+          <p style={{ margin: 0 }}>TODO: Loop</p>
+          <p style={{ margin: 0 }}>TODO: Seek</p>
+        </div>
       </div>
     </div>
   );

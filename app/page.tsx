@@ -34,12 +34,15 @@ export default function Home() {
           flex-direction: column;
           height: 100vh;
           width: 100vw;
+          position: fixed;
+          overflow: hidden;
         }
         
         .playbar-container {
           height: 80px;
           width: 100%;
           border-bottom: 1px solid #ccc;
+          flex: 0 0 80px;
         }
         
         .content-container {
@@ -47,24 +50,29 @@ export default function Home() {
           flex-direction: column;
           flex: 1;
           width: 100%;
+          overflow: hidden;
         }
         
         .top-section {
           display: flex;
           height: 50%;
           width: 100%;
+          flex: 1 0 50%;
+          overflow: hidden;
         }
         
         .detail-container {
-          width: 30%;
+          width: 50%;
           border-right: 1px solid #ccc;
           height: 100%;
-          overflow: auto;
+          flex: 0 0 50%;
+          overflow: hidden;
         }
         
         .visualizer-container {
-          width: 70%;
+          width: 50%;
           height: 100%;
+          flex: 0 0 50%;
           overflow: hidden;
         }
         
@@ -72,7 +80,8 @@ export default function Home() {
           height: 50%;
           width: 100%;
           border-top: 1px solid #ccc;
-          overflow: auto;
+          flex: 1 0 50%;
+          overflow: hidden;
         }
       `}</style>
     </main>
