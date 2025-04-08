@@ -2,12 +2,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import useStore from '../../store/store';
-import { MIDIBlock, MIDINote } from '../../lib/types';
+import { MIDIBlock, MIDINote, Track } from '../../lib/types';
 import PianoRollHeader from './PianoRollHeader';
 import PianoKeys from './PianoKeys';
 
 interface MidiEditorProps {
-  selectedBlockId: string;
+  block: MIDIBlock;
+  track: Track;
 }
 
 // Constants
@@ -17,14 +18,10 @@ const GRID_SNAP = 0.25; // Snap to 1/4 beat
 const KEY_COUNT = 88; // 88 piano keys (A0 to C8)
 const LOWEST_NOTE = 21; // A0 MIDI note number
 
-const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
-  const { trackManager, updateMidiBlock } = useStore();
+const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
+  const { updateMidiBlock } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const notesContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Find the selected block and its parent track
-  const [selectedTrack, setSelectedTrack] = useState<any>(null);
-  const [selectedBlock, setSelectedBlock] = useState<MIDIBlock | null>(null);
   
   // State for note operations
   const [dragOperation, setDragOperation] = useState<'none' | 'start' | 'end' | 'move'>('none');
@@ -34,29 +31,8 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
   const [dragDuration, setDragDuration] = useState(0);
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
   
-  // Find the selected block and its parent track
-  useEffect(() => {
-    if (!selectedBlockId) return;
-    
-    const tracks = trackManager.getTracks();
-    for (const track of tracks) {
-      const block = track.midiBlocks.find(block => block.id === selectedBlockId);
-      if (block) {
-        setSelectedTrack(track);
-        setSelectedBlock(block);
-        return;
-      }
-    }
-    
-    // Reset if block not found
-    setSelectedTrack(null);
-    setSelectedBlock(null);
-  }, [selectedBlockId, trackManager]);
-  
   // Handle mouse events for note operations
   useEffect(() => {
-    if (!selectedBlock || !selectedTrack) return;
-    
     const handleMouseUp = () => {
       setDragOperation('none');
     };
@@ -73,7 +49,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
       const pitchChange = Math.round(deltaY / PIXELS_PER_SEMITONE) * -1; // Invert Y direction
       
       // Create updated block with modified note
-      const updatedBlock = { ...selectedBlock };
+      const updatedBlock = { ...block };
       
       // Find the note being edited
       const noteIndex = updatedBlock.notes.findIndex(note => 
@@ -92,7 +68,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
       if (dragOperation === 'start') {
         // Resize start (don't move beyond end)
         const newStartBeat = Math.max(
-          selectedBlock.startBeat,
+          block.startBeat,
           Math.min(dragStartBeat + note.duration - GRID_SNAP, dragStartBeat + beatChange)
         );
         note.duration = note.startBeat + note.duration - newStartBeat;
@@ -103,8 +79,8 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
       } else if (dragOperation === 'move') {
         // Move note (constrain within block boundaries)
         note.startBeat = Math.max(
-          selectedBlock.startBeat,
-          Math.min(selectedBlock.endBeat - note.duration, dragStartBeat + beatChange)
+          block.startBeat,
+          Math.min(block.endBeat - note.duration, dragStartBeat + beatChange)
         );
         note.pitch = Math.max(0, Math.min(127, note.pitch + pitchChange));
       }
@@ -113,7 +89,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
       updatedBlock.notes[noteIndex] = note;
       
       // Update the block in the store
-      updateMidiBlock(selectedTrack.id, updatedBlock);
+      updateMidiBlock(track.id, updatedBlock);
     };
     
     window.addEventListener('mouseup', handleMouseUp);
@@ -124,8 +100,8 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
       window.removeEventListener('mousemove', handleMouseMove);
     };
   }, [
-    selectedBlock, 
-    selectedTrack, 
+    block, 
+    track,
     dragOperation, 
     dragStartX, 
     dragStartY, 
@@ -137,7 +113,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
   
   // Get the ID for a note (used for drag operations)
   const getNoteId = (note: MIDINote): string => {
-    return `note-${selectedBlock?.id}-${note.startBeat}-${note.pitch}`;
+    return `note-${block.id}-${note.startBeat}-${note.pitch}`;
   };
   
   // Handle starting to drag a note
@@ -153,18 +129,18 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
   
   // Add a new note on click
   const handleCanvasClick = (e: React.MouseEvent) => {
-    if (!selectedBlock || !selectedTrack || !notesContainerRef.current) return;
+    if (!notesContainerRef.current) return;
     
     const containerRect = notesContainerRef.current.getBoundingClientRect();
     const x = e.clientX - containerRect.left;
     const y = e.clientY - containerRect.top;
     
     // Convert to beat and pitch
-    const beat = Math.floor(x / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + selectedBlock.startBeat;
+    const beat = Math.floor(x / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
     const pitch = KEY_COUNT - Math.floor(y / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
     
     // Ensure beat is within block boundaries
-    if (beat < selectedBlock.startBeat || beat >= selectedBlock.endBeat) return;
+    if (beat < block.startBeat || beat >= block.endBeat) return;
     
     // Ensure pitch is valid
     if (pitch < 0 || pitch > 127) return;
@@ -178,11 +154,11 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
     };
     
     // Create updated block with new note
-    const updatedBlock = { ...selectedBlock };
-    updatedBlock.notes = [...updatedBlock.notes, newNote];
+    const updatedBlock = { ...block };
+    updatedBlock.notes = [...block.notes, newNote];
     
     // Update the block in the store
-    updateMidiBlock(selectedTrack.id, updatedBlock);
+    updateMidiBlock(track.id, updatedBlock);
   };
   
   // Delete a note on right click
@@ -190,29 +166,18 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
     e.preventDefault();
     e.stopPropagation();
     
-    if (!selectedBlock || !selectedTrack) return;
-    
     // Create updated block without the note
-    const updatedBlock = { ...selectedBlock };
-    updatedBlock.notes = selectedBlock.notes.filter(n => 
+    const updatedBlock = { ...block };
+    updatedBlock.notes = block.notes.filter(n => 
       n.startBeat !== note.startBeat || n.pitch !== note.pitch
     );
     
     // Update the block in the store
-    updateMidiBlock(selectedTrack.id, updatedBlock);
+    updateMidiBlock(track.id, updatedBlock);
   };
 
-  // If no block is selected, show a message
-  if (!selectedBlock || !selectedTrack) {
-    return (
-      <div className="midi-editor" style={{ padding: '20px' }}>
-        <p>Select a MIDI block to edit</p>
-      </div>
-    );
-  }
-
   // Calculate dimensions based on block and key count
-  const blockDuration = selectedBlock.endBeat - selectedBlock.startBeat;
+  const blockDuration = block.endBeat - block.startBeat;
   const editorWidth = blockDuration * PIXELS_PER_BEAT;
   const editorHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
 
@@ -230,7 +195,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
       }}
     >
       <h3 style={{ margin: '0', padding: '10px' }}>
-        MIDI Editor - {selectedTrack.name} - Block {selectedBlock.startBeat} to {selectedBlock.endBeat}
+        MIDI Editor - {track.name} - Block {block.startBeat} to {block.endBeat}
       </h3>
       
       <div style={{ 
@@ -268,8 +233,8 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
             borderBottom: '1px solid #333'
           }}>
             <PianoRollHeader 
-              startBeat={selectedBlock.startBeat} 
-              endBeat={selectedBlock.endBeat} 
+              startBeat={block.startBeat} 
+              endBeat={block.endBeat} 
               pixelsPerBeat={PIXELS_PER_BEAT} 
             />
           </div>
@@ -315,8 +280,8 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ selectedBlockId }) => {
             ))}
             
             {/* Render notes */}
-            {selectedBlock.notes.map(note => {
-              const noteX = (note.startBeat - selectedBlock.startBeat) * PIXELS_PER_BEAT;
+            {block.notes.map(note => {
+              const noteX = (note.startBeat - block.startBeat) * PIXELS_PER_BEAT;
               const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
               const noteWidth = note.duration * PIXELS_PER_BEAT;
               

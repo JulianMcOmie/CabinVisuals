@@ -14,6 +14,8 @@ interface AppState {
   trackManager: TrackManager;
   selectedTrackId: string | null;
   selectedBlockId: string | null;
+  selectedTrack: Track | null;
+  selectedBlock: MIDIBlock | null;
   
   // Actions
   selectTrack: (trackId: string | null) => void;
@@ -40,6 +42,24 @@ const useStore = create<AppState>((set, get) => {
     set({ currentBeat: beat });
   });
 
+  // Helper function to find track and block by IDs
+  const findSelectedItems = () => {
+    const { trackManager, selectedTrackId, selectedBlockId } = get();
+    
+    let selectedTrack: Track | null = null;
+    let selectedBlock: MIDIBlock | null = null;
+    
+    if (selectedTrackId) {
+      selectedTrack = trackManager.getTrack(selectedTrackId) || null;
+      
+      if (selectedTrack && selectedBlockId) {
+        selectedBlock = selectedTrack.midiBlocks.find(block => block.id === selectedBlockId) || null;
+      }
+    }
+    
+    return { selectedTrack, selectedBlock };
+  };
+
   return {
     // Initial state
     timeManager,
@@ -49,22 +69,69 @@ const useStore = create<AppState>((set, get) => {
     trackManager: new TrackManager(),
     selectedTrackId: null,
     selectedBlockId: null,
+    selectedTrack: null,
+    selectedBlock: null,
     
     // Actions
-    selectTrack: (trackId: string | null) => set({ selectedTrackId: trackId }),
+    selectTrack: (trackId: string | null) => {
+      set({ selectedTrackId: trackId, selectedBlockId: null });
+      
+      // Update selected track object
+      if (trackId) {
+        const { trackManager } = get();
+        const track = trackManager.getTrack(trackId);
+        set({ selectedTrack: track || null, selectedBlock: null });
+      } else {
+        set({ selectedTrack: null, selectedBlock: null });
+      }
+    },
     
-    selectBlock: (blockId: string | null) => set({ selectedBlockId: blockId }),
+    selectBlock: (blockId: string | null) => {
+      set({ selectedBlockId: blockId });
+      
+      // Update selected block object
+      if (blockId) {
+        const { trackManager, selectedTrackId } = get();
+        if (selectedTrackId) {
+          const track = trackManager.getTrack(selectedTrackId);
+          if (track) {
+            const block = track.midiBlocks.find(b => b.id === blockId);
+            set({ selectedBlock: block || null });
+          }
+        }
+      } else {
+        set({ selectedBlock: null });
+      }
+    },
     
     addTrack: (track: Track) => {
       const { trackManager } = get();
       trackManager.addTrack(track);
-      set({ trackManager });
+      set({ 
+        trackManager,
+        ...findSelectedItems() // Update selected items
+      });
     },
     
     removeTrack: (trackId: string) => {
-      const { trackManager } = get();
+      const { trackManager, selectedTrackId } = get();
       trackManager.removeTrack(trackId);
-      set({ trackManager });
+      
+      // Reset selection if the selected track was removed
+      if (selectedTrackId === trackId) {
+        set({ 
+          trackManager,
+          selectedTrackId: null,
+          selectedBlockId: null,
+          selectedTrack: null,
+          selectedBlock: null
+        });
+      } else {
+        set({ 
+          trackManager,
+          ...findSelectedItems() // Update selected items
+        });
+      }
     },
     
     addMidiBlock: (trackId: string, block: MIDIBlock) => {
@@ -73,29 +140,57 @@ const useStore = create<AppState>((set, get) => {
       
       if (track) {
         track.midiBlocks = [...track.midiBlocks, block];
-        set({ trackManager });
+        set({ 
+          trackManager,
+          ...findSelectedItems() // Update selected items
+        });
       }
     },
     
     updateMidiBlock: (trackId: string, updatedBlock: MIDIBlock) => {
-      const { trackManager } = get();
+      const { trackManager, selectedBlockId } = get();
       const track = trackManager.getTrack(trackId);
       
       if (track) {
         track.midiBlocks = track.midiBlocks.map(block => 
           block.id === updatedBlock.id ? updatedBlock : block
         );
-        set({ trackManager });
+        
+        // If the updated block is currently selected, update the selectedBlock
+        if (selectedBlockId === updatedBlock.id) {
+          set({ 
+            trackManager,
+            selectedBlock: updatedBlock
+          });
+        } else {
+          set({ 
+            trackManager,
+            ...findSelectedItems() // Update selected items
+          });
+        }
       }
     },
     
     removeMidiBlock: (trackId: string, blockId: string) => {
-      const { trackManager } = get();
+      const { trackManager, selectedBlockId } = get();
       const track = trackManager.getTrack(trackId);
       
       if (track) {
         track.midiBlocks = track.midiBlocks.filter(block => block.id !== blockId);
-        set({ trackManager, selectedBlockId: null });
+        
+        // If the removed block was selected, clear the selection
+        if (selectedBlockId === blockId) {
+          set({ 
+            trackManager,
+            selectedBlockId: null,
+            selectedBlock: null
+          });
+        } else {
+          set({ 
+            trackManager,
+            ...findSelectedItems() // Update selected items
+          });
+        }
       }
     },
     

@@ -5,17 +5,17 @@ import useStore from '../store/store';
 import MidiEditor from './MidiEditor';
 
 const DetailView: React.FC = () => {
-  const { selectedTrackId, selectedBlockId } = useStore();
+  const { selectedTrack, selectedBlock } = useStore();
   
   return (
     <div className="detail-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <h2 style={{ padding: '10px', margin: 0 }}>Detail View</h2>
       <div className="detail-container" style={{ flex: 1, overflowY: 'auto', padding: 0, backgroundColor: '#222' }}>
-        {selectedBlockId ? (
-          <MidiEditor selectedBlockId={selectedBlockId} />
-        ) : selectedTrackId ? (
+        {selectedBlock && selectedTrack ? (
+          <MidiEditor block={selectedBlock} track={selectedTrack} />
+        ) : selectedTrack ? (
           <div style={{ padding: '20px', color: '#ddd' }}>
-            <p>Track selected: {selectedTrackId}</p>
+            <p>Track selected: {selectedTrack.name}</p>
             <p>Select a MIDI block to edit</p>
           </div>
         ) : (
