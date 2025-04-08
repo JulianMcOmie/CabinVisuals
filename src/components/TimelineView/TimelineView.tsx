@@ -5,9 +5,10 @@ import useStore from '../../store/store';
 import InstrumentView from './InstrumentView';
 import TrackTimelineView from './TrackTimelineView';
 import MeasuresHeader from './MeasuresHeader';
+import BasicSynthesizer from '../../lib/synthesizers/BasicSynthesizer';
 
 const TimelineView: React.FC = () => {
-  const { currentBeat, trackManager } = useStore();
+  const { currentBeat, trackManager, addTrack } = useStore();
   const trackListRef = useRef<HTMLDivElement>(null);
   const timelineContentRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +40,17 @@ const TimelineView: React.FC = () => {
     };
   }, []);
 
+  // Handle adding a new track
+  const handleAddTrack = () => {
+    const trackNumber = trackManager?.getTracks().length + 1 || 1;
+    addTrack({
+      id: `track-${Date.now()}`,
+      name: `Track ${trackNumber}`,
+      midiBlocks: [],
+      synthesizer: new BasicSynthesizer()
+    });
+  };
+
   // Get tracks from track manager - fallback to example tracks if none exist
   const tracks = trackManager?.getTracks() || [
     { id: 'track1', name: 'Synth Lead' },
@@ -68,11 +80,25 @@ const TimelineView: React.FC = () => {
             height: '40px',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
             padding: '0 10px',
             fontWeight: 'bold',
             borderBottom: '1px solid #ccc'
           }}>
-            Tracks
+            <span>Tracks</span>
+            <button 
+              onClick={handleAddTrack}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '20px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+              title="Add new track"
+            >
+              +
+            </button>
           </div>
           
           {/* Track list - vertically scrollable */}
