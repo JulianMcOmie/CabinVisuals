@@ -74,12 +74,6 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
       }
       
       const containerRect = notesContainerRef.current.getBoundingClientRect();
-      const deltaX = e.clientX - dragStartX;
-      const deltaY = e.clientY - dragStartY;
-      
-      // Calculate beat and pitch changes
-      const beatChange = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
-      const pitchChange = Math.round(deltaY / PIXELS_PER_SEMITONE) * -1; // Invert Y direction
       
       // Create updated block with modified note
       const updatedBlock = { ...block };
@@ -97,6 +91,10 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
       
       // Update the note based on drag operation
       if (dragOperation === 'start') {
+        // For start resize, still use delta approach
+        const deltaX = e.clientX - dragStartX;
+        const beatChange = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
+        
         // Resize start (don't move beyond end)
         const newStartBeat = Math.max(
           block.startBeat,
@@ -105,15 +103,32 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
         note.duration = note.startBeat + note.duration - newStartBeat;
         note.startBeat = newStartBeat;
       } else if (dragOperation === 'end') {
+        // For end resize, still use delta approach
+        const deltaX = e.clientX - dragStartX;
+        const beatChange = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
+        
         // Resize end (ensure minimum duration)
         note.duration = Math.max(GRID_SNAP, dragDuration + beatChange);
       } else if (dragOperation === 'move') {
-        // Move note (constrain within block boundaries)
+        // For move, use absolute cursor position
+        
+        // Calculate current mouse position relative to container
+        const mouseX = e.clientX - containerRect.left;
+        const mouseY = e.clientY - containerRect.top;
+        
+        // Convert to beat and pitch, snap to grid
+        const beat = Math.round(mouseX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
+        const pitch = KEY_COUNT - Math.round(mouseY / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
+        
+        // Calculate offset from mouse position to note start (preserve the grab point)
+        const offsetBeats = dragStartBeat - (Math.round((dragStartX - containerRect.left) / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat);
+        
+        // Apply the position with constraints
         note.startBeat = Math.max(
           block.startBeat,
-          Math.min(block.endBeat - note.duration, dragStartBeat + beatChange)
+          Math.min(block.endBeat - note.duration, beat + offsetBeats)
         );
-        note.pitch = Math.max(0, Math.min(127, note.pitch + pitchChange));
+        note.pitch = Math.max(0, Math.min(127, pitch));
       }
       
       // Update the note in the block
