@@ -211,7 +211,7 @@ const PlaybarView: React.FC = () => {
       padding: '0 15px', 
       display: 'flex', 
       alignItems: 'center',
-      backgroundColor: '#f5f5f5',
+      backgroundColor: 'gray',
       boxShadow: '0 1px 3px rgba(0,0,0,0.12)'
     }}>
       <div style={{ 

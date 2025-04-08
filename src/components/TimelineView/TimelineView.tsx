@@ -1,44 +1,19 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import useStore from '../../store/store';
 import InstrumentView from './InstrumentView';
 import TrackTimelineView from './TrackTimelineView';
 import MeasuresHeader from './MeasuresHeader';
 import BasicSynthesizer from '../../lib/synthesizers/BasicSynthesizer';
 
+// Fixed height for each track
+const TRACK_HEIGHT = 50;
+
 const TimelineView: React.FC = () => {
   const { currentBeat, trackManager, addTrack } = useStore();
-  const trackListRef = useRef<HTMLDivElement>(null);
   const timelineContentRef = useRef<HTMLDivElement>(null);
-
-  // Synchronize vertical scrolling between track list and timeline content
-  useEffect(() => {
-    const trackListElement = trackListRef.current;
-    const timelineContentElement = timelineContentRef.current;
-    
-    if (!trackListElement || !timelineContentElement) return;
-    
-    const handleTrackListScroll = () => {
-      if (timelineContentElement.scrollTop !== trackListElement.scrollTop) {
-        timelineContentElement.scrollTop = trackListElement.scrollTop;
-      }
-    };
-    
-    const handleTimelineScroll = () => {
-      if (trackListElement.scrollTop !== timelineContentElement.scrollTop) {
-        trackListElement.scrollTop = timelineContentElement.scrollTop;
-      }
-    };
-    
-    trackListElement.addEventListener('scroll', handleTrackListScroll);
-    timelineContentElement.addEventListener('scroll', handleTimelineScroll);
-    
-    return () => {
-      trackListElement.removeEventListener('scroll', handleTrackListScroll);
-      timelineContentElement.removeEventListener('scroll', handleTimelineScroll);
-    };
-  }, []);
+  const [trackHeight, setTrackHeight] = useState(TRACK_HEIGHT);
 
   // Handle adding a new track
   const handleAddTrack = () => {
@@ -62,84 +37,110 @@ const TimelineView: React.FC = () => {
 
   return (
     <div className="timeline-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Timeline container */}
       <div className="timeline-container" style={{ 
         display: 'flex', 
         flex: 1, 
         overflow: 'hidden'
       }}>
-        {/* Track headers column - fixed during horizontal scrolling */}
-        <div className="tracks-column" style={{ 
-          width: '200px', 
+        {/* Tracks header - fixed at top-left */}
+        <div style={{
+          position: 'absolute',
+          width: '200px',
+          height: '40px',
           display: 'flex',
-          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 10px',
+          fontWeight: 'bold',
+          borderBottom: '1px solid #ccc',
           borderRight: '1px solid #ccc',
-          overflow: 'hidden'
+          backgroundColor: 'black',
+          zIndex: 3,
+          color: 'white',
+          boxSizing: 'border-box'
         }}>
-          {/* "Tracks" header */}
-          <div className="tracks-header" style={{
-            height: '40px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 10px',
-            fontWeight: 'bold',
-            borderBottom: '1px solid #ccc'
-          }}>
-            <span>Tracks</span>
-            <button 
-              onClick={handleAddTrack}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '20px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-              title="Add new track"
-            >
-              +
-            </button>
-          </div>
-          
-          {/* Track list - vertically scrollable */}
-          <div 
-            ref={trackListRef}
-            className="track-list" 
+          <span>Tracks</span>
+          <button 
+            onClick={handleAddTrack}
             style={{
-              flex: 1,
-              overflowY: 'auto',
-              overflowX: 'hidden'
+              background: 'none',
+              border: 'none',
+              fontSize: '20px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              color: 'white'
             }}
+            title="Add new track"
           >
-            {tracks.map(track => (
-              <InstrumentView key={track.id} track={track} />
-            ))}
-          </div>
+            +
+          </button>
         </div>
         
-        {/* Timeline content - horizontally and vertically scrollable */}
+        {/* Main scrollable area */}
         <div 
           ref={timelineContentRef}
           className="timeline-content" 
           style={{ 
             flex: 1, 
             overflowY: 'auto',
-            overflowX: 'auto'
+            overflowX: 'auto',
+            position: 'relative'
           }}
         >
-          {/* Measures header */}
-          <MeasuresHeader />
+          {/* Measures header - sticky at top */}
+          <div style={{ 
+            position: 'sticky', 
+            top: 0, 
+            paddingLeft: '200px', // Space for instrument column
+            zIndex: 2,
+            backgroundColor: 'black'
+          }}>
+            <MeasuresHeader />
+          </div>
           
-          {/* Track timelines */}
-          <div style={{ width: '3200px' }}> {/* Width to accommodate all measures */}
+          {/* Track content area */}
+          <div style={{ 
+            width: '3200px', // Width to accommodate all measures
+            minHeight: '100%',
+            paddingTop: '0' // No need for padding as header is sticky
+          }}>
+            {/* Track rows */}
             {tracks.map(track => (
-              <TrackTimelineView key={track.id} track={track} />
+              <div 
+                key={track.id} 
+                className="track-row"
+                style={{ 
+                  height: `${trackHeight}px`,
+                  position: 'relative',
+                  display: 'flex'
+                }}
+              >
+                {/* Instrument view - sticky at left */}
+                <div style={{
+                  position: 'sticky',
+                  left: 0,
+                  width: '200px',
+                  height: '100%',
+                  zIndex: 1,
+                  backgroundColor: 'black',
+                  borderRight: '1px solid #ccc',
+                  boxSizing: 'border-box'
+                }}>
+                  <InstrumentView track={track} />
+                </div>
+                
+                {/* Timeline view for the track */}
+                <div style={{ flex: 1 }}>
+                  <TrackTimelineView track={track} />
+                </div>
+              </div>
             ))}
           </div>
         </div>
       </div>
       
-      {/* Current beat indicator (optional) */}
+      {/* Current beat indicator */}
       <div style={{ padding: '5px 10px', borderTop: '1px solid #ccc' }}>
         Current beat: {currentBeat}
       </div>

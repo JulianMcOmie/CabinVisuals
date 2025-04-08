@@ -15,7 +15,7 @@ const MeasuresHeader: React.FC = () => {
       height: '40px',
       borderBottom: '1px solid #ccc',
       backgroundColor: 'black',
-      width: '3200px' // Match the width of the timeline content
+      width: '3000px' // Width to accommodate all measures, minus the 200px for instruments
     }}>
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
         {Array.from({ length: 8 }).map((_, i) => (
