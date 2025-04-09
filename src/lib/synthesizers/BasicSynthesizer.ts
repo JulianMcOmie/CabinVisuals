@@ -95,6 +95,10 @@ class BasicSynthesizer extends Synthesizer {
     const objects: VisualObject[] = [];
     const secondsPerBeat = 60 / bpm;
     
+    // Define the desired vertical range (e.g., -5 to +5)
+    const yRange = 1;
+    const yMin = -5;
+
     // Process all MIDI blocks
     midiBlocks.forEach(block => {
       const blockAbsoluteStartBeat = block.startBeat;
@@ -120,19 +124,27 @@ class BasicSynthesizer extends Synthesizer {
             
             // --- Visual Property Calculations --- 
 
-            // Y position based on sine wave within the note's duration
-            const timeSinceNoteStartBeats = time - noteAbsoluteStartBeat;
-            const progressWithinNote = noteDurationBeats > 0 ? Math.max(0, Math.min(1, timeSinceNoteStartBeats / noteDurationBeats)) : 0;
-            const yPosition = Math.sin(progressWithinNote * Math.PI) * 2; // Oscillates between 0 and 2
+            // X position remains 0 or could be based on something else
+            const xPosition = 0;
 
-            // Pitch mapping (remains the same)
-            const normalizedPitch = ((note.pitch - 60) / 24) * 5;
+            // Y position mapped from MIDI pitch (0-127) to yMin to yMin + yRange
+            const pitchFraction = note.pitch % 12;
+            const yPosition = yMin + pitchFraction * yRange;
+
+            console.log('ypos: ', yPosition);
+            // Scale calculation - Use pitch for height as before, but use base size for X/Z
+            const noteMod12 = note.pitch % 12;
+            const heightFactor = 0.5 + (noteMod12 / 11) * 1.0; // Factor based on note within octave (0.5 to 1.5)
+            const baseObjectSize = this.baseSize * (note.velocity / 127) * amplitude;
             
-            // Size based on base size, velocity, and amplitude
-            const objectSize = this.baseSize * (note.velocity / 127) * amplitude; // Use 127 for velocity max
+            const objectScale: [number, number, number] = [
+                baseObjectSize, // Keep X size based on velocity/amplitude
+                baseObjectSize * heightFactor, // Y scale (height) influenced by note within octave
+                baseObjectSize // Keep Z size based on velocity/amplitude
+            ];
             
-            // Color based on pitch and Y position influence
-            const color = this.pitchAndYToColor(note.pitch, yPosition / 2); // Normalize yInfluence to 0-1
+            // Color based on pitch only
+            const color = this.pitchAndYToColor(note.pitch, 0); // Pass 0 for yInfluence
 
             // Opacity based on amplitude
             const opacity = amplitude;
@@ -141,11 +153,11 @@ class BasicSynthesizer extends Synthesizer {
             objects.push({
               type: 'cube',
               properties: {
-                position: [0, yPosition, 0], // Map pitch to X, sine wave to Y
+                position: [0, yPosition, 0], // Static X, pitch-based Y
                 rotation: [0, 0, 0], // No rotation
-                scale: [objectSize, objectSize, objectSize],
+                scale: objectScale, // Use the calculated scale
                 color: color,
-                opacity: opacity // Added opacity
+                opacity: opacity
               }
             });
           }
