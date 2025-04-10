@@ -17,13 +17,8 @@ const Scene: React.FC<{ visualizerManager: VisualizerManager }> = ({ visualizerM
   
   return (
     <>
-      {/* Add ambient light */}
       <ambientLight intensity={0.5} />
-      
-      {/* Add directional light */}
       <directionalLight position={[10, 10, 5]} intensity={1} />
-      
-      {/* Render all visual objects */}
       {objects.map(obj => (
         <VisualObject key={obj.id} object={obj} />
       ))}
