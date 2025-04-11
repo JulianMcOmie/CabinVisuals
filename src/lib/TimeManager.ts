@@ -19,22 +19,18 @@ class TimeManager {
     };
   }
 
-  // Get the current BPM
   getBPM(): number {
     return this.bpm;
   }
 
-  // Set the BPM
   setBPM(bpm: number): void {
     this.bpm = bpm;
   }
 
-  // Get the current beat
   getCurrentBeat(): number {
     return this.currentBeat;
   }
 
-  // Start playback
   play(): void {
     if (this.isPlaying) return;
     
@@ -43,26 +39,22 @@ class TimeManager {
     this.startAnimationLoop();
   }
 
-  // Pause playback
   pause(): void {
     this.isPlaying = false;
     this.stopAnimationLoop();
   }
 
-  // Stop playback and reset position
   stop(): void {
     this.isPlaying = false;
     this.stopAnimationLoop();
     this.seekTo(0);
   }
 
-  // Seek to a specific beat
   seekTo(beat: number): void {
     this.currentBeat = beat;
     this.notifyUpdateCallbacks();
   }
 
-  // Check if playing
   isPlaybackActive(): boolean {
     return this.isPlaying;
   }

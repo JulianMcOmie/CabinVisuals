@@ -16,7 +16,7 @@ const PIXELS_PER_BEAT = 25; // From TrackTimelineView
 const SIDEBAR_BG_COLOR = '#1a1a1a';
 const HEADER_BG_COLOR = 'black';
 
-const TimelineView: React.FC = () => {
+function TimelineView() {
   const { currentBeat, trackManager, addTrack, selectTrack, seekTo } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const [trackHeight, setTrackHeight] = useState(TRACK_HEIGHT);
@@ -189,6 +189,6 @@ const TimelineView: React.FC = () => {
       </div>
     </div>
   );
-};
+}
 
 export default TimelineView;

@@ -7,7 +7,7 @@ import useStore from '../store/store';
 import VisualizerManager, { VisualObject3D } from '../lib/VisualizerManager';
 
 // Scene component that handles animation and object rendering
-const Scene: React.FC<{ visualizerManager: VisualizerManager }> = ({ visualizerManager }) => {
+function Scene({ visualizerManager }: { visualizerManager: VisualizerManager }) {
   const [objects, setObjects] = useState<VisualObject3D[]>([]);
   
   // Update objects on each frame
@@ -24,10 +24,10 @@ const Scene: React.FC<{ visualizerManager: VisualizerManager }> = ({ visualizerM
       ))}
     </>
   );
-};
+}
 
 // Component for a single visual object
-const VisualObject: React.FC<{ object: VisualObject3D }> = ({ object }) => {
+function VisualObject({ object }: { object: VisualObject3D }) {
   const meshRef = useRef<THREE.Mesh>(null);
   
   return (
@@ -41,10 +41,10 @@ const VisualObject: React.FC<{ object: VisualObject3D }> = ({ object }) => {
       <meshStandardMaterial color={object.color} />
     </mesh>
   );
-};
+}
 
 // Main VisualizerView component
-const VisualizerView: React.FC = () => {
+function VisualizerView() {
   const { timeManager, trackManager, currentBeat } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -78,6 +78,6 @@ const VisualizerView: React.FC = () => {
       </div>
     </div>
   );
-};
+}
 
 export default VisualizerView; 

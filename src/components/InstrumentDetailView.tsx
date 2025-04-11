@@ -16,7 +16,7 @@ const synthesizerOptions: { [key: string]: { class: new () => Synthesizer, name:
   drum: { class: DrumSynthesizer, name: 'Drum Synth' }
 };
 
-const InstrumentDetailView: React.FC<InstrumentDetailViewProps> = ({ track }) => {
+function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
   // Need a way to update the track's synthesizer in the store
   // Let's assume an updateTrack action exists or add it later.
   // For now, we'll just log the selection.
@@ -72,6 +72,6 @@ const InstrumentDetailView: React.FC<InstrumentDetailViewProps> = ({ track }) =>
       {/* Add more instrument-specific controls here later */}
     </div>
   );
-};
+}
 
 export default InstrumentDetailView;

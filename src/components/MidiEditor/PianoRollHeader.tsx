@@ -6,11 +6,11 @@ interface PianoRollHeaderProps {
   pixelsPerBeat: number;
 }
 
-const PianoRollHeader: React.FC<PianoRollHeaderProps> = ({ 
+function PianoRollHeader({ 
   startBeat, 
   endBeat, 
   pixelsPerBeat 
-}) => {
+}: PianoRollHeaderProps) {
   const duration = endBeat - startBeat;
   
   return (
@@ -68,6 +68,6 @@ const PianoRollHeader: React.FC<PianoRollHeaderProps> = ({
       })}
     </div>
   );
-};
+}
 
 export default PianoRollHeader; 

@@ -18,7 +18,7 @@ const GRID_SNAP = 0.25; // Snap to 1/4 beat
 const KEY_COUNT = 88; // 88 piano keys (A0 to C8)
 const LOWEST_NOTE = 21; // A0 MIDI note number
 
-const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
+function MidiEditor({ block, track }: MidiEditorProps) {
   const { updateMidiBlock } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const notesContainerRef = useRef<HTMLDivElement>(null);
@@ -365,6 +365,6 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
       </div>
     </div>
   );
-};
+}
 
 export default MidiEditor; 

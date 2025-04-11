@@ -1,7 +1,7 @@
 import React from 'react';
 import useStore from '../../store/store';
 
-const MeasuresHeader: React.FC = () => {
+function MeasuresHeader() {
   const { seekTo } = useStore();
 
   const handleMeasureClick = (measure: number) => {
@@ -47,6 +47,6 @@ const MeasuresHeader: React.FC = () => {
       </div>
     </div>
   );
-};
+}
 
 export default MeasuresHeader; 

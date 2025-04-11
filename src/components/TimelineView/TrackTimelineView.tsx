@@ -11,7 +11,7 @@ interface TrackTimelineViewProps {
 const PIXELS_PER_BEAT = 25; // 25px per beat
 const GRID_SNAP = 0.25; // Snap to 1/4 beat
 
-const TrackTimelineView: React.FC<TrackTimelineViewProps> = ({ track }) => {
+function TrackTimelineView({ track }: TrackTimelineViewProps) {
   const { selectedBlockId, selectBlock, addMidiBlock, updateMidiBlock, removeMidiBlock } = useStore();
   const trackRef = useRef<HTMLDivElement>(null);
   
@@ -271,6 +271,6 @@ const TrackTimelineView: React.FC<TrackTimelineViewProps> = ({ track }) => {
       )}
     </div>
   );
-};
+}
 
 export default TrackTimelineView; 

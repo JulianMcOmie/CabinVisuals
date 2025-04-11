@@ -6,7 +6,7 @@ interface InstrumentViewProps {
   track: Track;
 }
 
-const InstrumentView: React.FC<InstrumentViewProps> = ({ track }) => {
+function InstrumentView({ track }: InstrumentViewProps) {
   const { selectTrack, selectedTrackId } = useStore();
 
   const isSelected = track.id === selectedTrackId;
@@ -34,6 +34,6 @@ const InstrumentView: React.FC<InstrumentViewProps> = ({ track }) => {
       <div>{track.name || 'Untitled Track'}</div>
     </div>
   );
-};
+}
 
 export default InstrumentView; 

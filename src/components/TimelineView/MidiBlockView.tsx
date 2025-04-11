@@ -11,7 +11,7 @@ interface MidiBlockViewProps {
   onMoveBlock: (blockId: string, clientX: number) => void;
 }
 
-const MidiBlockView: React.FC<MidiBlockViewProps> = ({
+function MidiBlockView({
   block,
   isSelected,
   pixelsPerBeat,
@@ -19,7 +19,7 @@ const MidiBlockView: React.FC<MidiBlockViewProps> = ({
   onStartEdge,
   onEndEdge,
   onMoveBlock
-}) => {
+}: MidiBlockViewProps) {
   // Calculate position and width based on start/end beats
   const leftPosition = block.startBeat * pixelsPerBeat;
   const width = (block.endBeat - block.startBeat) * pixelsPerBeat;
@@ -109,6 +109,6 @@ const MidiBlockView: React.FC<MidiBlockViewProps> = ({
       />
     </div>
   );
-};
+}
 
 export default MidiBlockView; 

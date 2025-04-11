@@ -5,7 +5,7 @@ import useStore from '../store/store';
 import MidiEditor from './MidiEditor';
 import InstrumentDetailView from './InstrumentDetailView';
 
-const DetailView: React.FC = () => {
+function DetailView() {
   const { selectedTrack, selectedBlock } = useStore();
   
   return (
@@ -24,6 +24,6 @@ const DetailView: React.FC = () => {
       </div>
     </div>
   );
-};
+}
 
 export default DetailView; 

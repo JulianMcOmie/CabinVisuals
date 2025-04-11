@@ -12,7 +12,7 @@ const LOWEST_NOTE = 21; // A0 MIDI note number
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const WHITE_KEYS = [0, 2, 4, 5, 7, 9, 11]; // Indices of white keys (C, D, E, F, G, A, B)
 
-const PianoKeys: React.FC<PianoKeysProps> = ({ keyCount, keyHeight }) => {
+function PianoKeys({ keyCount, keyHeight }: PianoKeysProps) {
   const keys = [];
 
   for (let i = 0; i < keyCount; i++) {
@@ -56,6 +56,6 @@ const PianoKeys: React.FC<PianoKeysProps> = ({ keyCount, keyHeight }) => {
       {keys}
     </div>
   );
-};
+}
 
 export default PianoKeys; 

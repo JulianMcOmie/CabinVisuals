@@ -33,10 +33,9 @@ interface AppState {
   seekTo: (beat: number) => void;
 }
 
-// Create a single instance of TimeManager to be used throughout the app
-const timeManager = new TimeManager(120);
-
 const useStore = create<AppState>((set, get) => {
+  const timeManager = new TimeManager(120);
+
   // Set up beat update subscription
   timeManager.onUpdate((beat) => {
     set({ currentBeat: beat });
@@ -173,9 +172,11 @@ const useStore = create<AppState>((set, get) => {
       const track = trackManager.getTrack(trackId);
       
       if (track) {
-        track.midiBlocks = track.midiBlocks.map(block => 
-          block.id === updatedBlock.id ? updatedBlock : block
-        );
+        for (let i = 0; i < track.midiBlocks.length; i++) {
+          if (track.midiBlocks[i].id === updatedBlock.id) {
+            track.midiBlocks[i] = updatedBlock;
+          }
+        }
         
         // If the updated block is currently selected, update the selectedBlock
         if (selectedBlockId === updatedBlock.id) {
