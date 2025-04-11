@@ -25,32 +25,10 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
   
   // State for note operations
   const [dragOperation, setDragOperation] = useState<'none' | 'start' | 'end' | 'move'>('none');
-  const [dragStartX, setDragStartX] = useState(0);
-  const [dragStartY, setDragStartY] = useState(0);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragStartBeat, setDragStartBeat] = useState(0);
   const [dragDuration, setDragDuration] = useState(0);
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
-  
-  // Ensure all notes have IDs
-  useEffect(() => {
-    // Check if any notes are missing IDs
-    const hasNotesWithoutIds = block.notes.some(note => !note.id);
-    
-    if (hasNotesWithoutIds) {
-      // Create a new block with IDs for all notes
-      const updatedBlock = { ...block };
-      updatedBlock.notes = block.notes.map(note => {
-        if (note.id) return note;
-        return {
-          ...note,
-          id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-        };
-      });
-      
-      // Update the block in the store
-      updateMidiBlock(track.id, updatedBlock);
-    }
-  }, [block, track.id, updateMidiBlock]);
 
   // Handle mouse events for note operations
   useEffect(() => {
@@ -66,25 +44,19 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
       
       const containerRect = notesContainerRef.current.getBoundingClientRect();
       
-      // Create updated block with modified note
-      const updatedBlock = { ...block };
-      
       // Find the note being edited using its ID
-      const noteIndex = updatedBlock.notes.findIndex(note => note.id === dragNoteId);
+      const noteIndex = block.notes.findIndex(note => note.id === dragNoteId);
       
       if (noteIndex === -1) return;
       
-      // Create a copy of the notes array
-      updatedBlock.notes = [...updatedBlock.notes];
-      
       // Get current note
-      const note = { ...updatedBlock.notes[noteIndex] };
+      const note = { ...block.notes[noteIndex] };
       const blockDuration = block.endBeat - block.startBeat; // Duration of the block
 
       // Update the note based on drag operation
       if (dragOperation === 'start') {
         // Calculate change based on delta
-        const deltaX = e.clientX - dragStartX;
+        const deltaX = e.clientX - dragStart.x;
         const beatChange = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
         
         // Calculate new relative start beat
@@ -102,7 +74,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
 
       } else if (dragOperation === 'end') {
         // For end resize, use delta from initial relative drag state
-        const deltaX = e.clientX - dragStartX;
+        const deltaX = e.clientX - dragStart.x;
         const beatChange = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
         
         // Calculate new relative duration
@@ -136,9 +108,8 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
       }
       
       // Update the note in the block
+      const updatedBlock = { ...block };
       updatedBlock.notes[noteIndex] = note;
-      
-      // Update the block in the store
       updateMidiBlock(track.id, updatedBlock);
     };
     
@@ -153,8 +124,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
     block, 
     track,
     dragOperation, 
-    dragStartX, 
-    dragStartY, 
+    dragStart, 
     dragNoteId, 
     dragStartBeat, // Should be relative now 
     dragDuration, 
@@ -167,8 +137,7 @@ const MidiEditor: React.FC<MidiEditorProps> = ({ block, track }) => {
   const handleNoteMouseDown = (e: React.MouseEvent, note: MIDINote, operation: 'start' | 'end' | 'move') => {
     e.stopPropagation();
     setDragOperation(operation);
-    setDragStartX(e.clientX);
-    setDragStartY(e.clientY);
+    setDragStart({ x: e.clientX, y: e.clientY });
     setDragNoteId(note.id);
     // Store the RELATIVE start beat
     setDragStartBeat(note.startBeat);
