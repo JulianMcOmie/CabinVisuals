@@ -22,6 +22,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const { updateMidiBlock } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const notesContainerRef = useRef<HTMLDivElement>(null);
+  const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   
   // State for note operations
   const [dragOperation, setDragOperation] = useState<'none' | 'start' | 'end' | 'move'>('none');
@@ -29,6 +30,72 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [dragStartBeat, setDragStartBeat] = useState(0);
   const [dragDuration, setDragDuration] = useState(0);
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
+
+  // Calculate dimensions based on block and key count
+  const blockDuration = block.endBeat - block.startBeat;
+  const editorWidth = blockDuration * PIXELS_PER_BEAT;
+  const editorHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
+
+  // Draw grid lines on canvas
+  useEffect(() => {
+    const canvas = gridCanvasRef.current;
+    if (!canvas) return;
+    
+    // Set canvas dimensions (considering device pixel ratio for sharpness)
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = editorWidth * dpr;
+    canvas.height = editorHeight * dpr;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Scale all drawing operations by dpr
+    ctx.scale(dpr, dpr);
+    
+    // Clear the canvas
+    ctx.clearRect(0, 0, editorWidth, editorHeight);
+    
+    // Draw horizontal lines (pitch)
+    for (let i = 0; i <= KEY_COUNT; i++) {
+      const y = i * PIXELS_PER_SEMITONE;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(editorWidth, y);
+      
+      // Check if this is an octave line (every 12th line)
+      if (i % 12 === 0) {
+        ctx.strokeStyle = '#666'; // Stronger color for octaves
+        ctx.lineWidth = 1;
+      } else {
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 0.5;
+      }
+      
+      ctx.stroke();
+    }
+    
+    // Draw vertical lines (beats)
+    for (let i = 0; i <= Math.ceil(blockDuration / GRID_SNAP); i++) {
+      const x = i * GRID_SNAP * PIXELS_PER_BEAT;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, editorHeight);
+      
+      // Different styles for different beat divisions
+      if (i % (4/GRID_SNAP) === 0) {
+        ctx.strokeStyle = '#666'; // Measure lines
+        ctx.lineWidth = 1;
+      } else if (i % (1/GRID_SNAP) === 0) {
+        ctx.strokeStyle = '#444'; // Beat lines
+        ctx.lineWidth = 0.5;
+      } else {
+        ctx.strokeStyle = '#333'; // Grid lines
+        ctx.lineWidth = 0.5;
+      }
+      
+      ctx.stroke();
+    }
+  }, [blockDuration, editorWidth, editorHeight]);
 
   // Handle mouse events for note operations
   useEffect(() => {
@@ -201,11 +268,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     updateMidiBlock(track.id, updatedBlock);
   };
 
-  // Calculate dimensions based on block and key count
-  const blockDuration = block.endBeat - block.startBeat;
-  const editorWidth = blockDuration * PIXELS_PER_BEAT;
-  const editorHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
-
   return (
     <div 
       ref={editorRef}
@@ -276,33 +338,18 @@ function MidiEditor({ block, track }: MidiEditorProps) {
             onClick={handleCanvasClick}
             onContextMenu={(e) => e.preventDefault()}
           >
-            {/* Grid lines */}
-            {/* Horizontal lines (pitch) */}
-            {Array.from({ length: KEY_COUNT + 1 }).map((_, i) => (
-              <div key={`h-${i}`} style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: `${i * PIXELS_PER_SEMITONE}px`,
-                height: '1px',
-                backgroundColor: i % 12 === 0 ? '#666' : '#333' // Highlight octaves
-              }} />
-            ))}
-            
-            {/* Vertical lines (beats) */}
-            {Array.from({ length: Math.ceil(blockDuration / GRID_SNAP) + 1 }).map((_, i) => (
-              <div key={`v-${i}`} style={{
+            {/* Grid canvas */}
+            <canvas
+              ref={gridCanvasRef}
+              style={{
                 position: 'absolute',
                 top: 0,
-                bottom: 0,
-                left: `${i * GRID_SNAP * PIXELS_PER_BEAT}px`,
-                width: '1px',
-                backgroundColor: 
-                  i % (4/GRID_SNAP) === 0 ? '#666' :  // Measure lines
-                  i % (1/GRID_SNAP) === 0 ? '#444' :  // Beat lines
-                  '#333'                              // Grid lines
-              }} />
-            ))}
+                left: 0,
+                width: `${editorWidth}px`,
+                height: `${editorHeight}px`,
+                pointerEvents: 'none'
+              }}
+            />
             
             {/* Render notes */}
             {block.notes.map(note => {
