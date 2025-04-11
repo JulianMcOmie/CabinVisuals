@@ -30,6 +30,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [dragStartBeat, setDragStartBeat] = useState(0);
   const [dragDuration, setDragDuration] = useState(0);
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
+  const [clickOffset, setClickOffset] = useState({ x: 0, y: 0 });
 
   // Calculate dimensions based on block and key count
   const blockDuration = block.endBeat - block.startBeat;
@@ -155,16 +156,16 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         const mouseX = e.clientX - containerRect.left;
         const mouseY = e.clientY - containerRect.top;
         
-        // Convert to absolute beat and pitch, snap to grid
-        const targetAbsoluteBeat = Math.round(mouseX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
-        const pitch = KEY_COUNT - Math.round(mouseY / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
+        // Adjust for the click offset within the note
+        const adjustedMouseX = mouseX - clickOffset.x;
+        const adjustedMouseY = mouseY - clickOffset.y;
         
-        // Calculate offset from where the drag started (using relative start beat)
-        const dragStartAbsoluteBeat = block.startBeat + dragStartBeat; 
-        const targetStartAbsoluteBeat = targetAbsoluteBeat; // In this new model, target == where mouse is
-
+        // Convert to absolute beat and pitch, snap to grid
+        const targetAbsoluteBeat = Math.round((adjustedMouseX) / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
+        const pitch = KEY_COUNT - Math.round((adjustedMouseY) / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
+        
         // Calculate the new relative start beat
-        const newRelativeStartBeat = targetStartAbsoluteBeat - block.startBeat;
+        const newRelativeStartBeat = targetAbsoluteBeat - block.startBeat;
 
         // Apply the position with constraints (relative to block: 0 to blockDuration - noteDuration)
         note.startBeat = Math.max(
@@ -195,7 +196,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     dragNoteId, 
     dragStartBeat, // Should be relative now 
     dragDuration, 
-    updateMidiBlock
+    updateMidiBlock,
+    clickOffset
   ]);
   
 
@@ -209,6 +211,18 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     // Store the RELATIVE start beat
     setDragStartBeat(note.startBeat);
     setDragDuration(note.duration);
+    
+    if (operation === 'move' && notesContainerRef.current) {
+      // Calculate offset from the note's top-left corner
+      const containerRect = notesContainerRef.current.getBoundingClientRect();
+      const noteX = note.startBeat * PIXELS_PER_BEAT;
+      const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
+      
+      const clickX = e.clientX - containerRect.left - noteX;
+      const clickY = e.clientY - containerRect.top - noteY;
+      
+      setClickOffset({ x: clickX, y: clickY });
+    }
   };
   
   // Add a new note on click
