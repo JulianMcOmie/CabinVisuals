@@ -100,9 +100,64 @@ function MidiEditor({ block, track }: MidiEditorProps) {
 
   // Handle mouse events for note operations
   useEffect(() => {
-    const handleMouseUp = () => {
-      setDragNoteId(null);
-      setDragOperation('none');
+    const handleMouseUp = (e: MouseEvent) => {
+      //setDragNoteId(null);
+      //setDragOperation('none');
+
+      // Don't create a note if we just finished dragging
+    if (dragNoteId || !notesContainerRef.current) 
+    {
+        setDragNoteId(null);
+        setDragOperation('none');
+        return;
+    }
+    
+    const containerRect = notesContainerRef.current.getBoundingClientRect();
+    const x = e.clientX - containerRect.left;
+    const y = e.clientY - containerRect.top;
+    
+    // Convert to absolute beat and pitch
+    const absoluteBeat = Math.floor(x / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
+    const pitch = KEY_COUNT - Math.floor(y / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
+    
+    // Calculate relative beat for the note
+    const relativeBeat = absoluteBeat - block.startBeat;
+    const blockDuration = block.endBeat - block.startBeat;
+
+    // Ensure relative beat is within block boundaries [0, blockDuration)
+    if (relativeBeat < 0 || relativeBeat >= blockDuration) return;
+    
+    // Ensure pitch is valid
+    if (pitch < 0 || pitch > 127) return;
+    
+    // Create a new note with a unique ID and RELATIVE startBeat
+    const newNote: MIDINote = {
+      id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      startBeat: relativeBeat,
+      duration: 1, // Default to 1 beat
+      velocity: 100, // Default velocity
+      pitch
+    };
+    
+    // Create updated block with new note
+    const updatedBlock = { ...block };
+    updatedBlock.notes = [...block.notes, newNote];
+    
+    // Update the block in the store
+    updateMidiBlock(track.id, updatedBlock);
+  };
+  
+  // Delete a note on right click
+  const handleNoteRightClick = (e: React.MouseEvent, note: MIDINote) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Filter using note.id as it's the unique identifier
+    const updatedBlock = { ...block };
+    updatedBlock.notes = block.notes.filter(n => n.id !== note.id);
+    
+    // Update the block in the store
+    updateMidiBlock(track.id, updatedBlock);
     };
     
     const handleMouseMove = (e: MouseEvent) => {
@@ -225,49 +280,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     }
   };
   
-  // Add a new note on click
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    // Don't create a note if we just finished dragging
-    if (dragNoteId || !notesContainerRef.current) 
-    {
-        setDragNoteId(null);
-        return;
-    }
-    
-    const containerRect = notesContainerRef.current.getBoundingClientRect();
-    const x = e.clientX - containerRect.left;
-    const y = e.clientY - containerRect.top;
-    
-    // Convert to absolute beat and pitch
-    const absoluteBeat = Math.floor(x / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP + block.startBeat;
-    const pitch = KEY_COUNT - Math.floor(y / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
-    
-    // Calculate relative beat for the note
-    const relativeBeat = absoluteBeat - block.startBeat;
-    const blockDuration = block.endBeat - block.startBeat;
 
-    // Ensure relative beat is within block boundaries [0, blockDuration)
-    if (relativeBeat < 0 || relativeBeat >= blockDuration) return;
-    
-    // Ensure pitch is valid
-    if (pitch < 0 || pitch > 127) return;
-    
-    // Create a new note with a unique ID and RELATIVE startBeat
-    const newNote: MIDINote = {
-      id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      startBeat: relativeBeat,
-      duration: 1, // Default to 1 beat
-      velocity: 100, // Default velocity
-      pitch
-    };
-    
-    // Create updated block with new note
-    const updatedBlock = { ...block };
-    updatedBlock.notes = [...block.notes, newNote];
-    
-    // Update the block in the store
-    updateMidiBlock(track.id, updatedBlock);
-  };
   
   // Delete a note on right click
   const handleNoteRightClick = (e: React.MouseEvent, note: MIDINote) => {
@@ -349,7 +362,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
               height: `${editorHeight}px`,
               backgroundColor: '#2a2a2a'
             }}
-            onClick={handleCanvasClick}
             onContextMenu={(e) => e.preventDefault()}
           >
             {/* Grid canvas */}

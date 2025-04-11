@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@react-three/fiber": "^9.1.2",
+    "@tonejs/midi": "^2.0.28",
     "@types/three": "^0.175.0",
     "next": "15.2.4",
     "react": "^19.0.0",
