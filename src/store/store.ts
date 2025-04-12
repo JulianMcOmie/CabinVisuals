@@ -22,6 +22,7 @@ interface AppState {
   selectBlock: (blockId: string | null) => void;
   addTrack: (track: Track) => void;
   removeTrack: (trackId: string) => void;
+  updateTrack: (track: Track) => void;
   addMidiBlock: (trackId: string, block: MIDIBlock) => void;
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
   removeMidiBlock: (trackId: string, blockId: string) => void;
@@ -151,6 +152,31 @@ const useStore = create<AppState>((set, get) => {
           trackManager,
           ...findSelectedItems() // Update selected items
         });
+      }
+    },
+    
+    updateTrack: (updatedTrack: Track) => {
+      const { trackManager, selectedTrackId } = get();
+      
+      // Find track index
+      const tracks = trackManager.getTracks();
+      const trackIndex = tracks.findIndex(track => track.id === updatedTrack.id);
+      
+      if (trackIndex !== -1) {
+        // Update the track in the trackManager
+        tracks[trackIndex] = updatedTrack;
+        
+        // If this is the currently selected track, update it in state
+        if (selectedTrackId === updatedTrack.id) {
+          set({
+            trackManager,
+            selectedTrack: updatedTrack
+          });
+        } else {
+          set({
+            trackManager
+          });
+        }
       }
     },
     

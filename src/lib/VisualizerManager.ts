@@ -10,6 +10,15 @@ export interface VisualObject3D {
   rotation: [number, number, number];
   scale: [number, number, number];
   color: string;
+  opacity?: number;
+  // Custom properties for fractals
+  fractalType?: string;
+  vertices?: any[];
+  complexity?: number;
+  // Custom properties for triangle fractals
+  trianglePositions?: [number, number, number][];
+  triangleSize?: number;
+  triangleCount?: number;
 }
 
 class VisualizerManager {
@@ -53,7 +62,16 @@ class VisualizerManager {
         position,
         rotation,
         scale,
-        color: props.color
+        color: props.color,
+        opacity: props.opacity,
+        // Pass through custom fractal properties
+        fractalType: props.fractalType,
+        vertices: props.vertices,
+        complexity: props.complexity,
+        // Pass through triangle fractal properties
+        trianglePositions: props.trianglePositions,
+        triangleSize: props.triangleSize,
+        triangleCount: props.triangleCount
       });
     });
     

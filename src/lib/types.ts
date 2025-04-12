@@ -26,6 +26,16 @@ export interface VisualObjectProperties {
   rotation?: [number, number, number];
   scale?: [number, number, number];
   
+  // Custom properties for fractal rendering
+  fractalType?: string;
+  vertices?: any[];
+  complexity?: number;
+  
+  // Custom properties for triangle fractals
+  trianglePositions?: [number, number, number][];
+  triangleSize?: number;
+  triangleCount?: number;
+  
   // Expandable with more properties later
 }
 

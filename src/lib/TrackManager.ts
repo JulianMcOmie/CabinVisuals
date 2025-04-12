@@ -26,6 +26,13 @@ class TrackManager {
     return this.tracks.find(track => track.id === trackId);
   }
 
+  updateTrack(updatedTrack: Track): void {
+    const index = this.tracks.findIndex(track => track.id === updatedTrack.id);
+    if (index !== -1) {
+      this.tracks[index] = updatedTrack;
+    }
+  }
+
   getObjectsAtTime(time: number, bpm: number): VisualObject[] {
     // TODO: Implement logic to get all visual objects from all tracks at the current time
     let objects: VisualObject[] = [];

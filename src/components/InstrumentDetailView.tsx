@@ -5,6 +5,7 @@ import useStore from '../store/store';
 import { Track, Synthesizer } from '../lib/types';
 import BasicSynthesizer from '../lib/synthesizers/BasicSynthesizer';
 import DrumSynthesizer from '../lib/synthesizers/DrumSynthesizer';
+import FractalSynth from '../lib/synthesizers/FractalSynth';
 
 interface InstrumentDetailViewProps {
   track: Track;
@@ -13,14 +14,13 @@ interface InstrumentDetailViewProps {
 // Map synthesizer types to their classes and display names
 const synthesizerOptions: { [key: string]: { class: new () => Synthesizer, name: string } } = {
   basic: { class: BasicSynthesizer, name: 'Basic Synth' },
-  drum: { class: DrumSynthesizer, name: 'Drum Synth' }
+  drum: { class: DrumSynthesizer, name: 'Drum Synth' },
+  fractal: { class: FractalSynth, name: '▲ Triangle Fractal ▲' }
 };
 
 function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
-  // Need a way to update the track's synthesizer in the store
-  // Let's assume an updateTrack action exists or add it later.
-  // For now, we'll just log the selection.
-  // const { updateTrack } = useStore(); 
+  // Use the updateTrack function from the store
+  const { updateTrack } = useStore();
 
   const handleSynthesizerChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedSynthKey = event.target.value;
@@ -31,11 +31,9 @@ function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
       // Create a new instance of the selected synthesizer
       const newSynthesizer = new selectedOption.class();
       
-      // --- TODO: Update track in store --- 
-      // This requires an `updateTrack` action in zustand store
-      // const updatedTrack = { ...track, synthesizer: newSynthesizer };
-      // updateTrack(updatedTrack);
-      alert(`Synthesizer changed to ${selectedOption.name}. Store update needed.`); // Placeholder
+      // Update track in store
+      const updatedTrack = { ...track, synthesizer: newSynthesizer };
+      updateTrack(updatedTrack);
     }
   };
 
