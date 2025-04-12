@@ -10,6 +10,7 @@ export interface VisualObject3D {
   rotation: [number, number, number];
   scale: [number, number, number];
   color: string;
+  opacity: number;
 }
 
 class VisualizerManager {
@@ -34,10 +35,12 @@ class VisualizerManager {
     trackObjects.forEach((obj, index) => {
       const props = obj.properties;
       
-      // Default values for 3D properties if not provided
-      const position: [number, number, number] = props.position || [0, 0, 0];
-      const rotation: [number, number, number] = props.rotation || [0, 0, 0];
-      const scale: [number, number, number] = props.scale || [1, 1, 1];
+      // Extract properties, providing defaults
+      const position: [number, number, number] = props.position ?? [0, 0, 0];
+      const rotation: [number, number, number] = props.rotation ?? [0, 0, 0];
+      const scale: [number, number, number] = props.scale ?? [1, 1, 1];
+      const color: string = props.color ?? '#ffffff'; // Default color white
+      const opacity: number = props.opacity ?? 1.0; // Default opacity 1
       
       // Handle legacy objects that only have size
       if (props.size !== undefined && !props.scale) {
@@ -48,23 +51,15 @@ class VisualizerManager {
       }
       
       objects.push({
-        id: `obj-${index}-${time.toFixed(2)}`,
+        id: `obj-${obj.type}-${index}`,
         type: obj.type,
         position,
         rotation,
         scale,
-        color: props.color
+        color,
+        opacity
       });
     });
-    
-    // objects.push({
-    //   id: 'cube-1',
-    //   type: 'cube',
-    //   position: [0, 0, 0],
-    //   rotation: [time * 0.5, time, 0],
-    //   scale: [cubeSize, cubeSize, cubeSize],
-    //   color: colorHex
-    // });
     
     return objects;
   }

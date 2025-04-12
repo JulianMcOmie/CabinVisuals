@@ -37,8 +37,15 @@ function VisualObject({ object }: { object: VisualObject3D }) {
       rotation={object.rotation as any}
       scale={object.scale}
     >
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color={object.color} />
+      {/* Conditionally render geometry based on type */}
+      {object.type === 'sphere' ? (
+        <sphereGeometry args={[0.5, 32, 32]} /> // Radius 0.5 for base sphere
+      ) : (
+        <boxGeometry args={[1, 1, 1]} /> // Default to cube
+      )}
+      <meshStandardMaterial 
+        color={object.color} 
+      />
     </mesh>
   );
 }

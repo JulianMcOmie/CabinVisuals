@@ -12,27 +12,30 @@ class TrackManager {
   }
 
   addTrack(track: Track): void {
-    // TODO: Implement track addition logic
     this.tracks.push(track);
   }
 
   removeTrack(trackId: string): void {
-    // TODO: Implement track removal logic
     this.tracks = this.tracks.filter(track => track.id !== trackId);
   }
 
   getTrack(trackId: string): Track | undefined {
-    // TODO: Implement track retrieval logic
     return this.tracks.find(track => track.id === trackId);
   }
 
+  updateTrack(trackId: string, updatedProperties: Partial<Track>): void {
+    const track = this.getTrack(trackId);
+    if (track) {
+      Object.assign(track, updatedProperties);
+    }
+  }
+
   getObjectsAtTime(time: number, bpm: number): VisualObject[] {
-    // TODO: Implement logic to get all visual objects from all tracks at the current time
     let objects: VisualObject[] = [];
     
     // Collect visual objects from all tracks
     this.tracks.forEach(track => {
-      // Call each track's synthesizer to get visual objects
+      // Get visual objects from each track's synthesizer
       const trackObjects = track.synthesizer.getObjectsAtTime(time, track.midiBlocks, bpm);
       objects = [...objects, ...trackObjects];
     });

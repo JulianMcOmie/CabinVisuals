@@ -17,25 +17,15 @@ const synthesizerOptions: { [key: string]: { class: new () => Synthesizer, name:
 };
 
 function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
-  // Need a way to update the track's synthesizer in the store
-  // Let's assume an updateTrack action exists or add it later.
-  // For now, we'll just log the selection.
-  // const { updateTrack } = useStore(); 
+  const { updateTrack } = useStore(); 
 
   const handleSynthesizerChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedSynthKey = event.target.value;
     const selectedOption = synthesizerOptions[selectedSynthKey];
 
     if (selectedOption && track) {
-      console.log(`Track ${track.id}: Changing synthesizer to ${selectedOption.name}`);
-      // Create a new instance of the selected synthesizer
       const newSynthesizer = new selectedOption.class();
-      
-      // --- TODO: Update track in store --- 
-      // This requires an `updateTrack` action in zustand store
-      // const updatedTrack = { ...track, synthesizer: newSynthesizer };
-      // updateTrack(updatedTrack);
-      alert(`Synthesizer changed to ${selectedOption.name}. Store update needed.`); // Placeholder
+      updateTrack(track.id, { synthesizer: newSynthesizer });
     }
   };
 

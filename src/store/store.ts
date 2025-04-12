@@ -26,6 +26,7 @@ interface AppState {
   addMidiBlock: (trackId: string, block: MIDIBlock) => void;
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
   removeMidiBlock: (trackId: string, blockId: string) => void;
+  updateTrack: (trackId: string, updatedProperties: Partial<Track>) => void;
   updateCurrentBeat: (beat: number) => void;
   play: () => void;
   pause: () => void;
@@ -216,6 +217,15 @@ const useStore = create<AppState>((set, get) => {
           });
         }
       }
+    },
+    
+    updateTrack: (trackId: string, updatedProperties: Partial<Track>) => {
+      const { trackManager, selectedTrackId } = get();
+      trackManager.updateTrack(trackId, updatedProperties);
+      set({ 
+        trackManager: trackManager,
+        ...findSelectedItems() // Update selected items
+      });
     },
     
     updateCurrentBeat: (beat: number) => set({ currentBeat: beat }),
