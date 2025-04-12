@@ -7,6 +7,7 @@ interface AppState {
   // Time-related state
   timeManager: TimeManager;
   currentBeat: number;
+  numMeasures: number;
   isPlaying: boolean;
   bpm: number;
   
@@ -63,6 +64,7 @@ const useStore = create<AppState>((set, get) => {
     // Initial state
     timeManager,
     currentBeat: 0,
+    numMeasures: timeManager.getNumMeasures(),
     isPlaying: false,
     bpm: 120,
     trackManager: new TrackManager(),
