@@ -1,29 +1,38 @@
 import Synthesizer from '../Synthesizer';
 import { MIDIBlock, VisualObject } from '../types';
+import { Property } from '../properties/Property';
 
-// ADSR envelope parameters
-interface ADSREnvelope {
-  attack: number;  // seconds
-  decay: number;   // seconds
-  sustain: number; // level (0-1)
-  release: number; // seconds
-}
+// ADSR envelope parameters are now managed by properties
+// interface ADSREnvelope { ... } // No longer needed here
 
 class BasicSynthesizer extends Synthesizer {
-  private baseSize: number = 2; // Increased base size
-  private adsr: ADSREnvelope;
+  // No need for private members like baseSize, adsr anymore
+  // private baseSize: number = 2;
+  // private adsr: ADSREnvelope;
 
-  constructor(baseSize: number = 2) { // Updated default baseSize
+  constructor() {
     super();
-    this.baseSize = baseSize;
-    
-    // Modified ADSR for a springier feel
-    this.adsr = {
-      attack: 0.05,  // Faster attack
-      decay: 0.3,   // Longer decay
-      sustain: 0.5, // Lower sustain
-      release: 0.4  // Slightly longer release
-    };
+    this.initializeProperties();
+  }
+
+  private initializeProperties(): void {
+    this.properties = new Map<string, Property<any>>([
+      ['baseSize', new Property<number>('baseSize', 2, {
+        uiType: 'slider', label: 'Base Size', min: 0.1, max: 10, step: 0.1
+      })],
+      ['attack', new Property<number>('attack', 0.05, {
+        uiType: 'slider', label: 'Attack (s)', min: 0.001, max: 2, step: 0.001
+      })],
+      ['decay', new Property<number>('decay', 0.3, {
+        uiType: 'slider', label: 'Decay (s)', min: 0.001, max: 2, step: 0.001
+      })],
+      ['sustain', new Property<number>('sustain', 0.5, {
+        uiType: 'slider', label: 'Sustain Level', min: 0, max: 1, step: 0.01
+      })],
+      ['release', new Property<number>('release', 0.4, {
+        uiType: 'slider', label: 'Release (s)', min: 0.001, max: 5, step: 0.001
+      })],
+    ]);
   }
   
   // Map MIDI pitch (0-127) and Y-position influence to a color
@@ -46,116 +55,98 @@ class BasicSynthesizer extends Synthesizer {
   
   // Calculate amplitude based on ADSR envelope and note timing
   private calculateAmplitude(currentTime: number, noteStartTime: number, noteEndTime: number, bpm: number): number {
-    // Convert beats to seconds
+    const attack = this.getPropertyValue<number>('attack') ?? 0.01;
+    const decay = this.getPropertyValue<number>('decay') ?? 0.1;
+    const sustain = this.getPropertyValue<number>('sustain') ?? 0.5;
+    const release = this.getPropertyValue<number>('release') ?? 0.1;
+
     const secondsPerBeat = 60 / bpm;
     const noteStartSec = noteStartTime * secondsPerBeat;
     const noteEndSec = noteEndTime * secondsPerBeat;
     const currentTimeSec = currentTime * secondsPerBeat;
     
-    // Time relative to note start and end
     const timeFromStart = currentTimeSec - noteStartSec;
-    const timeToEnd = noteEndSec - currentTimeSec;
     
-    // Clamp timeFromStart to avoid issues before attack
     if (timeFromStart < 0) return 0; 
 
-    // Calculate where we are in the ADSR envelope
     // Attack phase
-    if (timeFromStart < this.adsr.attack) {
-      return (timeFromStart / this.adsr.attack);
+    if (timeFromStart < attack) {
+      // Avoid division by zero if attack is extremely small
+      return attack > 0 ? (timeFromStart / attack) : 1.0;
     }
     
     // Decay phase
-    if (timeFromStart < this.adsr.attack + this.adsr.decay) {
-      const decayProgress = (timeFromStart - this.adsr.attack) / this.adsr.decay;
-      return 1.0 - ((1.0 - this.adsr.sustain) * decayProgress);
+    const decayStartTime = attack;
+    if (timeFromStart < decayStartTime + decay) {
+      const decayProgress = decay > 0 ? (timeFromStart - decayStartTime) / decay : 1.0;
+      return 1.0 - ((1.0 - sustain) * decayProgress);
     }
     
-    // Sustain phase - check if current time is before the start of the release phase
-    const noteDurationSec = (noteEndTime - noteStartTime) * secondsPerBeat;
-    if (currentTimeSec <= noteEndSec) { // Still sustaining within the note duration
-         // Check if sustain phase duration is positive
-        const sustainStartTime = noteStartSec + this.adsr.attack + this.adsr.decay;
-        if (currentTimeSec >= sustainStartTime) {
-             return this.adsr.sustain;
-        } // else, still in attack/decay, handled above
+    // Sustain phase
+    if (currentTimeSec <= noteEndSec) {
+      const sustainStartTime = decayStartTime + decay;
+      if (currentTimeSec >= sustainStartTime) {
+           return sustain;
+      } // else, still in attack/decay, handled above
     }
     
-    // Release phase - starts *after* the note officially ends
+    // Release phase
     const timeIntoRelease = currentTimeSec - noteEndSec;
-    if (timeIntoRelease > 0 && timeIntoRelease < this.adsr.release) {
-         return (this.adsr.sustain * (1.0 - (timeIntoRelease / this.adsr.release)));
+    const releaseDuration = release;
+    if (timeIntoRelease > 0 && timeIntoRelease < releaseDuration) {
+         return releaseDuration > 0 ? (sustain * (1.0 - (timeIntoRelease / releaseDuration))) : 0;
     }
 
-    // Outside the envelope
     return 0;
   }
 
   getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
     const objects: VisualObject[] = [];
     const secondsPerBeat = 60 / bpm;
+    const baseSize = this.getPropertyValue<number>('baseSize') ?? 1;
+    const releaseTime = this.getPropertyValue<number>('release') ?? 0.1;
     
-    // Define the desired vertical range (e.g., -5 to +5)
-    const yRange = 1;
+    const yRange = 1; // Keep this fixed for now
     const yMin = -5;
 
-    // Process all MIDI blocks
     midiBlocks.forEach(block => {
       const blockAbsoluteStartBeat = block.startBeat;
-      const blockAbsoluteEndBeat = block.endBeat; 
+      const blockAbsoluteEndBeat = block.endBeat; // Assume endBeat exists
+      const blockEndTimeWithRelease = blockAbsoluteEndBeat + (releaseTime * bpm / 60);
 
-      // Check if the current time is within the block's potential influence range
-      if (time >= blockAbsoluteStartBeat && time <= blockAbsoluteEndBeat + (this.adsr.release * bpm / 60)) {
-        
-        // Process all notes in the block
+      if (time >= blockAbsoluteStartBeat && time <= blockEndTimeWithRelease) {
         block.notes.forEach(note => {
           const noteAbsoluteStartBeat = blockAbsoluteStartBeat + note.startBeat;
           const noteAbsoluteEndBeat = noteAbsoluteStartBeat + note.duration;
-          const noteDurationBeats = note.duration;
-          const noteDurationSec = noteDurationBeats * secondsPerBeat;
+          const noteEndTimeWithRelease = noteAbsoluteEndBeat + (releaseTime / secondsPerBeat);
 
-          // Check if the current time is within the note's active range (start to end + release)
-          if (time >= noteAbsoluteStartBeat && time <= noteAbsoluteEndBeat + (this.adsr.release / secondsPerBeat)) {
-            
+          if (time >= noteAbsoluteStartBeat && time <= noteEndTimeWithRelease) {
             const amplitude = this.calculateAmplitude(time, noteAbsoluteStartBeat, noteAbsoluteEndBeat, bpm);
-            
-            // Skip rendering if amplitude is effectively zero
             if (amplitude < 0.001) return;
             
-            // --- Visual Property Calculations --- 
-
-            // X position remains 0 or could be based on something else
             const xPosition = 0;
-
-            // Y position mapped from MIDI pitch (0-127) to yMin to yMin + yRange
-            const pitchFraction = note.pitch % 12;
+            const pitchFraction = note.pitch / 127;
             const yPosition = yMin + pitchFraction * yRange;
 
-            console.log('ypos: ', yPosition);
-            // Scale calculation - Use pitch for height as before, but use base size for X/Z
             const noteMod12 = note.pitch % 12;
-            const heightFactor = 0.5 + (noteMod12 / 11) * 1.0; // Factor based on note within octave (0.5 to 1.5)
-            const baseObjectSize = this.baseSize * (note.velocity / 127) * amplitude;
+            const heightFactor = 0.5 + (noteMod12 / 11) * 1.0;
+            const baseObjectSize = baseSize * (note.velocity / 127) * amplitude;
             
             const objectScale: [number, number, number] = [
-                baseObjectSize, // Keep X size based on velocity/amplitude
-                baseObjectSize * heightFactor, // Y scale (height) influenced by note within octave
-                baseObjectSize // Keep Z size based on velocity/amplitude
+                baseObjectSize,
+                baseObjectSize * heightFactor,
+                baseObjectSize
             ];
             
-            // Color based on pitch only
-            const color = this.pitchAndYToColor(note.pitch, 0); // Pass 0 for yInfluence
-
-            // Opacity based on amplitude
+            const color = this.pitchAndYToColor(note.pitch, yPosition); // Use calculated yPosition
             const opacity = amplitude;
             
-            // Create a cube for the note
             objects.push({
               type: 'cube',
               properties: {
-                position: [0, yPosition, 0], // Static X, pitch-based Y
-                rotation: [0, 0, 0], // No rotation
-                scale: objectScale, // Use the calculated scale
+                position: [xPosition, yPosition, 0],
+                rotation: [0, 0, 0],
+                scale: objectScale,
                 color: color,
                 opacity: opacity
               }
@@ -166,6 +157,20 @@ class BasicSynthesizer extends Synthesizer {
     });
     
     return objects;
+  }
+
+  // --- Implementation of clone method ---
+  clone(): this {
+    // Create a new instance of the same class
+    const cloned = new BasicSynthesizer() as this;
+    
+    // Deep copy the properties map
+    cloned.properties = new Map();
+    this.properties.forEach((property, name) => {
+      cloned.properties.set(name, property.clone());
+    });
+
+    return cloned;
   }
 }
 
