@@ -33,20 +33,16 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
   const [clickOffset, setClickOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  // Add state for hover cursor
   const [hoverCursor, setHoverCursor] = useState<'default' | 'move' | 'w-resize' | 'e-resize'>('default');
 
-  // Calculate dimensions based on block and key count
   const blockDuration = block.endBeat - block.startBeat;
   const editorWidth = blockDuration * PIXELS_PER_BEAT;
   const editorHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
 
-  // Draw grid lines AND notes on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    // Set canvas dimensions (considering device pixel ratio for sharpness)
     const dpr = window.devicePixelRatio || 1;
     canvas.width = editorWidth * dpr;
     canvas.height = editorHeight * dpr;
@@ -54,10 +50,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Scale all drawing operations by dpr
     ctx.scale(dpr, dpr);
     
-    // Clear the canvas
     ctx.clearRect(0, 0, editorWidth, editorHeight);
     
     // Draw horizontal lines (pitch)
@@ -69,7 +63,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       
       // Check if this is an octave line (every 12th line)
       if (i % 12 === 0) {
-        ctx.strokeStyle = '#666'; // Stronger color for octaves
+        ctx.strokeStyle = '#666';
         ctx.lineWidth = 1;
       } else {
         ctx.strokeStyle = '#333';
@@ -346,7 +340,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         let newStartBeat = dragStartBeat + deltaBeats;
         
         // Clamp to valid range
-        newStartBeat = Math.max(0, Math.min(dragStartBeat + note.duration - GRID_SNAP, newStartBeat));
+        newStartBeat = Math.max(0, Math.min(note.startBeat + note.duration - GRID_SNAP, newStartBeat));
         
         note.duration = note.duration - (newStartBeat - note.startBeat);
         note.startBeat = newStartBeat;
