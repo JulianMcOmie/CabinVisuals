@@ -478,7 +478,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     }
   };
 
-  // Modified global mouse move handler to handle multi-select movement
+  // Modified global mouse move handler to handle multi-select movement and alt/option-drag
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       // Handle selection box updates
@@ -514,6 +514,33 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         const dy = e.clientY - dragStart.y;
         if (Math.sqrt(dx * dx + dy * dy) > 5) { // 5px threshold
           setIsDragging(true);
+          
+          // Check for Alt/Option key when starting drag (for duplicating notes)
+          if (dragOperation === 'move' && (e.altKey || e.metaKey)) {
+            // Get the notes to be duplicated
+            const notesToDuplicate = block.notes
+              .filter(note => selectedNoteIds.includes(note.id))
+              .map(note => ({ 
+                ...note,
+                id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+              }));
+            
+            // Create duplicate notes and add them to the block
+            const updatedBlock = { ...block };
+            updatedBlock.notes = [...block.notes, ...notesToDuplicate];
+            updateMidiBlock(track.id, updatedBlock);
+            
+            // Update the selection to the new duplicated notes
+            const newNoteIds = notesToDuplicate.map(note => note.id);
+            setSelectedNoteIds(newNoteIds);
+            storeSelectNotes(notesToDuplicate);
+            
+            // Update the drag note ID to the duplicated version of the originally clicked note
+            const originalNoteIndex = block.notes.findIndex(note => note.id === dragNoteId);
+            if (originalNoteIndex !== -1) {
+              setDragNoteId(notesToDuplicate[notesToDuplicate.length - 1].id);
+            }
+          }
         } else {
           return; // Don't start dragging yet
         }
@@ -686,7 +713,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     blockDuration,
     selectionBox,
     selectedNoteIds,
-    storeSelectNotes
+    storeSelectNotes,
+    clickOffset
   ]);
 
   // Handle key events for keyboard shortcuts
