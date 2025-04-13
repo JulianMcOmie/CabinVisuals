@@ -43,14 +43,20 @@ import {
   resizeNoteFromEnd,
   toggleNoteSelection,
   processSelectionBoxNotes,
-  copyNotes,
+  copyNotes
+} from './utils/noteOperations';
+
+import {
   handleNoteClick,
-  handleOptionDrag,
-  handleDragMove,
-  isDragThresholdMet,
   handleSelectionBoxComplete,
   handleContextMenuOnNote
-} from './utils/noteOperations';
+} from './utils/clickOperations';
+
+import {
+  handleOptionDrag,
+  handleDragMove,
+  isDragThresholdMet
+} from './utils/dragOperations';
 
 import { handleKeyboardShortcuts } from './utils/keyboardHandlers';
 
