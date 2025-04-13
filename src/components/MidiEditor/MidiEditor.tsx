@@ -117,15 +117,15 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     if (!coords) return;
     
     const { x, y, beat, pitch } = coords;
-    const result = findNoteAt(x, y, block.notes, selectedNoteIds);
+    const clickResult = findNoteAt(x, y, block.notes, selectedNoteIds);
     
     setIsDragging(false);
     setDragStart({ x: e.clientX, y: e.clientY });
     
-    if (result) {
+    if (clickResult) {
       // Clicked on a note
       e.stopPropagation();
-      const { note, area } = result;
+      const { note, area } = clickResult;
       
       // Use the utility function to handle note click
       const { 
