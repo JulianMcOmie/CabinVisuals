@@ -22,6 +22,7 @@ const SELECTED_NOTE_COLOR = '#b3d9ff'; // Even brighter color for selected notes
 const RESIZE_HANDLE_WIDTH = 5; // Width of resize handles in pixels
 const SELECTION_BOX_COLOR = 'rgba(100, 181, 255, 0.2)'; // Semi-transparent blue for selection box
 const SELECTION_BOX_BORDER_COLOR = 'rgba(100, 181, 255, 0.8)'; // More opaque blue for selection box border
+const PASTE_OFFSET = 1.5; // Offset in beats when pasting notes (2 beats to the right)
 
 function MidiEditor({ block, track }: MidiEditorProps) {
   const { updateMidiBlock, selectNotes: storeSelectNotes } = useStore();
@@ -41,6 +42,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // Selection related state
   const [selectionBox, setSelectionBox] = useState<{ startX: number, startY: number, endX: number, endY: number } | null>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  
+  // Copy/paste related state
+  const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
 
   const blockDuration = block.endBeat - block.startBeat;
   const editorWidth = blockDuration * PIXELS_PER_BEAT;
@@ -635,6 +639,13 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     // Handle key events
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if focus is on an input element
+      if (document.activeElement && 
+          (document.activeElement.tagName === 'INPUT' || 
+           document.activeElement.tagName === 'TEXTAREA')) {
+        return; // Don't handle shortcuts when typing in form controls
+      }
+
       // Delete key to remove selected notes
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNoteIds.length > 0) {
@@ -677,6 +688,75 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     selectedNoteIds,
     storeSelectNotes
   ]);
+
+  // Handle key events for keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if focus is on an input element
+      if (document.activeElement && 
+          (document.activeElement.tagName === 'INPUT' || 
+           document.activeElement.tagName === 'TEXTAREA')) {
+        return; // Don't handle shortcuts when typing in form controls
+      }
+
+      // Copy selected notes (Ctrl+C)
+      if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+        if (selectedNoteIds.length > 0) {
+          const notesToCopy = block.notes
+            .filter(note => selectedNoteIds.includes(note.id))
+            .map(note => ({ ...note })); // Create a deep copy
+          
+          setCopiedNotes(notesToCopy);
+          console.log(`Copied ${notesToCopy.length} notes`);
+        }
+      }
+      
+      // Paste notes (Ctrl+V)
+      if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+        if (copiedNotes.length > 0) {
+          // Find the leftmost position of copied notes to calculate relative positions
+          const minBeat = Math.min(...copiedNotes.map(note => note.startBeat));
+          
+          // Create new notes with new IDs and offset positions
+          const newNotes = copiedNotes.map(note => {
+            // Calculate position relative to the leftmost note and add paste offset
+            const relativePosition = note.startBeat - minBeat;
+            const newStartBeat = minBeat + relativePosition + PASTE_OFFSET;
+            
+            // Ensure the note fits within the block
+            if (newStartBeat + note.duration > blockDuration) {
+              return null; // Skip notes that would extend beyond the block
+            }
+            
+            return {
+              ...note,
+              id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              startBeat: newStartBeat
+            };
+          }).filter(note => note !== null) as MIDINote[];
+          
+          if (newNotes.length > 0) {
+            // Add pasted notes to block
+            const updatedBlock = { ...block };
+            updatedBlock.notes = [...block.notes, ...newNotes];
+            updateMidiBlock(track.id, updatedBlock);
+            
+            // Select the newly pasted notes
+            setSelectedNoteIds(newNotes.map(note => note.id));
+            storeSelectNotes(newNotes);
+            
+            console.log(`Pasted ${newNotes.length} notes`);
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [block, track.id, selectedNoteIds, copiedNotes, blockDuration, updateMidiBlock, storeSelectNotes]);
 
   return (
     <div 
