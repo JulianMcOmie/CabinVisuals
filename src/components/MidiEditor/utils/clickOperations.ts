@@ -5,7 +5,6 @@ import {
   KEY_COUNT,
   LOWEST_NOTE 
 } from './constants';
-import { isNoteInSelectionBox } from './utils';
 import { createNewNote, toggleNoteSelection, processSelectionBoxNotes } from './noteOperations';
 
 /**

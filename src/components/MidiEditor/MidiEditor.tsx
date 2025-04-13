@@ -13,38 +13,17 @@ import {
   PIXELS_PER_BEAT,
   PIXELS_PER_SEMITONE,
   KEY_COUNT,
-  GRID_SNAP,
   DragOperation,
   CursorType,
   SelectionBox,
-  LOWEST_NOTE,
-  NOTE_COLOR,
-  SELECTED_NOTE_COLOR,
-  SELECTION_BOX_COLOR,
-  SELECTION_BOX_BORDER_COLOR,
-  PASTE_OFFSET
 } from './utils/constants';
 
 import {
-  isNoteInSelectionBox,
   getCoordsFromEvent,
   findNoteAt,
-  generateNoteId
 } from './utils/utils';
 
 import { drawMidiEditor } from './utils/canvas';
-import { 
-  createNewNote, 
-  deleteSelectedNotes, 
-  duplicateNotes,
-  pasteNotes,
-  moveSelectedNotes,
-  resizeNoteFromStart,
-  resizeNoteFromEnd,
-  toggleNoteSelection,
-  processSelectionBoxNotes,
-  copyNotes
-} from './utils/noteOperations';
 
 import {
   handleNoteClick,

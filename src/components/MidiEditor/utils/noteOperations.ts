@@ -2,10 +2,6 @@ import { MIDIBlock, MIDINote } from '../../../lib/types';
 import { 
   GRID_SNAP, 
   PASTE_OFFSET,
-  PIXELS_PER_BEAT,
-  PIXELS_PER_SEMITONE,
-  KEY_COUNT,
-  LOWEST_NOTE 
 } from './constants';
 import { generateNoteId, isNoteInSelectionBox } from './utils';
 
