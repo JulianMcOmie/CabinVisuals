@@ -25,7 +25,7 @@ const SELECTION_BOX_BORDER_COLOR = 'rgba(100, 181, 255, 0.8)'; // More opaque bl
 const PASTE_OFFSET = 1.5; // Offset in beats when pasting notes (2 beats to the right)
 
 function MidiEditor({ block, track }: MidiEditorProps) {
-  const { updateMidiBlock, selectNotes: storeSelectNotes } = useStore();
+  const { updateMidiBlock, selectNotes: storeSelectNotes, selectBlock} = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -663,6 +663,10 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         }
       }
     };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      //selectBlock(null);
+    }
     
     // Handle key events
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -693,11 +697,13 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('keydown', handleKeyDown);
     
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [

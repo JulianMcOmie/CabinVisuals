@@ -33,7 +33,7 @@ function TrackTimelineView({ track }: TrackTimelineViewProps) {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBlockId) {
         const selectedBlock = track.midiBlocks.find(block => block.id === selectedBlockId);
         if (selectedBlock) {
-          removeMidiBlock(track.id, selectedBlockId);
+          //removeMidiBlock(track.id, selectedBlockId);
         }
       }
       
