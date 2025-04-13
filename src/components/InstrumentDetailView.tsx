@@ -5,14 +5,14 @@ import useStore from '../store/store';
 import { Track } from '../lib/types';
 import Synthesizer from '../lib/Synthesizer';
 import BasicSynthesizer from '../lib/synthesizers/BasicSynthesizer';
-import DrumSynthesizer from '../lib/synthesizers/DrumSynthesizer';
-import SpiralSynth from '../lib/synthesizers/SpiralSynth';
-import ParticleBurstSynth from '../lib/synthesizers/ParticleBurstSynth';
-import NestedCubeSynth from '../lib/synthesizers/NestedCubeSynth';
-import PulsingRadiusSynth from '../lib/synthesizers/PulsingRadiusSynth';
-import RadialVibratingSynth from '../lib/synthesizers/RadialVibratingSynth';
-import FracturingCubeSynth from '../lib/synthesizers/FracturingCubeSynth';
-import HypotrochoidSynth from '../lib/synthesizers/HypotrochoidSynth';
+import MelodicOrbitSynth from '../lib/synthesizers/MelodicOrbitSynth';
+import KickDrumSynth from '../lib/synthesizers/KickDrumSynth';
+import SnareDrumSynth from '../lib/synthesizers/SnareDrumSynth';
+import ShakerSynth from '../lib/synthesizers/ShakerSynth';
+import HiHatSynth from '../lib/synthesizers/HiHatSynth';
+import SineWaveSynth from '../lib/synthesizers/SineWaveSynth';
+import BackgroundPlaneSynth from '../lib/synthesizers/BackgroundPlaneSynth';
+import ApproachingCubeSynth from '../lib/synthesizers/ApproachingCubeSynth';
 import { Property } from '../lib/properties/Property';
 import SliderPropertyControl from './properties/SliderPropertyControl';
 import NumberInputPropertyControl from './properties/NumberInputPropertyControl';
@@ -25,14 +25,16 @@ interface InstrumentDetailViewProps {
 // Map synthesizer types to their classes and display names
 const synthesizerOptions: { [key: string]: { class: new () => Synthesizer, name: string } } = {
   basic: { class: BasicSynthesizer, name: 'Basic Synth' },
-  drum: { class: DrumSynthesizer, name: 'Drum Synth' },
-  spiral: { class: SpiralSynth, name: 'Spiral Synth' },
-  particleBurst: { class: ParticleBurstSynth, name: 'Particle Burst' },
-  nestedCube: { class: NestedCubeSynth, name: 'Nested Cube' },
-  pulsingRadius: { class: PulsingRadiusSynth, name: 'Pulsing Radius' },
-  radialVibrating: { class: RadialVibratingSynth, name: 'Radial Vibrator' },
-  fracturingCube: { class: FracturingCubeSynth, name: 'Fracturing Cube' },
-  hypotrochoid: { class: HypotrochoidSynth, name: 'Hypotrochoid' },
+  // Add the new synthesizers
+  melodicOrbit: { class: MelodicOrbitSynth, name: 'Melodic Orbit' },
+  kickDrum: { class: KickDrumSynth, name: 'Kick Drum' },
+  snareDrum: { class: SnareDrumSynth, name: 'Snare Drum' },
+  shaker: { class: ShakerSynth, name: 'Shaker' },
+  hiHat: { class: HiHatSynth, name: 'Hi-Hat' },
+  sineWave: { class: SineWaveSynth, name: 'Sine Wave' },
+  backgroundPlane: { class: BackgroundPlaneSynth, name: 'Background Plane' },
+  // Add the new synthesizer
+  approachingCube: { class: ApproachingCubeSynth, name: 'Approaching Cube' },
 };
 
 function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
