@@ -34,14 +34,12 @@ export interface VisualObject {
   properties: VisualObjectProperties;
 }
 
-export interface Synthesizer {
-  // This will be used when we implement the abstract class
-  getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[];
-}
+// Import the actual Synthesizer class
+import Synthesizer from './Synthesizer';
 
 export interface Track {
   id: string;
   name: string;
   midiBlocks: MIDIBlock[];
-  synthesizer: Synthesizer;
+  synthesizer: Synthesizer; // Now uses the imported class type
 } 
