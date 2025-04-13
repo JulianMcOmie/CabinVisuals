@@ -112,6 +112,13 @@ class TimeManager {
       const secondsPerBeat = 60.0 / this.bpm;
       return beat * secondsPerBeat;
   }
+
+  // Convert time in seconds to a beat number based on current BPM
+  public timeToBeat(time: number): number {
+      if (this.bpm <= 0 || time <= 0) return 0;
+      const beatsPerSecond = this.bpm / 60.0;
+      return time * beatsPerSecond;
+  }
 }
 
 export default TimeManager; 
