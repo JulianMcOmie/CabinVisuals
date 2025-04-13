@@ -12,7 +12,7 @@ const PIXELS_PER_BEAT = 25; // 25px per beat
 const GRID_SNAP = 0.25; // Snap to 1/4 beat
 
 function TrackTimelineView({ track }: TrackTimelineViewProps) {
-  const { selectedBlockId, selectBlock, addMidiBlock, updateMidiBlock, removeMidiBlock } = useStore();
+  const { selectedBlockId, numMeasures, selectBlock, addMidiBlock, updateMidiBlock, removeMidiBlock } = useStore();
   const trackRef = useRef<HTMLDivElement>(null);
   
   // State for drag operations
@@ -33,7 +33,7 @@ function TrackTimelineView({ track }: TrackTimelineViewProps) {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBlockId) {
         const selectedBlock = track.midiBlocks.find(block => block.id === selectedBlockId);
         if (selectedBlock) {
-          removeMidiBlock(track.id, selectedBlockId);
+          //removeMidiBlock(track.id, selectedBlockId);
         }
       }
       
@@ -206,21 +206,10 @@ function TrackTimelineView({ track }: TrackTimelineViewProps) {
           top: 0,
           bottom: 0,
           width: '1px',
-          backgroundColor: i % 4 === 0 ? '#888' : '#ddd'
+          backgroundColor: i % 4 === 0 ? '#ddd' : '#888'
         }} />
       ))}
       
-      {/* Beat markers (for more precise grid visualization) */}
-      {Array.from({ length: 128 }).map((_, i) => (
-        <div key={`beat-${i}`} style={{
-          position: 'absolute',
-          left: `${i * PIXELS_PER_BEAT}px`,
-          top: 0,
-          height: '3px',
-          width: '1px',
-          backgroundColor: '#555'
-        }} />
-      ))}
       
       {/* Render MIDI blocks */}
       {track.midiBlocks.map(block => (
@@ -240,6 +229,21 @@ function TrackTimelineView({ track }: TrackTimelineViewProps) {
         </div>
       ))}
       
+
+      {/* Horizontal Divider Line */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          height: '1px',
+          width: `${400 * numMeasures}px`,
+          backgroundColor: '#000',
+          zIndex: 0,
+        }}
+      />
+      
+
       {/* Context menu */}
       {showContextMenu && (
         <div 
