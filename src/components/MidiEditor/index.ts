@@ -1,2 +1,2 @@
 import MidiEditor from './MidiEditor';
-export default MidiEditor; 
+export default MidiEditor;
