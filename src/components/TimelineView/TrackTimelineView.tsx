@@ -206,7 +206,7 @@ function TrackTimelineView({ track }: TrackTimelineViewProps) {
           top: 0,
           bottom: 0,
           width: '1px',
-          backgroundColor: i % 4 === 0 ? '#bbb' : '#666'
+          backgroundColor: i % 4 === 0 ? '#ddd' : '#888'
         }} />
       ))}
       

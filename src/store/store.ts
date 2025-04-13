@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Track, MIDIBlock } from '../lib/types';
+import { Track, MIDIBlock, MIDINote } from '../lib/types';
 import TimeManager from '../lib/TimeManager';
 import TrackManager from '../lib/TrackManager';
 
@@ -17,6 +17,7 @@ interface AppState {
   selectedBlockId: string | null;
   selectedTrack: Track | null;
   selectedBlock: MIDIBlock | null;
+  selectedNotes: MIDINote[] | null;
   
   // Actions
   selectTrack: (trackId: string | null) => void;
@@ -26,6 +27,7 @@ interface AppState {
   addMidiBlock: (trackId: string, block: MIDIBlock) => void;
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
   removeMidiBlock: (trackId: string, blockId: string) => void;
+  selectNotes: (notes: MIDINote[]) => void;
   updateCurrentBeat: (beat: number) => void;
   play: () => void;
   pause: () => void;
@@ -72,10 +74,11 @@ const useStore = create<AppState>((set, get) => {
     selectedBlockId: null,
     selectedTrack: null,
     selectedBlock: null,
+    selectedNotes: null,
     
     // Actions
     selectTrack: (trackId: string | null) => {
-      set({ selectedTrackId: trackId, selectedBlockId: null });
+      set({ selectedTrackId: trackId, selectedBlockId: null, selectedNotes: null });
       
       // Update selected track object
       if (trackId) {
@@ -88,7 +91,7 @@ const useStore = create<AppState>((set, get) => {
     },
     
     selectBlock: (blockId: string | null) => {
-      set({ selectedBlockId: blockId });
+      set({ selectedBlockId: blockId, selectedNotes: null });
 
       if (blockId) {
         const { trackManager } = get();
@@ -146,7 +149,8 @@ const useStore = create<AppState>((set, get) => {
           selectedTrackId: null,
           selectedBlockId: null,
           selectedTrack: null,
-          selectedBlock: null
+          selectedBlock: null,
+          selectedNotes: null
         });
       } else {
         set({ 
@@ -216,6 +220,10 @@ const useStore = create<AppState>((set, get) => {
           });
         }
       }
+    },
+
+    selectNotes: (notes: MIDINote[]) => {
+      set({ selectedNotes: notes });
     },
     
     updateCurrentBeat: (beat: number) => set({ currentBeat: beat }),

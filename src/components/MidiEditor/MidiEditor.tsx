@@ -19,16 +19,16 @@ const KEY_COUNT = 88; // 88 piano keys (A0 to C8)
 const LOWEST_NOTE = 21; // A0 MIDI note number
 
 function MidiEditor({ block, track }: MidiEditorProps) {
-  const { updateMidiBlock } = useStore();
+  const { updateMidiBlock, selectNotes } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const notesContainerRef = useRef<HTMLDivElement>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   
-  // State for note operations
-  const [dragOperation, setDragOperation] = useState<'none' | 'start' | 'end' | 'move'>('none');
+  // State for drag operations
+  const [dragOperation, setDragOperation] = useState<'none' | 'select' | 'start' | 'end' | 'move'>('none');
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [dragStartBeat, setDragStartBeat] = useState(0);
-  const [dragDuration, setDragDuration] = useState(0);
+  const [dragStartBeat, setDragNoteStartBeat] = useState(0);
+  const [dragDuration, setDragNoteDuration] = useState(0);
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
   const [clickOffset, setClickOffset] = useState({ x: 0, y: 0 });
 
@@ -105,21 +105,21 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       setDragOperation('none');
     };
   
-  // Delete a note on right click
-  const handleNoteRightClick = (e: React.MouseEvent, note: MIDINote) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Filter using note.id as it's the unique identifier
-    const updatedBlock = { ...block };
-    updatedBlock.notes = block.notes.filter(n => n.id !== note.id);
-    
-    // Update the block in the store
-    updateMidiBlock(track.id, updatedBlock);
+    // Delete a note on right click
+    const handleNoteRightClick = (e: React.MouseEvent, note: MIDINote) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Filter using note.id as it's the unique identifier
+      const updatedBlock = { ...block };
+      updatedBlock.notes = block.notes.filter(n => n.id !== note.id);
+      
+      // Update the block in the store
+      updateMidiBlock(track.id, updatedBlock);
     };
     
     const handleMouseMove = (e: MouseEvent) => {
-      if (dragOperation === 'none' || !dragNoteId || !notesContainerRef.current) {
+      if (dragOperation === 'none' || !notesContainerRef.current) {
         return;
       }
       
@@ -193,13 +193,36 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       updatedBlock.notes[noteIndex] = note;
       updateMidiBlock(track.id, updatedBlock);
     };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (!notesContainerRef.current) return;
+
+      const containerRect = notesContainerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - containerRect.left;
+      const mouseY = e.clientY - containerRect.top;
+
+      // Check if the cursor is within the canvas grid note editor
+      if (
+        mouseX < 0 || 
+        mouseX > containerRect.width || 
+        mouseY < 0 || 
+        mouseY > containerRect.height
+      ) {
+        return;
+      }
+
+      setDragStart({ x: e.clientX, y: e.clientY });
+      setDragOperation('select');
+    };
     
     window.addEventListener('mouseup', handleMouseUp);
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousedown', handleMouseDown);
     
     return () => {
       window.removeEventListener('mouseup', handleMouseUp);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousedown', handleMouseDown);
     };
   }, [
     block, 
@@ -265,10 +288,12 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     setDragStart({ x: e.clientX, y: e.clientY });
     setDragNoteId(note.id);
     // Store the RELATIVE start beat
-    setDragStartBeat(note.startBeat);
-    setDragDuration(note.duration);
+    setDragNoteStartBeat(note.startBeat);
+    setDragNoteDuration(note.duration);
     
     if (operation === 'move' && notesContainerRef.current) {
+      selectNotes([note]);
+
       // Calculate offset from the note's top-left corner
       const containerRect = notesContainerRef.current.getBoundingClientRect();
       const noteX = note.startBeat * PIXELS_PER_BEAT;
