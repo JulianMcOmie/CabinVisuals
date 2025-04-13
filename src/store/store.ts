@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Track, MIDIBlock, MIDINote } from '../lib/types';
 import TimeManager from '../lib/TimeManager';
 import TrackManager from '../lib/TrackManager';
+import { AudioManager } from '../lib/AudioManager';
 
 interface AppState {
   // Time-related state
@@ -18,6 +19,11 @@ interface AppState {
   selectedTrack: Track | null;
   selectedBlock: MIDIBlock | null;
   selectedNotes: MIDINote[] | null;
+
+  // Audio-related state
+  audioManager: AudioManager;
+  isAudioLoaded: boolean;
+  audioDuration: number | null;
   
   // Actions
   selectTrack: (trackId: string | null) => void;
@@ -30,6 +36,7 @@ interface AppState {
   updateTrack: (trackId: string, updatedProperties: Partial<Track>) => void;
   selectNotes: (notes: MIDINote[]) => void;
   updateCurrentBeat: (beat: number) => void;
+  loadAudio: (audioData: ArrayBuffer) => Promise<void>;
   play: () => void;
   pause: () => void;
   stop: () => void;
@@ -39,6 +46,7 @@ interface AppState {
 
 const useStore = create<AppState>((set, get) => {
   const timeManager = new TimeManager(120);
+  const audioManager = new AudioManager();
 
   // Set up beat update subscription
   timeManager.onUpdate((beat) => {
@@ -76,6 +84,9 @@ const useStore = create<AppState>((set, get) => {
     selectedTrack: null,
     selectedBlock: null,
     selectedNotes: null,
+    audioManager,
+    isAudioLoaded: audioManager.isAudioLoaded,
+    audioDuration: audioManager.audioDuration,
     
     // Actions
     selectTrack: (trackId: string | null) => {
@@ -179,19 +190,20 @@ const useStore = create<AppState>((set, get) => {
       const track = trackManager.getTrack(trackId);
       
       if (track) {
-        for (let i = 0; i < track.midiBlocks.length; i++) {
-          if (track.midiBlocks[i].id === updatedBlock.id) {
-            track.midiBlocks[i] = updatedBlock;
-          }
+        // Find and update the block in the array
+        const blockIndex = track.midiBlocks.findIndex(b => b.id === updatedBlock.id);
+        if (blockIndex !== -1) {
+            track.midiBlocks[blockIndex] = updatedBlock;
         }
         
-        // If the updated block is currently selected, update the selectedBlock
+        // If the updated block is currently selected, update the selectedBlock state
         if (selectedBlockId === updatedBlock.id) {
           set({ 
             trackManager,
             selectedBlock: updatedBlock
           });
         } else {
+          // If the updated block wasn't the selected one, potentially update selected items if IDs match
           set({ 
             trackManager,
             ...findSelectedItems() // Update selected items
@@ -215,6 +227,7 @@ const useStore = create<AppState>((set, get) => {
             selectedBlock: null
           });
         } else {
+          // If the removed block wasn't the selected one, potentially update selected items if IDs match
           set({ 
             trackManager,
             ...findSelectedItems() // Update selected items
@@ -228,7 +241,7 @@ const useStore = create<AppState>((set, get) => {
     },
     
     updateTrack: (trackId: string, updatedProperties: Partial<Track>) => {
-      const { trackManager, selectedTrackId } = get();
+      const { trackManager } = get();
       trackManager.updateTrack(trackId, updatedProperties);
       set({ 
         trackManager: trackManager,
@@ -238,34 +251,112 @@ const useStore = create<AppState>((set, get) => {
     
     updateCurrentBeat: (beat: number) => set({ currentBeat: beat }),
     
+    loadAudio: async (audioData: ArrayBuffer) => {
+        const { audioManager } = get();
+        try {
+            // Ensure AudioContext is resumed (required for user interaction)
+            if (audioManager.context && audioManager.context.state === 'suspended') {
+              await audioManager.context.resume();
+            }
+            const { duration } = await audioManager.loadAudio(audioData);
+            set({ isAudioLoaded: true, audioDuration: duration });
+        } catch (error) {
+            console.error("Store: Failed to load audio", error);
+            set({ isAudioLoaded: false, audioDuration: null });
+            throw error; // Re-throw so the component can catch it
+        }
+    },
+
     play: () => {
-      const { timeManager } = get();
+      const { timeManager, audioManager, isAudioLoaded, currentBeat } = get();
+      // Ensure AudioContext is running before trying to play
+      if (audioManager.context && audioManager.context.state === 'suspended') {
+           console.warn("AudioContext is suspended. Attempting to resume...");
+           // Attempt to resume - user interaction might be required
+           audioManager.context.resume().then(() => {
+               console.log("AudioContext resumed successfully.");
+               // Now try playing audio if loaded
+                if (isAudioLoaded) {
+                    const offset = timeManager.beatToTime(currentBeat);
+                    const startTime = audioManager.context!.currentTime + 0.05; // Schedule slightly ahead
+                    audioManager.play(startTime, offset);
+                }
+           }).catch(err => console.error("Failed to resume AudioContext:", err));
+      } else if (isAudioLoaded && audioManager.context) {
+          // Context running and audio loaded, play normally
+          const offset = timeManager.beatToTime(currentBeat);
+          const startTime = audioManager.context.currentTime + 0.05; // Schedule slightly ahead
+          audioManager.play(startTime, offset);
+      } else if (!isAudioLoaded) {
+          console.warn("Play called but no audio loaded.");
+      } else {
+           console.warn("Play called but AudioContext not available or in unexpected state.");
+      }
+
+      // Always start the TimeManager
       timeManager.play();
       set({ isPlaying: true });
     },
     
     pause: () => {
-      const { timeManager } = get();
-      timeManager.pause();
+      const { timeManager, audioManager } = get();
+      timeManager.pause(); // Pause TimeManager first
+      const pausedAudioTime = audioManager.pause(); // Pause audio
       set({ isPlaying: false });
+      // We don't sync currentBeat to pausedAudioTime here; TimeManager owns the beat time.
     },
     
     stop: () => {
-      const { timeManager } = get();
-      timeManager.stop();
+      const { timeManager, audioManager } = get();
+      timeManager.stop(); // Stop TimeManager first
+      audioManager.stop(); // Stop audio
       set({ isPlaying: false, currentBeat: 0 });
     },
     
     setBPM: (bpm: number) => {
-      const { timeManager } = get();
+      const { timeManager, audioManager, isPlaying, isAudioLoaded, currentBeat } = get();
+      const wasPlaying = isPlaying;
+
+      // Pause everything temporarily if it was playing
+      if (wasPlaying) {
+        timeManager.pause();
+        if (isAudioLoaded) audioManager.pause();
+      }
+      
+      // Update BPM in TimeManager
       timeManager.setBPM(bpm);
-      set({ bpm });
+      set({ bpm }); // Update state
+
+      // Resume if it was playing, recalculating audio start time
+      if (wasPlaying) {
+          timeManager.play(); // Resume TimeManager immediately
+          // Resume audio slightly delayed and synced to current beat
+          if (isAudioLoaded && audioManager.context) {
+              const offset = timeManager.beatToTime(currentBeat); // Get offset for the *current* beat at the *new* BPM
+              const startTime = audioManager.context.currentTime + 0.05; // Schedule slightly ahead
+              audioManager.play(startTime, offset);
+          }
+      }
     },
     
     seekTo: (beat: number) => {
-      const { timeManager } = get();
-      timeManager.seekTo(beat);
-      set({ currentBeat: beat });
+      const { timeManager, audioManager, isPlaying, isAudioLoaded } = get();
+      const targetTime = timeManager.beatToTime(beat); // Calculate target time based on beat
+      
+      timeManager.seekTo(beat); // Update TimeManager first
+      set({ currentBeat: beat }); // Update beat state immediately
+
+      if (isAudioLoaded && audioManager.context) {
+          if (isPlaying) {
+              // If playing: stop audio, then restart it at the new offset immediately
+              audioManager.stop(); 
+              const startTime = audioManager.context.currentTime + 0.05; // Schedule slightly ahead
+              audioManager.play(startTime, targetTime); 
+          } else {
+              // If paused or stopped: just tell AudioManager the new seek position for the next play
+              audioManager.seek(targetTime);
+          }
+      }
     }
   };
 });

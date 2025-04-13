@@ -5,12 +5,14 @@ import TimelineView from '../src/components/TimelineView';
 import VisualizerView from '../src/components/VisualizerView';
 import PlaybarView from '../src/components/PlaybarView';
 import DetailView from '../src/components/DetailView';
+import AudioLoader from '../src/components/AudioLoader';
 
 export default function Home() {
   return (
     <main className="main-container">
       <div className="playbar-container">
         <PlaybarView />
+        <AudioLoader />
       </div>
       
       <div className="content-container">
@@ -43,6 +45,10 @@ export default function Home() {
           width: 100%;
           border-bottom: 1px solid #ccc;
           flex: 0 0 80px;
+          display: flex;
+          align-items: center;
+          padding: 0 10px;
+          box-sizing: border-box;
         }
         
         .content-container {
