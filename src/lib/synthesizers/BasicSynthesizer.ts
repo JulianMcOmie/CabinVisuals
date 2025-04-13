@@ -1,6 +1,8 @@
 import Synthesizer from '../Synthesizer';
-import { MIDIBlock, VisualObject } from '../types';
+import { MIDIBlock, VisualObject, MIDINote } from '../types';
 import { Property } from '../properties/Property';
+// Import Engine and related components
+import VisualObjectEngine, { MappingContext, MappingUtils, NoteContext } from '../VisualObjectEngine';
 
 // ADSR envelope parameters are now managed by properties
 // interface ADSREnvelope { ... } // No longer needed here
@@ -13,6 +15,9 @@ class BasicSynthesizer extends Synthesizer {
   constructor() {
     super();
     this.initializeProperties();
+    // Initialize the engine *after* properties are set up
+    this.engine = new VisualObjectEngine(this);
+    this.initializeEngine(); // Define engine rules
   }
 
   private initializeProperties(): void {
@@ -32,143 +37,105 @@ class BasicSynthesizer extends Synthesizer {
       ['release', new Property<number>('release', 0.4, {
         uiType: 'slider', label: 'Release (s)', min: 0.001, max: 5, step: 0.001
       })],
+       // Add a property for Y Range if desired
+       ['yRange', new Property<number>('yRange', 10, {
+        uiType: 'slider', label: 'Y Range', min: 1, max: 20, step: 0.5
+       })],
+       ['yMin', new Property<number>('yMin', -5, {
+           uiType: 'slider', label: 'Y Min', min: -10, max: 0, step: 0.5
+       })],
     ]);
   }
-  
-  // Map MIDI pitch (0-127) and Y-position influence to a color
-  private pitchAndYToColor(pitch: number, yInfluence: number): string {
-    // Map pitch to hue (0-360)
-    const hue = (pitch % 12) * 30; // Each semitone shifts hue by 30 degrees
-    
-    // Map octave to base lightness
-    const octave = Math.floor(pitch / 12);
-    const baseLightness = 55 + Math.min(octave * 4, 25); // Increased base brightness (55-80% range)
-    
-    // Add Y influence to lightness (e.g., +/- 10%)
-    const lightness = Math.max(40, Math.min(95, baseLightness + yInfluence * 20)); // Clamp lightness
-    
-    // Use a fairly saturated color
-    const saturation = 80; // Slightly more saturation
-    
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-  }
-  
-  // Calculate amplitude based on ADSR envelope and note timing
-  private calculateAmplitude(currentTime: number, noteStartTime: number, noteEndTime: number, bpm: number): number {
-    const attack = this.getPropertyValue<number>('attack') ?? 0.01;
-    const decay = this.getPropertyValue<number>('decay') ?? 0.1;
-    const sustain = this.getPropertyValue<number>('sustain') ?? 0.5;
-    const release = this.getPropertyValue<number>('release') ?? 0.1;
 
-    const secondsPerBeat = 60 / bpm;
-    const noteStartSec = noteStartTime * secondsPerBeat;
-    const noteEndSec = noteEndTime * secondsPerBeat;
-    const currentTimeSec = currentTime * secondsPerBeat;
-    
-    const timeFromStart = currentTimeSec - noteStartSec;
-    
-    if (timeFromStart < 0) return 0; 
+  // Define object generation rules using the engine
+  private initializeEngine(): void {
+    const MUtils = MappingUtils; // Alias for convenience
 
-    // Attack phase
-    if (timeFromStart < attack) {
-      // Avoid division by zero if attack is extremely small
-      return attack > 0 ? (timeFromStart / attack) : 1.0;
-    }
-    
-    // Decay phase
-    const decayStartTime = attack;
-    if (timeFromStart < decayStartTime + decay) {
-      const decayProgress = decay > 0 ? (timeFromStart - decayStartTime) / decay : 1.0;
-      return 1.0 - ((1.0 - sustain) * decayProgress);
-    }
-    
-    // Sustain phase
-    if (currentTimeSec <= noteEndSec) {
-      const sustainStartTime = decayStartTime + decay;
-      if (currentTimeSec >= sustainStartTime) {
-           return sustain;
-      } // else, still in attack/decay, handled above
-    }
-    
-    // Release phase
-    const timeIntoRelease = currentTimeSec - noteEndSec;
-    const releaseDuration = release;
-    if (timeIntoRelease > 0 && timeIntoRelease < releaseDuration) {
-         return releaseDuration > 0 ? (sustain * (1.0 - (timeIntoRelease / releaseDuration))) : 0;
-    }
+    this.engine.defineObject('cube') // Initial object type is 'cube'
+      .applyADSR((noteCtx: NoteContext) => ({ // Added type: NoteContext
+        attack: this.getPropertyValue<number>('attack') ?? 0.01,
+        decay: this.getPropertyValue<number>('decay') ?? 0.1,
+        sustain: this.getPropertyValue<number>('sustain') ?? 0.5,
+        release: this.getPropertyValue<number>('release') ?? 0.1,
+      }))
+      .withPosition((ctx: MappingContext) => { // Added type: MappingContext
+        const yRange = this.getPropertyValue<number>('yRange') ?? 10;
+        const yMin = this.getPropertyValue<number>('yMin') ?? -5;
+        const pitchFraction = ctx.note.pitch / 127;
+        const yPosition = yMin + pitchFraction * yRange;
+        const xPosition = 0;
+        const zPosition = 0;
+        return [xPosition, yPosition, zPosition];
+      })
+      .withScale((ctx: MappingContext) => { // Added type: MappingContext
+        const baseSize = this.getPropertyValue<number>('baseSize') ?? 1;
+        const amplitude = ctx.adsrAmplitude ?? 0; // ADSR amplitude from context
+        const noteMod12 = ctx.note.pitch % 12;
+        const heightFactor = 0.5 + (noteMod12 / 11) * 1.0; // Apply height factor based on note
+        const baseObjectSize = baseSize * (ctx.note.velocity / 127) * amplitude;
 
-    return 0;
+        // Return scale [sx, sy, sz]
+        return [
+            baseObjectSize,
+            baseObjectSize * heightFactor, // Apply height factor to Y scale
+            baseObjectSize
+        ];
+      })
+      .withColor((ctx: MappingContext) => { // Added type: MappingContext
+         // Replicate the HSL calculation from the old pitchAndYToColor
+         const pitch = ctx.note.pitch;
+         const yRange = this.getPropertyValue<number>('yRange') ?? 10;
+         const yMin = this.getPropertyValue<number>('yMin') ?? -5;
+
+         // Recalculate yPosition (as calculated in withPosition mapper)
+         const pitchFraction = pitch / 127;
+         const yPosition = yMin + pitchFraction * yRange;
+
+         const hue = (pitch % 12) * 30;
+         const octave = Math.floor(pitch / 12);
+         const baseLightness = 55 + Math.min(octave * 4, 25); // 55-80% range
+
+         // Map calculated yPosition to influence lightness (-1 to 1 influence approx)
+         const yInfluence = MUtils.mapValue(yPosition, yMin, yMin + yRange, -1, 1, true);
+         const lightness = Math.max(40, Math.min(95, baseLightness + yInfluence * 20)); // Clamp 40-95%
+         const saturation = 80;
+
+         return `hsl(${hue.toFixed(0)}, ${saturation.toFixed(0)}%, ${lightness.toFixed(0)}%)`;
+      })
+      .withOpacity((ctx: MappingContext) => ctx.adsrAmplitude ?? 0); // Added type: MappingContext
   }
 
+
+  // No longer needed - logic moved to engine definition
+  // private pitchAndYToColor(pitch: number, yInfluence: number): string { ... }
+
+  // No longer needed - ADSR handled by engine
+  // private calculateAmplitude(currentTime: number, noteStartTime: number, noteEndTime: number, bpm: number): number { ... }
+
+
+  // getObjectsAtTime now simply delegates to the engine
   getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
-    const objects: VisualObject[] = [];
-    const secondsPerBeat = 60 / bpm;
-    const baseSize = this.getPropertyValue<number>('baseSize') ?? 1;
-    const releaseTime = this.getPropertyValue<number>('release') ?? 0.1;
-    
-    const yRange = 1; // Keep this fixed for now
-    const yMin = -5;
-
-    midiBlocks.forEach(block => {
-      const blockAbsoluteStartBeat = block.startBeat;
-      const blockAbsoluteEndBeat = block.endBeat; // Assume endBeat exists
-      const blockEndTimeWithRelease = blockAbsoluteEndBeat + (releaseTime * bpm / 60);
-
-      if (time >= blockAbsoluteStartBeat && time <= blockEndTimeWithRelease) {
-        block.notes.forEach(note => {
-          const noteAbsoluteStartBeat = blockAbsoluteStartBeat + note.startBeat;
-          const noteAbsoluteEndBeat = noteAbsoluteStartBeat + note.duration;
-          const noteEndTimeWithRelease = noteAbsoluteEndBeat + (releaseTime / secondsPerBeat);
-
-          if (time >= noteAbsoluteStartBeat && time <= noteEndTimeWithRelease) {
-            const amplitude = this.calculateAmplitude(time, noteAbsoluteStartBeat, noteAbsoluteEndBeat, bpm);
-            if (amplitude < 0.001) return;
-            
-            const xPosition = 0;
-            const pitchFraction = note.pitch / 127;
-            const yPosition = yMin + pitchFraction * yRange;
-
-            const noteMod12 = note.pitch % 12;
-            const heightFactor = 0.5 + (noteMod12 / 11) * 1.0;
-            const baseObjectSize = baseSize * (note.velocity / 127) * amplitude;
-            
-            const objectScale: [number, number, number] = [
-                baseObjectSize,
-                baseObjectSize * heightFactor,
-                baseObjectSize
-            ];
-            
-            const color = this.pitchAndYToColor(note.pitch, yPosition); // Use calculated yPosition
-            const opacity = amplitude;
-            
-            objects.push({
-              type: 'cube',
-              properties: {
-                position: [xPosition, yPosition, 0],
-                rotation: [0, 0, 0],
-                scale: objectScale,
-                color: color,
-                opacity: opacity
-              }
-            });
-          }
-        });
-      }
-    });
-    
-    return objects;
+    return this.engine.getObjectsAtTime(time, midiBlocks, bpm);
   }
 
   // --- Implementation of clone method ---
   clone(): this {
-    // Create a new instance of the same class
+    // Create a new instance - constructor will re-initialize properties and engine
     const cloned = new BasicSynthesizer() as this;
-    
-    // Deep copy the properties map
-    cloned.properties = new Map();
+
+    // Deep copy the *current* property values from the original to the clone
     this.properties.forEach((property, name) => {
-      cloned.properties.set(name, property.clone());
+       // Get the corresponding property on the clone (which was initialized with defaults)
+       const clonedProperty = cloned.properties.get(name);
+       if (clonedProperty) {
+           // Set the clone's property value to the original's current value
+           clonedProperty.value = property.value;
+       }
     });
+
+    // The clone's engine is already initialized in its constructor with the correct 'this' context
+    // and the default property values. The loop above updates the property values to match the original.
+    // The engine definitions (closures) in the clone correctly reference the clone's 'this.properties'.
 
     return cloned;
   }

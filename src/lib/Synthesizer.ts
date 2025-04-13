@@ -1,9 +1,11 @@
 import { MIDIBlock, VisualObject } from './types';
 import { Property } from './properties/Property';
+import VisualObjectEngine from './VisualObjectEngine';
 
 abstract class Synthesizer {
   // Map to store configurable properties
   public properties: Map<string, Property<any>> = new Map();
+  protected engine!: VisualObjectEngine; // Non-null assertion, initialized in subclass
 
   // Abstract method for getting visual objects
   abstract getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[];
