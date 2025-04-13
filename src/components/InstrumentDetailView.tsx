@@ -6,6 +6,13 @@ import { Track } from '../lib/types';
 import Synthesizer from '../lib/Synthesizer';
 import BasicSynthesizer from '../lib/synthesizers/BasicSynthesizer';
 import DrumSynthesizer from '../lib/synthesizers/DrumSynthesizer';
+import SpiralSynth from '../lib/synthesizers/SpiralSynth';
+import ParticleBurstSynth from '../lib/synthesizers/ParticleBurstSynth';
+import NestedCubeSynth from '../lib/synthesizers/NestedCubeSynth';
+import PulsingRadiusSynth from '../lib/synthesizers/PulsingRadiusSynth';
+import RadialVibratingSynth from '../lib/synthesizers/RadialVibratingSynth';
+import FracturingCubeSynth from '../lib/synthesizers/FracturingCubeSynth';
+import HypotrochoidSynth from '../lib/synthesizers/HypotrochoidSynth';
 import { Property } from '../lib/properties/Property';
 import SliderPropertyControl from './properties/SliderPropertyControl';
 import NumberInputPropertyControl from './properties/NumberInputPropertyControl';
@@ -18,7 +25,14 @@ interface InstrumentDetailViewProps {
 // Map synthesizer types to their classes and display names
 const synthesizerOptions: { [key: string]: { class: new () => Synthesizer, name: string } } = {
   basic: { class: BasicSynthesizer, name: 'Basic Synth' },
-  drum: { class: DrumSynthesizer, name: 'Drum Synth' }
+  drum: { class: DrumSynthesizer, name: 'Drum Synth' },
+  spiral: { class: SpiralSynth, name: 'Spiral Synth' },
+  particleBurst: { class: ParticleBurstSynth, name: 'Particle Burst' },
+  nestedCube: { class: NestedCubeSynth, name: 'Nested Cube' },
+  pulsingRadius: { class: PulsingRadiusSynth, name: 'Pulsing Radius' },
+  radialVibrating: { class: RadialVibratingSynth, name: 'Radial Vibrator' },
+  fracturingCube: { class: FracturingCubeSynth, name: 'Fracturing Cube' },
+  hypotrochoid: { class: HypotrochoidSynth, name: 'Hypotrochoid' },
 };
 
 function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
