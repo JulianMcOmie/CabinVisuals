@@ -18,10 +18,13 @@ const GRID_SNAP = 0.25; // Snap to 1/4 beat
 const KEY_COUNT = 88; // 88 piano keys (A0 to C8)
 const LOWEST_NOTE = 21; // A0 MIDI note number
 const NOTE_COLOR = '#4a90e2'; // Color for MIDI notes
+const SELECTED_NOTE_COLOR = '#b3d9ff'; // Even brighter color for selected notes, closer to white
 const RESIZE_HANDLE_WIDTH = 5; // Width of resize handles in pixels
+const SELECTION_BOX_COLOR = 'rgba(100, 181, 255, 0.2)'; // Semi-transparent blue for selection box
+const SELECTION_BOX_BORDER_COLOR = 'rgba(100, 181, 255, 0.8)'; // More opaque blue for selection box border
 
 function MidiEditor({ block, track }: MidiEditorProps) {
-  const { updateMidiBlock, selectNotes } = useStore();
+  const { updateMidiBlock, selectNotes: storeSelectNotes } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -34,11 +37,16 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [clickOffset, setClickOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [hoverCursor, setHoverCursor] = useState<'default' | 'move' | 'w-resize' | 'e-resize'>('default');
+  
+  // Selection related state
+  const [selectionBox, setSelectionBox] = useState<{ startX: number, startY: number, endX: number, endY: number } | null>(null);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
 
   const blockDuration = block.endBeat - block.startBeat;
   const editorWidth = blockDuration * PIXELS_PER_BEAT;
   const editorHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
 
+  // Draw grid lines, notes, and selection box on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -102,8 +110,10 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       const noteWidth = note.duration * PIXELS_PER_BEAT;
       const noteHeight = PIXELS_PER_SEMITONE;
       
-      // Draw note body
-      ctx.fillStyle = NOTE_COLOR;
+      // Set color based on selection state
+      const isSelected = selectedNoteIds.includes(note.id);
+      ctx.fillStyle = isSelected ? SELECTED_NOTE_COLOR : NOTE_COLOR;
+      
       // Round corners for the note
       const radius = 3;
       ctx.beginPath();
@@ -131,7 +141,54 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       ctx.lineWidth = 1;
       ctx.stroke();
     });
-  }, [block.notes, blockDuration, editorWidth, editorHeight]);
+    
+    // Draw selection box if active
+    if (selectionBox && isDragging) {
+      // Draw semi-transparent selection box
+      ctx.fillStyle = SELECTION_BOX_COLOR;
+      ctx.fillRect(
+        Math.min(selectionBox.startX, selectionBox.endX),
+        Math.min(selectionBox.startY, selectionBox.endY),
+        Math.abs(selectionBox.endX - selectionBox.startX),
+        Math.abs(selectionBox.endY - selectionBox.startY)
+      );
+      
+      // Draw selection box border
+      ctx.strokeStyle = SELECTION_BOX_BORDER_COLOR;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        Math.min(selectionBox.startX, selectionBox.endX),
+        Math.min(selectionBox.startY, selectionBox.endY),
+        Math.abs(selectionBox.endX - selectionBox.startX),
+        Math.abs(selectionBox.endY - selectionBox.startY)
+      );
+    }
+  }, [block.notes, blockDuration, editorWidth, editorHeight, selectionBox, isDragging, selectedNoteIds]);
+
+  // Helper function to check if a note is inside the selection box
+  const isNoteInSelectionBox = (note: MIDINote, box: { startX: number, startY: number, endX: number, endY: number }) => {
+    if (!box) return false;
+    
+    const noteX = note.startBeat * PIXELS_PER_BEAT;
+    const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
+    const noteWidth = note.duration * PIXELS_PER_BEAT;
+    const noteHeight = PIXELS_PER_SEMITONE;
+    const noteEndX = noteX + noteWidth;
+    const noteEndY = noteY + noteHeight;
+    
+    const boxLeft = Math.min(box.startX, box.endX);
+    const boxRight = Math.max(box.startX, box.endX);
+    const boxTop = Math.min(box.startY, box.endY);
+    const boxBottom = Math.max(box.startY, box.endY);
+    
+    // Check if note overlaps with selection box
+    return !(
+      noteEndX < boxLeft ||
+      noteX > boxRight ||
+      noteEndY < boxTop ||
+      noteY > boxBottom
+    );
+  };
 
   // Helper functions for canvas interactions
   const getCoordsFromEvent = (e: MouseEvent | React.MouseEvent): { x: number, y: number, beat: number, pitch: number } | null => {
@@ -149,8 +206,37 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     return { x, y, beat, pitch };
   };
   
+  // Modified findNoteAt to work with multiple note selection
   const findNoteAt = (x: number, y: number): { note: MIDINote, area: 'start' | 'end' | 'body' } | null => {
-    // Check each note to see if the coordinates fall within it
+    // First check if any selected note was clicked (prioritize selected notes)
+    if (selectedNoteIds.length > 0) {
+      for (const noteId of selectedNoteIds) {
+        const note = block.notes.find(n => n.id === noteId);
+        if (!note) continue;
+        
+        const noteX = note.startBeat * PIXELS_PER_BEAT;
+        const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
+        const noteWidth = note.duration * PIXELS_PER_BEAT;
+        const noteHeight = PIXELS_PER_SEMITONE;
+        
+        if (
+          x >= noteX && 
+          x <= noteX + noteWidth && 
+          y >= noteY && 
+          y <= noteY + noteHeight
+        ) {
+          if (x <= noteX + RESIZE_HANDLE_WIDTH) {
+            return { note, area: 'start' };
+          } else if (x >= noteX + noteWidth - RESIZE_HANDLE_WIDTH) {
+            return { note, area: 'end' };
+          } else {
+            return { note, area: 'body' };
+          }
+        }
+      }
+    }
+    
+    // If no selected note was clicked, check all notes
     for (const note of block.notes) {
       const noteX = note.startBeat * PIXELS_PER_BEAT;
       const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
@@ -163,7 +249,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         y >= noteY && 
         y <= noteY + noteHeight
       ) {
-        // Found a note, now determine which area was clicked
         if (x <= noteX + RESIZE_HANDLE_WIDTH) {
           return { note, area: 'start' };
         } else if (x >= noteX + noteWidth - RESIZE_HANDLE_WIDTH) {
@@ -193,6 +278,25 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       e.stopPropagation();
       const { note, area } = result;
       
+      // Handle selection behavior
+      if (!e.shiftKey && !selectedNoteIds.includes(note.id)) {
+        // If not holding shift and note is not already selected, select only this note
+        setSelectedNoteIds([note.id]);
+        storeSelectNotes([note]);
+      } else if (e.shiftKey) {
+        // If holding shift, toggle this note's selection
+        if (selectedNoteIds.includes(note.id)) {
+          const newSelectedIds = selectedNoteIds.filter(id => id !== note.id);
+          setSelectedNoteIds(newSelectedIds);
+          storeSelectNotes(block.notes.filter(n => newSelectedIds.includes(n.id)));
+        } else {
+          const newSelectedIds = [...selectedNoteIds, note.id];
+          setSelectedNoteIds(newSelectedIds);
+          storeSelectNotes(block.notes.filter(n => newSelectedIds.includes(n.id)));
+        }
+      }
+      
+      // Set up for dragging
       setDragNoteId(note.id);
       setDragStartBeat(note.startBeat);
       setDragDuration(note.duration);
@@ -206,7 +310,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       } else {
         setDragOperation('move');
         setHoverCursor('move');
-        selectNotes([note]);
         
         // Calculate click offset within the note for smooth dragging
         const noteX = note.startBeat * PIXELS_PER_BEAT;
@@ -214,11 +317,18 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         setClickOffset({ x: x - noteX, y: y - noteY });
       }
     } else {
-      // Clicked on empty space - will create a note on mouseup if not dragging
+      // Clicked on empty space - will start selection box
       setDragOperation('select');
+      setSelectionBox({ startX: x, startY: y, endX: x, endY: y });
+      
+      // Clear selection if not holding shift
+      if (!e.shiftKey) {
+        setSelectedNoteIds([]);
+        storeSelectNotes([]);
+      }
+      
       setDragNoteId(null);
       setHoverCursor('default');
-      selectNotes([]);
     }
   };
   
@@ -227,42 +337,74 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       // We were dragging a note - just end the drag
       setDragNoteId(null);
       setDragOperation('none');
+      setSelectionBox(null);
       return;
     }
     
-    if (dragOperation !== 'select' || isDragging) {
-      // Either not in selection mode or we were dragging selection
+    if (dragOperation === 'select') {
+      // Handle selection box completion
+      if (selectionBox) {
+        // If selection box is very small (basically a click), create a note
+        const boxWidth = Math.abs(selectionBox.endX - selectionBox.startX);
+        const boxHeight = Math.abs(selectionBox.endY - selectionBox.startY);
+        
+        if (boxWidth < 5 && boxHeight < 5 && !isDragging) {
+          // Treat as a click for note creation
+          const coords = getCoordsFromEvent(e);
+          if (!coords) return;
+          
+          const { beat, pitch } = coords;
+          
+          // Snap to grid
+          const snappedBeat = Math.floor(beat / GRID_SNAP) * GRID_SNAP;
+          
+          // Ensure values are in valid range
+          if (snappedBeat < 0 || snappedBeat >= blockDuration || pitch < 0 || pitch > 127) {
+            setDragOperation('none');
+            setSelectionBox(null);
+            return;
+          }
+          
+          // Create a new note
+          const newNote: MIDINote = {
+            id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            startBeat: snappedBeat,
+            duration: 1, // Default to 1 beat
+            velocity: 100,
+            pitch
+          };
+          
+          // Add to block
+          const updatedBlock = { ...block };
+          updatedBlock.notes = [...block.notes, newNote];
+          updateMidiBlock(track.id, updatedBlock);
+        } else {
+          // Process notes inside selection box
+          const notesInSelection = block.notes.filter(note => 
+            isNoteInSelectionBox(note, selectionBox)
+          );
+          
+          if (e.shiftKey) {
+            // Add to existing selection if shift is held
+            const newSelectedIds = [...new Set([...selectedNoteIds, ...notesInSelection.map(n => n.id)])];
+            setSelectedNoteIds(newSelectedIds);
+            storeSelectNotes(block.notes.filter(n => newSelectedIds.includes(n.id)));
+          } else {
+            // Replace selection
+            setSelectedNoteIds(notesInSelection.map(n => n.id));
+            storeSelectNotes(notesInSelection);
+          }
+        }
+      }
+      
       setDragOperation('none');
+      setSelectionBox(null);
       return;
     }
     
-    // If we reach here, it was a click on empty space - create a new note
-    const coords = getCoordsFromEvent(e);
-    if (!coords) return;
-    
-    const { beat, pitch } = coords;
-    
-    // Snap to grid
-    const snappedBeat = Math.floor(beat / GRID_SNAP) * GRID_SNAP;
-    
-    // Ensure values are in valid range
-    if (snappedBeat < 0 || snappedBeat >= blockDuration || pitch < 0 || pitch > 127) {
-      return;
-    }
-    
-    // Create a new note
-    const newNote: MIDINote = {
-      id: `note-${block.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      startBeat: snappedBeat,
-      duration: 1, // Default to 1 beat
-      velocity: 100,
-      pitch
-    };
-    
-    // Add to block
-    const updatedBlock = { ...block };
-    updatedBlock.notes = [...block.notes, newNote];
-    updateMidiBlock(track.id, updatedBlock);
+    // Other operations handled elsewhere
+    setDragOperation('none');
+    setSelectionBox(null);
   };
   
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -281,11 +423,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     }
   };
   
-  // Add mousemove handler for the canvas to handle hover styles
+  // Modified canvasMouseMove to handle selection box updates
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Skip if we're already in a drag operation
-    if (dragOperation !== 'none') return;
-    
     const coords = getCoordsFromEvent(e);
     if (!coords) {
       setHoverCursor('default');
@@ -293,6 +432,31 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     }
     
     const { x, y } = coords;
+    
+    // Update selection box if in select mode
+    if (dragOperation === 'select' && selectionBox) {
+      setSelectionBox({
+        ...selectionBox,
+        endX: x,
+        endY: y
+      });
+      
+      // Set isDragging if we've moved a significant distance
+      if (!isDragging) {
+        const dx = x - selectionBox.startX;
+        const dy = y - selectionBox.startY;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) {
+          setIsDragging(true);
+        }
+      }
+      
+      return;
+    }
+    
+    // Skip hover effects if we're already in a drag operation
+    if (dragOperation !== 'none') return;
+    
+    // Handle hover cursor
     const result = findNoteAt(x, y);
     
     if (result) {
@@ -310,9 +474,34 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     }
   };
 
-  // Global mouse move handler
+  // Modified global mouse move handler to handle multi-select movement
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      // Handle selection box updates
+      if (dragOperation === 'select' && selectionBox) {
+        const coords = getCoordsFromEvent(e);
+        if (!coords) return;
+        
+        // Update selection box
+        setSelectionBox({
+          ...selectionBox,
+          endX: coords.x,
+          endY: coords.y
+        });
+        
+        // Set isDragging if we've moved a significant distance
+        if (!isDragging) {
+          const dx = coords.x - selectionBox.startX;
+          const dy = coords.y - selectionBox.startY;
+          if (Math.sqrt(dx * dx + dy * dy) > 5) {
+            setIsDragging(true);
+          }
+        }
+        
+        return;
+      }
+      
+      // Handle note modifications
       if (dragOperation === 'none' || !dragNoteId) return;
       
       // Check if we've dragged enough to be considered a drag vs. click
@@ -329,6 +518,54 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       const coords = getCoordsFromEvent(e);
       if (!coords) return;
       
+      // Special handling for move operation with multiple selected notes
+      if (dragOperation === 'move' && selectedNoteIds.length > 0) {
+        // Get the primary note being dragged
+        const primaryNoteIndex = block.notes.findIndex(note => note.id === dragNoteId);
+        if (primaryNoteIndex === -1) return;
+        
+        const primaryNote = block.notes[primaryNoteIndex];
+        
+        const { x, y } = coords;
+        
+        // Calculate the target position for the primary note
+        const targetX = x - clickOffset.x;
+        const targetY = y - clickOffset.y;
+        
+        // Convert to beat and pitch, with snapping
+        const targetBeat = Math.round(targetX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
+        const targetPitch = KEY_COUNT - Math.floor(targetY / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
+        
+        // Calculate the delta from primary note's original position
+        const beatDelta = targetBeat - primaryNote.startBeat;
+        const pitchDelta = targetPitch - primaryNote.pitch;
+        
+        // Skip if no change
+        if (beatDelta === 0 && pitchDelta === 0) return;
+        
+        // Update all selected notes with the same delta
+        const updatedBlock = { ...block };
+        updatedBlock.notes = block.notes.map(note => {
+          if (selectedNoteIds.includes(note.id)) {
+            const newStartBeat = note.startBeat + beatDelta;
+            const newPitch = note.pitch + pitchDelta;
+            
+            // Clamp values
+            return {
+              ...note,
+              startBeat: Math.max(0, Math.min(blockDuration - note.duration, newStartBeat)),
+              pitch: Math.max(0, Math.min(127, newPitch))
+            };
+          }
+          return note;
+        });
+        
+        // Update block
+        updateMidiBlock(track.id, updatedBlock);
+        return;
+      }
+      
+      // Handle single note operations (start/end resize)
       const noteIndex = block.notes.findIndex(note => note.id === dragNoteId);
       if (noteIndex === -1) return;
       
@@ -354,22 +591,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         newDuration = Math.max(GRID_SNAP, Math.min(blockDuration - note.startBeat, newDuration));
         
         note.duration = newDuration;
-        
-      } else if (dragOperation === 'move') {
-        // Moving note - adjust position (startBeat and pitch)
-        const { x, y } = coords;
-        
-        // Adjust for click offset within the note
-        const targetX = x - clickOffset.x;
-        const targetY = y - clickOffset.y;
-        
-        // Convert to beat and pitch, with snapping
-        const targetBeat = Math.round(targetX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
-        const targetPitch = KEY_COUNT - Math.floor(targetY / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
-        
-        // Clamp to valid ranges
-        note.startBeat = Math.max(0, Math.min(blockDuration - note.duration, targetBeat));
-        note.pitch = Math.max(0, Math.min(127, targetPitch));
       }
       
       // Update the note in the block
@@ -383,6 +604,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       setDragNoteId(null);
       setDragOperation('none');
       setIsDragging(false);
+      setSelectionBox(null);
       
       // When mouse is up, we need to reset the hover cursor 
       // and let the regular mousemove handler take over
@@ -411,14 +633,50 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       }
     };
     
+    // Handle key events
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Delete key to remove selected notes
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedNoteIds.length > 0) {
+          const updatedBlock = { ...block };
+          updatedBlock.notes = block.notes.filter(note => !selectedNoteIds.includes(note.id));
+          updateMidiBlock(track.id, updatedBlock);
+          setSelectedNoteIds([]);
+          storeSelectNotes([]);
+        }
+      }
+      
+      // Escape key to clear selection
+      if (e.key === 'Escape') {
+        setSelectedNoteIds([]);
+        storeSelectNotes([]);
+      }
+    };
+    
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('keydown', handleKeyDown);
     
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [block, track.id, dragNoteId, dragOperation, dragStart, dragStartBeat, dragDuration, isDragging, updateMidiBlock, blockDuration]);
+  }, [
+    block, 
+    track.id, 
+    dragNoteId, 
+    dragOperation, 
+    dragStart, 
+    dragStartBeat, 
+    dragDuration, 
+    isDragging, 
+    updateMidiBlock, 
+    blockDuration,
+    selectionBox,
+    selectedNoteIds,
+    storeSelectNotes
+  ]);
 
   return (
     <div 
