@@ -115,6 +115,7 @@ export function useTrackGestures({
         setDragOperation('none');
         setDragBlockId(null);
         setDragTrackId(null);
+        setOriginalDragTrackId(null);
       }
     };
 
@@ -169,6 +170,9 @@ export function useTrackGestures({
         const potentialTargetTrack = tracks[targetTrackIndex];
         if (potentialTargetTrack) {
           targetTrackId = potentialTargetTrack.id;
+        }
+        if (targetTrackId !== dragTrackId) {
+            changed = true;
         }
       }
 
