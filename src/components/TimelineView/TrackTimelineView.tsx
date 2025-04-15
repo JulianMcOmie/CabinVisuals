@@ -332,14 +332,22 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
       ref={timelineAreaRef}
       className="all-tracks-timeline-view"
       style={{
-        position: 'relative',
         width: '100%',
         height: `${tracks.length * TRACK_HEIGHT}px`,
         backgroundColor: '#222',
-        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
-      <div className="grid-lines-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}>
+      <div className="grid-lines-container" style={{ 
+        position: 'absolute',
+        top: 0, 
+        left: 0, 
+        width: '100%', 
+        height: '100%',
+        zIndex: 0, 
+        pointerEvents: 'none'
+      }}>
         {Array.from({ length: numMeasures * 4 }).map((_, i) => (
           <div key={`grid-${i}`} style={{
             position: 'absolute',
@@ -359,11 +367,10 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
           style={{
             height: `${TRACK_HEIGHT}px`,
             borderBottom: '1px solid #333',
-            position: 'relative',
-            top: `${index * TRACK_HEIGHT}px`,
             left: 0,
             width: '100%',
             boxSizing: 'border-box',
+            position: 'relative'
           }}
           onDoubleClick={(e) => handleDoubleClick(e, track.id)}
           onContextMenu={(e) => handleContextMenu(e, null, track.id)}
