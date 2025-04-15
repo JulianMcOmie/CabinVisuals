@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../../store/store'; // Import the actual store hook
-import { InstrumentDefinition } from '../../store/store'; // Import InstrumentDefinition type if not already
+import { InstrumentDefinition } from '../../store/store'; // Import InstrumentDefinition type
 
 const InstrumentSidebar: React.FC = () => {
   // Select needed state and actions from the store
-  const { availableInstruments, selectedTrackId, updateTrack } = useStore();
+  const {
+    availableInstruments,
+    selectedTrackId,
+    updateTrack,
+    selectedTrack // Select the currently selected track object
+  } = useStore();
 
-  // Initialize expanded state based on store data
+  // State to track the ID of the highlighted instrument in the sidebar
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState<string | null>(null);
+
+  // State for expanded categories (remains the same)
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() =>
     Object.keys(availableInstruments).reduce((acc, category) => {
       acc[category] = true; // Default to expanded
@@ -14,7 +22,26 @@ const InstrumentSidebar: React.FC = () => {
     }, {} as Record<string, boolean>)
   );
 
-  // Reset expanded state if availableInstruments changes (e.g., dynamic loading)
+  // Effect to update highlighted instrument based on the selected track
+  useEffect(() => {
+    if (selectedTrack && selectedTrack.synthesizer) {
+      const currentSynthConstructor = selectedTrack.synthesizer.constructor;
+      let foundId: string | null = null;
+      // Iterate through available instruments to find a match by constructor
+      for (const category in availableInstruments) {
+        const found = availableInstruments[category].find(inst => inst.constructor === currentSynthConstructor);
+        if (found) {
+          foundId = found.id;
+          break;
+        }
+      }
+      setSelectedInstrumentId(foundId); // Set the found ID or null
+    } else {
+      setSelectedInstrumentId(null); // No track selected or track has no synthesizer
+    }
+  }, [selectedTrack, availableInstruments]); // Rerun when selectedTrack or instrument list changes
+
+  // Effect to reset expanded state if availableInstruments changes (remains the same)
   useEffect(() => {
     setExpandedCategories(
       Object.keys(availableInstruments).reduce((acc, category) => {
@@ -30,7 +57,6 @@ const InstrumentSidebar: React.FC = () => {
 
   const handleInstrumentSelect = (instrumentId: string) => {
     if (selectedTrackId) {
-      // Find the instrument definition in the store data
       let selectedInstrumentDef: InstrumentDefinition | null = null;
       for (const category in availableInstruments) {
         const found = availableInstruments[category].find(inst => inst.id === instrumentId);
@@ -40,14 +66,14 @@ const InstrumentSidebar: React.FC = () => {
         }
       }
 
-      if (selectedInstrumentDef && selectedInstrumentDef.constructor) {
-        // Instantiate the synthesizer using the constructor from the store
+      if (selectedInstrumentDef?.constructor) {
         const newSynthesizerInstance = new selectedInstrumentDef.constructor();
-
-        // Call the updateTrack action with the new synthesizer instance
         updateTrack(selectedTrackId, { synthesizer: newSynthesizerInstance });
+        // Update the highlighted instrument immediately on click
+        setSelectedInstrumentId(instrumentId);
       } else {
         console.error(`Instrument definition or constructor not found for ID: ${instrumentId}`);
+        setSelectedInstrumentId(null); // Clear selection if instantiation fails
       }
     } else {
       console.warn('No track selected to assign the instrument to.');
@@ -66,11 +92,12 @@ const InstrumentSidebar: React.FC = () => {
             <ul className="instrument-list">
               {instruments.map((instrument) => (
                 <li
-                  key={instrument.id} // Use the instrument id from the store data
-                  onClick={() => handleInstrumentSelect(instrument.id)} // Pass the instrument id
-                  className="instrument-item"
+                  key={instrument.id}
+                  onClick={() => handleInstrumentSelect(instrument.id)}
+                  // Apply 'selected' class if this instrument is the selected one
+                  className={`instrument-item ${instrument.id === selectedInstrumentId ? 'selected' : ''}`}
                 >
-                  {instrument.name} {/* Use the instrument name from the store data */}
+                  {instrument.name}
                 </li>
               ))}
             </ul>
@@ -107,12 +134,22 @@ const InstrumentSidebar: React.FC = () => {
           margin: 0;
         }
         .instrument-item {
-          padding: 4px 0;
+          padding: 4px 8px; /* Added some horizontal padding */
           cursor: pointer;
           border-radius: 3px;
+          margin: 1px 0; /* Added tiny margin */
         }
         .instrument-item:hover {
           background-color: #e0e0e0;
+        }
+        /* Style for the selected instrument */
+        .instrument-item.selected {
+          background-color: #cce5ff; /* Light blue background */
+          font-weight: bold;
+          color: #004085; /* Darker blue text */
+        }
+        .instrument-item.selected:hover {
+          background-color: #b8daff; /* Slightly darker blue on hover */
         }
       `}</style>
     </div>
