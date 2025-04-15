@@ -21,7 +21,6 @@ function TimelineView() {
   const { currentBeat, trackManager, addTrack, selectTrack, seekTo } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null); // Ref for the playhead
-  const [trackHeight, setTrackHeight] = useState(TRACK_HEIGHT);
   const [isDragging, setIsDragging] = useState(false); // State for dragging
 
   // Handle adding a new track
@@ -92,6 +91,7 @@ function TimelineView() {
 
   // Get tracks from track manager
   const tracks = trackManager?.getTracks() || [];
+  const totalTracksHeight = tracks.length * TRACK_HEIGHT;
 
   return (
     <div className="timeline-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -170,58 +170,71 @@ function TimelineView() {
             <MeasuresHeader />
           </div>
           
-          {/* Track content area */}
+          {/* Combined content area for instruments and timelines */}
           <div style={{ 
             width: '3200px', // Width to accommodate all measures
-            minHeight: '100%',
-            paddingTop: '0', // No need for padding as header is sticky
-            position: 'relative'
+            minHeight: '100%', // Ensure it fills vertical space
+            paddingTop: '40px', // Space for the MeasuresHeader
+            position: 'relative', // Context for absolute positioning of playhead
+            display: 'flex', // Use flexbox for side-by-side layout
+            height: `${totalTracksHeight}px` // Set explicit height for track area
           }}>
-            {/* Track rows */}
-            {tracks.map(track => (
-              <div 
-                key={track.id} 
-                className="track-row"
-                style={{ 
-                  height: `${trackHeight}px`,
-                  position: 'relative',
-                  display: 'flex'
-                }}
-              >
-                {/* Instrument view - sticky at left */}
-                <div style={{
-                  position: 'sticky',
-                  left: 0,
-                  width: '200px',
-                  height: '100%',
-                  zIndex: 1,
-                  backgroundColor: SIDEBAR_BG_COLOR,
-                  borderRight: '1px solid #333',
-                  boxSizing: 'border-box'
-                }}>
+            {/* Instrument Views Column - sticky */}
+            <div 
+              className="instruments-column"
+              style={{
+                position: 'sticky', // Make this column sticky
+                left: 0, // Stick to the left edge
+                width: `${SIDEBAR_WIDTH}px`, // Use constant width
+                zIndex: 1, // Above timeline background, below header/playhead
+                backgroundColor: SIDEBAR_BG_COLOR, // Match sidebar background
+                borderRight: '1px solid #333', // Keep the border
+                height: '100%' // Takes full height of the container (totalTracksHeight)
+              }}
+            >
+              {/* Map over tracks to render InstrumentView */}
+              {tracks.map(track => (
+                <div 
+                  key={`${track.id}-instrument`} // Unique key
+                  style={{ 
+                    height: `${TRACK_HEIGHT}px`, // Use fixed track height
+                    borderBottom: '1px solid #333', // Add border between instruments
+                    boxSizing: 'border-box'
+                  }}
+                >
                   <InstrumentView track={track} />
                 </div>
-                
-                {/* Timeline view for the track */}
-                <div style={{ flex: 1 }}>
-                  <TrackTimelineView track={track} />
-                </div>
-              </div>
-            ))}
-            
-            {/* Show message when no tracks exist */}
-            {tracks.length === 0 && (
-              <div style={{
-                padding: '20px 0 0 220px',
-                color: 'white',
-                fontStyle: 'italic'
-              }}>
-                Click the + button to add a track
-              </div>
-            )}
+              ))}
+            </div>
+
+            {/* Single TrackTimelineView for all tracks */}
+            <div 
+              className="timelines-column"
+              style={{
+                flex: 1, // Take remaining horizontal space
+                position: 'relative', // Needed for positioning blocks correctly
+                height: '100%' // Takes full height of the container (totalTracksHeight)
+              }}
+            >
+              <TrackTimelineView tracks={tracks} />
+            </div>
           </div>
           
-          {/* Playhead - positioned absolutely within the scrollable area */}
+          {/* Message when no tracks exist - Adjust positioning if needed */}
+          {tracks.length === 0 && (
+            <div style={{ 
+              // Position relative to the scrollable container, below header
+              position: 'absolute', 
+              top: '60px', // Adjust as needed (below header + some padding)
+              left: `${SIDEBAR_WIDTH + 20}px`, // Position to the right of the sidebar area
+              color: 'white', 
+              fontStyle: 'italic' 
+            }}>
+              Click the + button to add a track
+            </div>
+          )}
+
+          {/* Playhead - position relative to timeline-content */}
           <div 
             ref={playheadRef} // Assign ref
             className="playhead" 
@@ -230,12 +243,13 @@ function TimelineView() {
               position: 'absolute',
               top: '40px', // Start below the measures header
               left: `${playheadPosition}px`,
-              width: '3px', // Slightly wider for easier grabbing
-              height: 'calc(100% - 40px)', // Extend full height below header
+              width: '3px',
+              // Height should span the track area OR the visible viewport, 
+              // depending on desired behavior. Spanning total track height seems correct.
+              height: `calc(${totalTracksHeight}px)`, // Span height of all tracks
               backgroundColor: 'red',
-              zIndex: 4, // Ensure it's above other elements
-              // pointerEvents: 'none' // REMOVE this to allow interaction
-              cursor: 'ew-resize' // Add resize cursor
+              zIndex: 4, 
+              cursor: 'ew-resize' 
             }}
           />
         </div>

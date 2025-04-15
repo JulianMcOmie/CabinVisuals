@@ -3,16 +3,18 @@ import { MIDIBlock } from '../../lib/types';
 
 interface MidiBlockViewProps {
   block: MIDIBlock;
+  trackId: string;
   isSelected: boolean;
   pixelsPerBeat: number;
   onSelectBlock: (blockId: string) => void;
-  onStartEdge: (blockId: string, clientX: number) => void;
-  onEndEdge: (blockId: string, clientX: number) => void;
-  onMoveBlock: (blockId: string, clientX: number) => void;
+  onStartEdge: (trackId: string, blockId: string, clientX: number) => void;
+  onEndEdge: (trackId: string, blockId: string, clientX: number) => void;
+  onMoveBlock: (trackId: string, blockId: string, clientX: number) => void;
 }
 
 function MidiBlockView({
   block,
+  trackId,
   isSelected,
   pixelsPerBeat,
   onSelectBlock,
@@ -27,12 +29,12 @@ function MidiBlockView({
   // Edge dragging handlers
   const handleLeftEdgeMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onStartEdge(block.id, e.clientX);
+    onStartEdge(trackId, block.id, e.clientX);
   };
   
   const handleRightEdgeMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onEndEdge(block.id, e.clientX);
+    onEndEdge(trackId, block.id, e.clientX);
   };
   
   // Block move handler
@@ -41,7 +43,7 @@ function MidiBlockView({
     if (!e.currentTarget.classList.contains('edge')) {
       e.stopPropagation();
       onSelectBlock(block.id);
-      onMoveBlock(block.id, e.clientX);
+      onMoveBlock(trackId, block.id, e.clientX);
     }
   };
 
