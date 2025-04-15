@@ -7,8 +7,11 @@ import PlaybarView from '../src/components/PlaybarView';
 import DetailView from '../src/components/DetailView';
 import AudioLoader from '../src/components/AudioLoader';
 import InstrumentSidebar from '../src/components/InstrumentSidebar/InstrumentSidebar';
+import useStore from '../src/store/store';
 
 export default function Home() {
+  const isInstrumentSidebarVisible = useStore((state) => state.isInstrumentSidebarVisible);
+
   return (
     <main className="main-container">
       <div className="playbar-container">
@@ -16,9 +19,11 @@ export default function Home() {
       </div>
       
       <div className="content-container">
-        <div className="sidebar-area">
-          <InstrumentSidebar />
-        </div>
+        {isInstrumentSidebarVisible && (
+          <div className="sidebar-area">
+            <InstrumentSidebar />
+          </div>
+        )}
         <div className="main-content-area">
           <div className="top-section">
             <div className="detail-container">
@@ -73,6 +78,7 @@ export default function Home() {
           flex: 0 0 250px;
           height: 100%;
           overflow: hidden;
+          transition: width 0.3s ease, flex-basis 0.3s ease, opacity 0.3s ease;
         }
         
         .main-content-area {

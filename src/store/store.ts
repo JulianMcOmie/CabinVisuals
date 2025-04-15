@@ -50,6 +50,9 @@ interface AppState {
   // Add instrument definitions
   availableInstruments: InstrumentCategories;
 
+  // NEW: Sidebar visibility state
+  isInstrumentSidebarVisible: boolean;
+
   // Actions
   selectTrack: (trackId: string | null) => void;
   selectBlock: (blockId: string | null) => void;
@@ -67,6 +70,9 @@ interface AppState {
   stop: () => void;
   setBPM: (bpm: number) => void;
   seekTo: (beat: number) => void;
+
+  // NEW: Action to toggle sidebar
+  toggleInstrumentSidebar: () => void;
 }
 
 // Define the actual instrument data with constructors
@@ -132,6 +138,9 @@ const useStore = create<AppState>((set, get) => {
     
     // Add instruments to initial state
     availableInstruments: availableInstrumentsData,
+    
+    // Initialize sidebar as visible
+    isInstrumentSidebarVisible: true,
     
     // Actions
     selectTrack: (trackId: string | null) => {
@@ -406,7 +415,12 @@ const useStore = create<AppState>((set, get) => {
               audioManager.seek(targetTime);
           }
       }
-    }
+    },
+
+    // NEW: Action to toggle sidebar
+    toggleInstrumentSidebar: () => set((state) => ({ 
+      isInstrumentSidebarVisible: !state.isInstrumentSidebarVisible 
+    })),
   };
 });
 

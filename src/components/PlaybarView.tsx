@@ -199,7 +199,9 @@ const PlaybarView: React.FC = () => {
     pause, 
     stop, 
     setBPM, 
-    seekTo 
+    seekTo,
+    isInstrumentSidebarVisible,
+    toggleInstrumentSidebar
   } = useStore();
   
   // For demo purposes, set total measure length to 16 bars (64 beats in 4/4)
@@ -207,6 +209,7 @@ const PlaybarView: React.FC = () => {
   
   return (
     <div className="playbar-view" style={{ 
+      width: '100%',
       height: '100%', 
       padding: '0 15px', 
       display: 'flex', 
@@ -219,9 +222,25 @@ const PlaybarView: React.FC = () => {
         alignItems: 'center', 
         justifyContent: 'space-between',
         width: '100%',
-        gap: '20px'
+        gap: '15px'
       }}>
-        {/* Transport buttons */}
+        <button 
+          onClick={toggleInstrumentSidebar}
+          title={isInstrumentSidebarVisible ? "Hide Instruments" : "Show Instruments"}
+          style={{
+            background: isInstrumentSidebarVisible ? '#555' : '#333',
+            border: 'none',
+            color: 'white',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold'
+          }}
+        >
+          🎹
+        </button>
+
         <div className="transport-buttons" style={{ 
           display: 'flex', 
           alignItems: 'center',
@@ -245,10 +264,8 @@ const PlaybarView: React.FC = () => {
           )}
         </div>
         
-        {/* Time display */}
         <TimeDisplay beat={currentBeat} />
         
-        {/* Seek bar - takes up most space */}
         <SeekBar
           currentBeat={currentBeat}
           isPlaying={isPlaying}
@@ -256,7 +273,6 @@ const PlaybarView: React.FC = () => {
           onSeek={seekTo}
         />
         
-        {/* BPM control */}
         <BPMControl
           bpm={bpm}
           onChange={setBPM}
