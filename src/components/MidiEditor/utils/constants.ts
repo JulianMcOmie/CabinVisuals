@@ -10,6 +10,7 @@ export const RESIZE_HANDLE_WIDTH = 5; // Width of resize handles in pixels
 export const SELECTION_BOX_COLOR = 'rgba(100, 181, 255, 0.2)'; // Semi-transparent blue for selection box
 export const SELECTION_BOX_BORDER_COLOR = 'rgba(100, 181, 255, 0.8)'; // More opaque blue for selection box border
 export const PASTE_OFFSET = 1.5; // Offset in beats when pasting notes
+export const MINIMUM_NOTE_DURATION = 0.25; // Minimum note duration in beats
 
 // Common type definitions specific to MIDI Editor
 export type DragOperation = 'none' | 'select' | 'start' | 'end' | 'move';

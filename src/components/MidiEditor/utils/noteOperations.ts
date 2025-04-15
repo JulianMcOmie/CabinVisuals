@@ -1,6 +1,7 @@
 import { MIDIBlock, MIDINote } from '../../../lib/types';
 import { 
   GRID_SNAP, 
+  MINIMUM_NOTE_DURATION, 
   PASTE_OFFSET,
 } from './constants';
 import { generateNoteId, isNoteInSelectionBox } from './utils';
@@ -171,6 +172,13 @@ export const resizeNotesFromStart = (
   for (const noteId of noteIds) {
     const initialState = initialDragStates.get(noteId);
     if (!initialState) continue;
+
+    deltaBeats = Math.min(deltaBeats, initialState.duration - MINIMUM_NOTE_DURATION);
+  }
+
+  for (const noteId of noteIds) {
+    const initialState = initialDragStates.get(noteId);
+    if (!initialState) continue;
     
     const noteIndex = block.notes.findIndex(note => note.id === noteId);
     if (noteIndex === -1) continue;
@@ -200,6 +208,13 @@ export const resizeNotesFromEnd = (
   const updatedBlock = { ...block };
   updatedBlock.notes = [...block.notes];
   
+  for (const noteId of noteIds) {
+    const initialState = initialDragStates.get(noteId);
+    if (!initialState) continue;
+
+    deltaBeats = Math.max(deltaBeats, -1 * initialState.duration + MINIMUM_NOTE_DURATION);
+  }
+
   for (const noteId of noteIds) {
     const initialState = initialDragStates.get(noteId);
     if (!initialState) continue;

@@ -87,7 +87,6 @@ export const handleDragMove = (
     const dx = coords.x - dragStart.x;
     const deltaBeats = Math.round(dx / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
     
-
     return resizeNotesFromStart(block, selectedNoteIds, deltaBeats, initialDragStates);
   } else if (dragOperation === 'end' && dragNoteId) {
     const updatedBlock = { ...block };
@@ -95,7 +94,7 @@ export const handleDragMove = (
 
     // Resize note from its end edge
     const dx = coords.x - dragStart.x;
-    const deltaBeats = Math.round(dx / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
+    let deltaBeats = Math.round(dx / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
     
     return resizeNotesFromEnd(block, selectedNoteIds, deltaBeats, initialDragStates);
   }
