@@ -14,6 +14,7 @@ interface UseTrackGesturesProps {
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
   addMidiBlock: (trackId: string, block: MIDIBlock) => void;
   removeMidiBlock: (trackId: string, blockId: string) => void;
+  moveMidiBlock: (oldTrackId: string, newTrackId: string, block: MIDIBlock) => void;
   selectBlock: (blockId: string | null) => void;
   selectedBlockId: string | null;
   timelineAreaRef: RefObject<HTMLDivElement | null>;
@@ -25,6 +26,7 @@ export function useTrackGestures({
   updateMidiBlock,
   addMidiBlock,
   removeMidiBlock,
+  moveMidiBlock,
   selectBlock,
   selectedBlockId,
   timelineAreaRef,
@@ -37,6 +39,7 @@ export function useTrackGestures({
   const [dragEndBeat, setDragEndBeat] = useState(0);
   const [dragBlockId, setDragBlockId] = useState<string | null>(null);
   const [dragTrackId, setDragTrackId] = useState<string | null>(null);
+  const [originalDragTrackId, setOriginalDragTrackId] = useState<string | null>(null);
 
   // State for context menu
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -129,7 +132,8 @@ export function useTrackGestures({
       const timelineAreaRect = timelineAreaRef.current.getBoundingClientRect();
       if (!timelineAreaRect) return;
 
-      const currentX = e.clientX;
+      const currentX = e.clientX; // Horizontal position
+      const currentY = e.clientY - timelineAreaRect.top; // Vertical position relative to timeline area
       const deltaX = currentX - dragStartX;
       // Use Math.round for snapping
       const deltaBeat = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
@@ -137,6 +141,7 @@ export function useTrackGestures({
       let newStartBeat: number | undefined;
       let newEndBeat: number | undefined;
       let changed = false;
+      let targetTrackId = dragTrackId; // Assume current track unless mouse moves over another
 
       if (dragOperation === 'start') {
         newStartBeat = Math.max(0, Math.min(block.endBeat - GRID_SNAP, dragStartBeat + deltaBeat));
@@ -158,11 +163,27 @@ export function useTrackGestures({
             updatedBlock.endBeat = newStartBeat + duration;
             changed = true;
         }
+        
+        // Determine target track based on vertical position
+        const targetTrackIndex = Math.floor(Math.max(0, currentY) / TRACK_HEIGHT);
+        const potentialTargetTrack = tracks[targetTrackIndex];
+        if (potentialTargetTrack) {
+          targetTrackId = potentialTargetTrack.id;
+        }
       }
 
-      // Only update if the block actually changed
+      // Decide whether to move or update based on target track
       if (changed) {
-           updateMidiBlock(track.id, updatedBlock);
+         if (dragOperation === 'move' && targetTrackId !== track.id && originalDragTrackId) {
+             // Call moveMidiBlock if dragging to a different track
+             moveMidiBlock(originalDragTrackId, targetTrackId, updatedBlock);
+             // Update the dragTrackId state to reflect the new track for subsequent updates
+             setOriginalDragTrackId(targetTrackId);
+             setDragTrackId(targetTrackId);
+         } else {
+             // Call updateMidiBlock if resizing or moving within the same track
+             updateMidiBlock(track.id, updatedBlock);
+         }
       }
     };
 
@@ -174,7 +195,7 @@ export function useTrackGestures({
       window.removeEventListener('mousemove', handleMouseMove);
     };
     // Dependencies now include props passed to the hook
-  }, [dragOperation, dragStartX, dragBlockId, dragTrackId, dragStartBeat, dragEndBeat, updateMidiBlock, findTrackById, timelineAreaRef]);
+  }, [dragOperation, dragStartX, dragBlockId, dragTrackId, dragStartBeat, dragEndBeat, updateMidiBlock, findTrackById, timelineAreaRef, moveMidiBlock, originalDragTrackId]);
 
   // Start resizing from the left edge
   const handleStartEdge = useCallback((trackId: string, blockId: string, clientX: number) => {
@@ -188,6 +209,7 @@ export function useTrackGestures({
     setDragTrackId(trackId);
     setDragStartBeat(block.startBeat);
     selectBlock(blockId);
+    setOriginalDragTrackId(trackId); // Store the original track ID
   }, [findTrackById]);
 
   // Start resizing from the right edge
@@ -202,6 +224,7 @@ export function useTrackGestures({
     setDragTrackId(trackId);
     setDragEndBeat(block.endBeat);
     selectBlock(blockId);
+    setOriginalDragTrackId(trackId); // Store the original track ID
   }, [findTrackById]);
 
   // Start moving the block
@@ -216,6 +239,7 @@ export function useTrackGestures({
     setDragTrackId(trackId);
     setDragStartBeat(block.startBeat);
     selectBlock(blockId); // Also select the block being moved
+    setOriginalDragTrackId(trackId); // Store the original track ID
   }, [findTrackById, selectBlock]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent, trackId: string) => {
@@ -358,22 +382,3 @@ export function useTrackGestures({
     fileInputRef,
   };
 }
-
-// Define placeholder types if not already imported
-// declare module '../../lib/types' {
-//   interface Track {
-//     id: string;
-//     midiBlocks: MIDIBlock[];
-//   }
-//   interface MIDIBlock {
-//     id: string;
-//     startBeat: number;
-//     endBeat: number;
-//     notes: any[]; // Define more specifically if possible
-//   }
-// }
-
-// declare module 'zustand' {
-//   interface StoreApi<T> {}
-//   interface UseBoundStore<S extends StoreApi<unknown>> {}
-// } 

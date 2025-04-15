@@ -21,7 +21,16 @@ const PIXELS_PER_BEAT = 100; // Updated to match TimelineView and MeasuresHeader
 // GRID_SNAP is used within useTrackGestures, keep it there or pass if needed externally
 
 function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
-  const { selectedBlockId, numMeasures, selectBlock, addMidiBlock, updateMidiBlock, removeMidiBlock, timeManager } = useStore();
+  const { 
+    selectedBlockId, 
+    numMeasures, 
+    selectBlock, 
+    addMidiBlock, 
+    updateMidiBlock, 
+    removeMidiBlock, 
+    moveMidiBlock,
+    timeManager 
+  } = useStore();
   const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for hook, points to the container
   const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for the canvas element
 
@@ -44,13 +53,12 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
       updateMidiBlock,
       addMidiBlock,
       removeMidiBlock,
+      moveMidiBlock,
       selectBlock,
       selectedBlockId,
       timelineAreaRef, // Pass container ref
       timeManager,
   });
-
-  console.log('tracks', tracks);
 
   // Helper function to draw rounded rectangles
   const drawRoundedRect = (

@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { Track, MIDIBlock, MIDINote, VisualObject } from '../lib/types';
+import { Track, MIDIBlock, MIDINote } from '../lib/types';
 import { AppState } from './store'; // Import the combined AppState
 
 // Track Slice
@@ -20,9 +20,9 @@ export interface TrackActions {
   addMidiBlock: (trackId: string, block: MIDIBlock) => void;
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
   removeMidiBlock: (trackId: string, blockId: string) => void;
+  moveMidiBlock: (oldTrackId: string, newTrackId: string, block: MIDIBlock) => void;
   updateTrack: (trackId: string, updatedProperties: Partial<Track>) => void;
   selectNotes: (notes: MIDINote[]) => void;
-  getVisualObjectsAtTime: (time: number) => VisualObject[];
 }
 
 export type TrackSlice = TrackState & TrackActions;
@@ -57,7 +57,7 @@ export const createTrackSlice: StateCreator<
     selectedBlock: null,
     selectedNotes: null,
     selectTrack: (trackId: string | null) => {
-      set(state => {
+      set((state: TrackState) => {
         const newSelectedTrackId = trackId;
         const newSelectedBlockId = null;
         const selections = getUpdatedSelections(state.tracks, newSelectedTrackId, newSelectedBlockId);
@@ -71,7 +71,7 @@ export const createTrackSlice: StateCreator<
       });
     },
     selectBlock: (blockId: string | null) => {
-      set(state => {
+      set((state: TrackState & { tracks: Track[] }) => {
           let newSelectedTrackId: string | null = null;
           const newSelectedBlockId = blockId;
 
@@ -103,7 +103,7 @@ export const createTrackSlice: StateCreator<
       });
     },
     addTrack: (track: Track) => {
-      set(state => {
+      set((state: TrackState & { tracks: Track[] }) => {
         const newTracks = [...state.tracks, track];
         const newSelectedTrackId = track.id;
         const newSelectedBlockId = null;
@@ -119,8 +119,8 @@ export const createTrackSlice: StateCreator<
       });
     },
     removeTrack: (trackId: string) => {
-       set(state => {
-        const newTracks = state.tracks.filter(t => t.id !== trackId);
+       set((state: TrackState & { tracks: Track[] }) => {
+        const newTracks = state.tracks.filter((t: Track) => t.id !== trackId);
         let newSelectedTrackId = state.selectedTrackId;
         let newSelectedBlockId = state.selectedBlockId;
 
@@ -142,9 +142,9 @@ export const createTrackSlice: StateCreator<
        });
     },
     addMidiBlock: (trackId: string, block: MIDIBlock) => {
-       set(state => {
+       set((state: TrackState & { tracks: Track[] }) => {
            let trackFound = false;
-           const newTracks = state.tracks.map(t => {
+           const newTracks = state.tracks.map((t: Track) => {
                if (t.id === trackId) {
                    trackFound = true;
                    return { ...t, midiBlocks: [...t.midiBlocks, block] };
@@ -164,12 +164,12 @@ export const createTrackSlice: StateCreator<
        });
     },
     updateMidiBlock: (trackId: string, updatedBlock: MIDIBlock) => {
-        set(state => {
+        set((state: TrackState & { tracks: Track[] }) => {
             let trackUpdated = false;
-            const newTracks = state.tracks.map(t => {
+            const newTracks = state.tracks.map((t: Track) => {
                 if (t.id === trackId) {
                     let blockFoundInTrack = false;
-                    const updatedMidiBlocks = t.midiBlocks.map(b => {
+                    const updatedMidiBlocks = t.midiBlocks.map((b: MIDIBlock) => {
                         if (b.id === updatedBlock.id) {
                             blockFoundInTrack = true;
                             return updatedBlock;
@@ -197,12 +197,12 @@ export const createTrackSlice: StateCreator<
         });
     },
     removeMidiBlock: (trackId: string, blockId: string) => {
-        set(state => {
+        set((state: TrackState & { tracks: Track[] }) => {
             let trackUpdated = false;
-            const newTracks = state.tracks.map(t => {
+            const newTracks = state.tracks.map((t: Track) => {
                 if (t.id === trackId) {
                     const originalLength = t.midiBlocks.length;
-                    const updatedMidiBlocks = t.midiBlocks.filter(b => b.id !== blockId);
+                    const updatedMidiBlocks = t.midiBlocks.filter((b: MIDIBlock) => b.id !== blockId);
                     if (updatedMidiBlocks.length < originalLength) {
                         trackUpdated = true;
                         return { ...t, midiBlocks: updatedMidiBlocks };
@@ -231,13 +231,56 @@ export const createTrackSlice: StateCreator<
              };
         });
     },
+    moveMidiBlock: (oldTrackId: string, newTrackId: string, block: MIDIBlock) => {
+        set((state: TrackState & { tracks: Track[] }) => {
+            let blockMoved = false;
+            const newTracks = state.tracks.map((t: Track) => {
+                // Remove block from old track
+                if (t.id === oldTrackId) {
+                    const updatedMidiBlocks = t.midiBlocks.filter(b => b.id !== block.id);
+                    if (updatedMidiBlocks.length < t.midiBlocks.length) {
+                        blockMoved = true; // Mark moved only if actually found and removed
+                        return { ...t, midiBlocks: updatedMidiBlocks };
+                    }
+                }
+                // Add block to new track (potentially replacing existing if ID matched, though unlikely)
+                if (t.id === newTrackId) {
+                    // Ensure block isn't duplicated if somehow oldTrackId === newTrackId
+                    const blockExists = t.midiBlocks.some(b => b.id === block.id);
+                    if (!blockExists) {
+                        return { ...t, midiBlocks: [...t.midiBlocks, block] };
+                    } else {
+                        // If block already exists (e.g., move within same track - should be handled by update), update it
+                        return { ...t, midiBlocks: t.midiBlocks.map(b => b.id === block.id ? block : b) };
+                    }
+                }
+                return t;
+            });
+
+            if (!blockMoved) {
+                console.warn(`moveMidiBlock: Block ID ${block.id} not found in original track ID ${oldTrackId}. No move performed.`);
+                return {}; // No change if block wasn't found in original track
+            }
+
+            // Update selections - keep block selected, update track ID if needed
+            const selections = getUpdatedSelections(newTracks, newTrackId, block.id);
+
+            return {
+                tracks: newTracks,
+                selectedTrackId: newTrackId, // Update selected track to the new one
+                selectedBlockId: block.id, // Keep the block selected
+                selectedTrack: selections.selectedTrack,
+                selectedBlock: selections.selectedBlock
+            };
+        });
+    },
     selectNotes: (notes: MIDINote[]) => {
       set({ selectedNotes: notes });
     },
     updateTrack: (trackId: string, updatedProperties: Partial<Track>) => {
-       set(state => {
+       set((state: TrackState & { tracks: Track[] }) => {
             let trackUpdated = false;
-            const newTracks = state.tracks.map(t => {
+            const newTracks = state.tracks.map((t: Track) => {
                 if (t.id === trackId) {
                     trackUpdated = true;
                     return { ...t, ...updatedProperties }; 
@@ -255,48 +298,6 @@ export const createTrackSlice: StateCreator<
                  selectedBlock: selections.selectedBlock 
              };
        });
-    },
-    getVisualObjectsAtTime: (time: number): VisualObject[] => {
-        // Access state from other slices via get()
-        const { tracks, bpm } = get();
-        let allVisuals: VisualObject[] = [];
-        const secondsPerBeat = 60 / bpm;
-
-        tracks.forEach(track => {
-            if (track.synthesizer && typeof (track.synthesizer as any).getVisuals === 'function') {
-                track.midiBlocks.forEach(block => {
-                    const blockStartBeat = block.startBeat;
-                    const blockEndBeat = block.endBeat; 
-                    const durationInBeats = blockEndBeat - blockStartBeat;
-                    
-                    const blockStartTimeSeconds = blockStartBeat * secondsPerBeat;
-                    const blockEndTimeSeconds = blockEndBeat * secondsPerBeat;
-                    
-                    if (time >= blockStartTimeSeconds && time < blockEndTimeSeconds) {
-                       const timeWithinBlockSeconds = time - blockStartTimeSeconds;
-                       const blockDurationSeconds = durationInBeats * secondsPerBeat;
-                       const synth = track.synthesizer as any; 
-                       const blockVisuals = synth.getVisuals(
-                           block.notes,
-                           blockDurationSeconds,
-                           timeWithinBlockSeconds,
-                           block.id
-                       );
-                       
-                       if(blockVisuals) {
-                           const visualsArray = Array.isArray(blockVisuals) ? blockVisuals : [blockVisuals];
-                           const visualsWithContext = visualsArray.map(vis => ({
-                               ...vis,
-                               trackId: track.id,
-                               blockId: block.id
-                           }));
-                           allVisuals = allVisuals.concat(visualsWithContext);
-                       }
-                    }
-                });
-            }
-        });
-        return allVisuals;
     },
   };
 } 
