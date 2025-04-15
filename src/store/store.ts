@@ -102,6 +102,25 @@ const useStore = create<AppState>((set, get) => {
     set({ currentBeat: beat });
   });
 
+  // Helper function to derive selected track/block objects from IDs and tracks array
+  const getUpdatedSelections = (tracks: Track[], selectedTrackId: string | null, selectedBlockId: string | null)
+    : { selectedTrack: Track | null, selectedBlock: MIDIBlock | null } => {
+    
+    let selectedTrack: Track | null = null;
+    let selectedBlock: MIDIBlock | null = null;
+
+    if (selectedTrackId) {
+      selectedTrack = tracks.find(t => t.id === selectedTrackId) || null;
+      if (selectedTrack && selectedBlockId) {
+        selectedBlock = selectedTrack.midiBlocks.find(b => b.id === selectedBlockId) || null;
+        // If block ID is set but block not found in the found track, maybe deselect block?
+        // For now, keeping it simple: if track found, look for block ID in it.
+      }
+    }
+
+    return { selectedTrack, selectedBlock };
+  };
+
   return {
     // Initial state
     timeManager,
@@ -128,54 +147,55 @@ const useStore = create<AppState>((set, get) => {
     // Actions
     selectTrack: (trackId: string | null) => {
       set(state => {
-        // Find the selected track directly from the state's tracks array
-        const selectedTrack = trackId ? state.tracks.find(t => t.id === trackId) || null : null;
+        // Determine new selection IDs
+        const newSelectedTrackId = trackId;
+        const newSelectedBlockId = null; // Selecting track clears block selection
+        
+        // Get updated selection objects based on new IDs and current tracks
+        const selections = getUpdatedSelections(state.tracks, newSelectedTrackId, newSelectedBlockId);
+
         return { 
-            selectedTrackId: trackId, 
-            selectedTrack: selectedTrack,
-            selectedBlockId: null, // Selecting track clears block selection
-            selectedBlock: null,
-            selectedNotes: null 
+            selectedTrackId: newSelectedTrackId,
+            selectedBlockId: newSelectedBlockId,
+            selectedTrack: selections.selectedTrack,
+            selectedBlock: selections.selectedBlock,
+            selectedNotes: null // Clear notes on track selection change
         };
       });
     },
     
     selectBlock: (blockId: string | null) => {
       set(state => {
-          let newSelectedTrackId: string | null = null;
-          let newSelectedTrack: Track | null = null;
-          let newSelectedBlock: MIDIBlock | null = null;
+          let newSelectedTrackId: string | null = null; // Start assuming current track
+          const newSelectedBlockId = blockId;
 
           if (blockId) {
-              // Iterate through the state's tracks array
+              let found = false;
+              // Find which track the block belongs to
               for (const track of state.tracks) {
-                  const block = track.midiBlocks.find((b: MIDIBlock) => b.id === blockId);
-                  if (block) {
+                  if (track.midiBlocks.some((b: MIDIBlock) => b.id === blockId)) {
                       newSelectedTrackId = track.id;
-                      newSelectedTrack = track;
-                      newSelectedBlock = block;
+                      found = true;
                       break; 
                   }
               }
-          } 
-
-          // If block wasn't found or blockId is null, clear/update selections accordingly
-           if (!newSelectedBlock) {
-               newSelectedTrackId = state.selectedTrackId; // Keep current track if block is just deselected
-               newSelectedTrack = state.selectedTrack;
-               // If blockId was provided but not found, it implies the currently selected track might be wrong
-               // However, sticking to simple deselection/clearing if not found.
-               if (blockId && !state.tracks.some(t => t.id === newSelectedTrackId)) {
+              // If blockId was given but not found in any track, invalidate track selection too
+              if (!found) {
                   newSelectedTrackId = null;
-                  newSelectedTrack = null;
-               }
-           }
+              }
+          } else {
+             // Keep current track ID if just deselecting a block
+             newSelectedTrackId = state.selectedTrackId;
+          }
 
+          // Get updated selection objects based on potentially new IDs and current tracks
+          const selections = getUpdatedSelections(state.tracks, newSelectedTrackId, newSelectedBlockId);
+          
           return {
               selectedTrackId: newSelectedTrackId,
-              selectedBlockId: blockId, // Set to null if blockId is null
-              selectedTrack: newSelectedTrack,
-              selectedBlock: newSelectedBlock, // Set to null if not found or blockId is null
+              selectedBlockId: newSelectedBlockId,
+              selectedTrack: selections.selectedTrack,
+              selectedBlock: selections.selectedBlock,
               selectedNotes: null // Clear note selection when block changes
           };
       });
@@ -183,57 +203,92 @@ const useStore = create<AppState>((set, get) => {
     
     addTrack: (track: Track) => {
       set(state => {
-        // Add track immutably to the tracks array
+        // Add track immutably
         const newTracks = [...state.tracks, track];
+        
+        // Select the newly added track
+        const newSelectedTrackId = track.id;
+        const newSelectedBlockId = null;
+        
+        // Get updated selection objects based on new tracks and new IDs
+        const selections = getUpdatedSelections(newTracks, newSelectedTrackId, newSelectedBlockId);
+
         return { 
           tracks: newTracks,
+          selectedTrackId: newSelectedTrackId,
+          selectedBlockId: newSelectedBlockId,
+          selectedTrack: selections.selectedTrack, // Should be the newly added track
+          selectedBlock: selections.selectedBlock, // Should be null
+          selectedNotes: null // Clear notes when adding a track
         };
       });
     },
     
     removeTrack: (trackId: string) => {
        set(state => {
-        // Remove track immutably using filter
+        // Remove track immutably
         const newTracks = state.tracks.filter(t => t.id !== trackId);
         
+        let newSelectedTrackId = state.selectedTrackId;
+        let newSelectedBlockId = state.selectedBlockId;
+
         // If the removed track was selected, clear selection
         if (state.selectedTrackId === trackId) {
-          return {
-            tracks: newTracks,
-            selectedTrackId: null,
-            selectedBlockId: null,
-            selectedTrack: null,
-            selectedBlock: null,
-            selectedNotes: null
-          };
-        } else {
-          // Otherwise, just update the tracks array
-          return { tracks: newTracks };
+          newSelectedTrackId = null;
+          newSelectedBlockId = null;
         }
+        // Note: If the selected block belonged to the removed track, 
+        // but the track itself wasn't selected, the blockId might remain,
+        // but getUpdatedSelections will return null for selectedBlock.
+
+        const selections = getUpdatedSelections(newTracks, newSelectedTrackId, newSelectedBlockId);
+
+        return {
+            tracks: newTracks,
+            selectedTrackId: newSelectedTrackId,
+            selectedBlockId: newSelectedBlockId,
+            selectedTrack: selections.selectedTrack,
+            selectedBlock: selections.selectedBlock,
+            selectedNotes: selections.selectedTrack ? state.selectedNotes : null // Clear notes if track selection cleared
+          };
        });
     },
     
     addMidiBlock: (trackId: string, block: MIDIBlock) => {
        set(state => {
            // Update tracks array immutably
+           let trackFound = false;
            const newTracks = state.tracks.map(t => {
                if (t.id === trackId) {
-                   // Immutable update of midiBlocks array for the target track
+                   trackFound = true;
+                   // Immutable update of midiBlocks array
                    return { ...t, midiBlocks: [...t.midiBlocks, block] };
                }
                return t; // Return other tracks unchanged
            });
+
+           // If track wasn't found, don't change state
+           if (!trackFound) return {}; 
+
+           // Keep current selection IDs
+           const newSelectedTrackId = state.selectedTrackId;
+           const newSelectedBlockId = state.selectedBlockId;
+           
+           // Update selection objects based on the modified tracks array
+           const selections = getUpdatedSelections(newTracks, newSelectedTrackId, newSelectedBlockId);
+
             return { 
                 tracks: newTracks,
+                // Keep selection IDs, update objects
+                selectedTrack: selections.selectedTrack,
+                selectedBlock: selections.selectedBlock,
             };
        });
     },
     
     updateMidiBlock: (trackId: string, updatedBlock: MIDIBlock) => {
         set(state => {
-            let blockStillExists = false; // Flag to check if selected block is still valid
-            let updatedSelectedTrack = state.selectedTrack; // Keep track if the selected track is updated
-
+            let trackUpdated = false;
             // Update tracks array immutably
             const newTracks = state.tracks.map(t => {
                 if (t.id === trackId) {
@@ -241,7 +296,6 @@ const useStore = create<AppState>((set, get) => {
                     // Immutable update of the midiBlocks array
                     const updatedMidiBlocks = t.midiBlocks.map(b => {
                         if (b.id === updatedBlock.id) {
-                            blockStillExists = true; // Confirm the block exists
                             blockFoundInTrack = true;
                             return updatedBlock; // Replace with the updated block
                         }
@@ -250,74 +304,71 @@ const useStore = create<AppState>((set, get) => {
                     
                     // Only return updated track if the block was actually found and updated
                     if (blockFoundInTrack) {
-                        const newlyUpdatedTrack = { ...t, midiBlocks: updatedMidiBlocks };
-                        // If this is the currently selected track, update the selectedTrack reference
-                        if (state.selectedTrackId === trackId) {
-                            updatedSelectedTrack = newlyUpdatedTrack;
-                        }
-                        return newlyUpdatedTrack;
+                        trackUpdated = true;
+                        return { ...t, midiBlocks: updatedMidiBlocks };
                     }
                 }
                 return t;
             });
             
-             // If the updated block was selected, update the selectedBlock state object too
-            if (state.selectedBlockId === updatedBlock.id && blockStillExists) {
-                return {
-                    tracks: newTracks,
-                    selectedBlock: updatedBlock, // Update the selectedBlock object directly
-                    selectedTrack: updatedSelectedTrack // Update selectedTrack if it changed
-                };
-            } else {
-                // Otherwise, just update the tracks array (and potentially selectedTrack if it was the parent)
-                 return { 
-                    tracks: newTracks,
-                    selectedTrack: updatedSelectedTrack 
-                };
-            }
+            // If the target track or the specific block wasn't found/updated, do nothing
+            if (!trackUpdated) return {};
+
+            // Keep current selection IDs
+            const newSelectedTrackId = state.selectedTrackId;
+            const newSelectedBlockId = state.selectedBlockId;
+
+            // Get updated selection objects based on the modified tracks
+            const selections = getUpdatedSelections(newTracks, newSelectedTrackId, newSelectedBlockId);
+
+            return {
+                tracks: newTracks,
+                // Update selection objects, IDs remain the same
+                selectedTrack: selections.selectedTrack,
+                selectedBlock: selections.selectedBlock 
+            };
         });
     },
     
     removeMidiBlock: (trackId: string, blockId: string) => {
         set(state => {
-            let selectedBlockWasRemoved = false;
-             let updatedSelectedTrack = state.selectedTrack;
-
+            let trackUpdated = false;
             // Update tracks array immutably
             const newTracks = state.tracks.map(t => {
                 if (t.id === trackId) {
                     const originalLength = t.midiBlocks.length;
                     // Filter midiBlocks immutably
                     const updatedMidiBlocks = t.midiBlocks.filter(b => b.id !== blockId);
-                    // Check if the selected block was the one removed
-                    if (state.selectedBlockId === blockId && updatedMidiBlocks.length < originalLength) {
-                        selectedBlockWasRemoved = true;
+                    // Only create a new track object if a block was actually removed
+                    if (updatedMidiBlocks.length < originalLength) {
+                        trackUpdated = true;
+                        return { ...t, midiBlocks: updatedMidiBlocks };
                     }
-                    const newlyUpdatedTrack = { ...t, midiBlocks: updatedMidiBlocks };
-                    // If this is the currently selected track, update the selectedTrack reference
-                    if (state.selectedTrackId === trackId) {
-                        updatedSelectedTrack = newlyUpdatedTrack;
-                    }
-                    return newlyUpdatedTrack;
                 }
                 return t;
             });
 
-            // If the removed block was selected, clear the block selection
-            if (selectedBlockWasRemoved) {
-                 return {
-                     tracks: newTracks,
-                     selectedBlockId: null,
-                     selectedBlock: null,
-                     selectedTrack: updatedSelectedTrack // Keep updated selected track reference
-                 };
-            } else {
-                // Otherwise, just update the tracks array and selected track if necessary
-                 return { 
-                    tracks: newTracks,
-                    selectedTrack: updatedSelectedTrack 
-                 };
+            // If track/block wasn't found or removed, do nothing
+            if (!trackUpdated) return {};
+
+            let newSelectedTrackId = state.selectedTrackId;
+            let newSelectedBlockId = state.selectedBlockId;
+
+            // If the removed block was the selected one, clear block selection ID
+            if (state.selectedBlockId === blockId) {
+                 newSelectedBlockId = null;
             }
+
+            // Get updated selection objects based on new tracks and potentially updated block ID
+            const selections = getUpdatedSelections(newTracks, newSelectedTrackId, newSelectedBlockId);
+
+            return {
+                 tracks: newTracks,
+                 selectedTrackId: newSelectedTrackId, // Keep track ID
+                 selectedBlockId: newSelectedBlockId, // Update block ID if it was removed
+                 selectedTrack: selections.selectedTrack, // Update object references
+                 selectedBlock: selections.selectedBlock, // Update object references (will be null if ID cleared)
+             };
         });
     },
 
@@ -327,35 +378,33 @@ const useStore = create<AppState>((set, get) => {
     
     updateTrack: (trackId: string, updatedProperties: Partial<Track>) => {
        set(state => {
-             let selectedTrackStillExists = false;
-             let newlySelectedTrackObject: Track | null = null; // To hold the updated selected track object
-
+            let trackUpdated = false;
             // Update tracks array immutably
             const newTracks = state.tracks.map(t => {
                 if (t.id === trackId) {
-                    selectedTrackStillExists = true;
+                    trackUpdated = true;
                     // Merge updated properties immutably
-                    const updatedTrack = { ...t, ...updatedProperties };
-                    // If this is the selected track, store its updated version
-                    if (state.selectedTrackId === trackId) {
-                        newlySelectedTrackObject = updatedTrack;
-                    }
-                    return updatedTrack;
+                    return { ...t, ...updatedProperties }; 
                 }
                 return t;
             });
 
+            // If track wasn't found/updated, do nothing
+            if (!trackUpdated) return {};
 
-            // If the updated track was selected, update the selectedTrack object
-            if (state.selectedTrackId === trackId && selectedTrackStillExists) {
-                 return {
-                     tracks: newTracks,
-                     selectedTrack: newlySelectedTrackObject // Update selectedTrack object
-                 };
-            } else {
-                 // Otherwise, just update the tracks array
-                 return { tracks: newTracks };
-            }
+            // Keep current selection IDs
+            const newSelectedTrackId = state.selectedTrackId;
+            const newSelectedBlockId = state.selectedBlockId;
+
+            // Get updated selection objects based on the modified tracks
+            const selections = getUpdatedSelections(newTracks, newSelectedTrackId, newSelectedBlockId);
+
+            return {
+                 tracks: newTracks,
+                 // Update selection objects, IDs remain the same
+                 selectedTrack: selections.selectedTrack,
+                 selectedBlock: selections.selectedBlock 
+             };
        });
     },
     
