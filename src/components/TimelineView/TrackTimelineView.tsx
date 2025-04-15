@@ -3,6 +3,7 @@ import { Track, MIDIBlock } from '../../lib/types';
 import useStore from '../../store/store';
 import MidiBlockView from './MidiBlockView';
 import { MidiParser } from '../../lib/MidiParser';
+import { useTrackGestures } from './useTrackGestures'; // Import the new hook
 
 // Import TRACK_HEIGHT or define it if not easily importable
 // Assuming TRACK_HEIGHT is defined elsewhere or passed as prop if variable
@@ -18,7 +19,7 @@ const GRID_SNAP = 0.25; // Snap to 1/4 beat
 
 function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop name
   const { selectedBlockId, numMeasures, selectBlock, addMidiBlock, updateMidiBlock, removeMidiBlock, timeManager } = useStore();
-  const timelineAreaRef = useRef<HTMLDivElement>(null); // Renamed ref for clarity
+  const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for double-click and hook
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // State for drag operations
@@ -29,6 +30,17 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
   const [dragBlockId, setDragBlockId] = useState<string | null>(null);
   const [dragTrackId, setDragTrackId] = useState<string | null>(null); // Store track ID during drag
   
+  // Use the custom hook for gesture handling
+  const { handleStartEdge, handleEndEdge, handleMoveBlock } = useTrackGestures({
+      tracks,
+      updateMidiBlock,
+      selectBlock,
+      timelineAreaRef,
+      // Pass constants if they are not defined within the hook
+      // PIXELS_PER_BEAT,
+      // GRID_SNAP
+  });
+  
   // Context menu state
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
@@ -36,7 +48,7 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
   const [contextMenuTrackId, setContextMenuTrackId] = useState<string | null>(null); // Store track ID for context actions
   
   // Helper to find track and block
-  const findTrackAndBlock = (blockId: string | null): { track: Track | null, block: MIDIBlock | null } => {
+  const findTrackAndBlock = useCallback((blockId: string | null): { track: Track | null, block: MIDIBlock | null } => {
     if (!blockId) return { track: null, block: null };
     for (const track of tracks) {
       const block = track.midiBlocks.find(b => b.id === blockId);
@@ -45,13 +57,13 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
       }
     }
     return { track: null, block: null };
-  };
+  }, [tracks]);
   
   // Helper to find track by ID
-   const findTrackById = (trackId: string | null): Track | null => {
+   const findTrackById = useCallback((trackId: string | null): Track | null => {
     if (!trackId) return null;
     return tracks.find(t => t.id === trackId) || null;
-  };
+  }, [tracks]);
   
   // Handle key press for delete
   useEffect(() => {
@@ -82,120 +94,13 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('click', handleClickOutside);
     };
-  }, [selectedBlockId, removeMidiBlock, tracks]); // Added tracks dependency
+  }, [selectedBlockId, removeMidiBlock, tracks, findTrackAndBlock]); // Added findTrackAndBlock dependency
   
-  // Handle mouse up to end all drag operations
-  useEffect(() => {
-    const handleMouseUp = () => {
-      if (dragOperation !== 'none') {
-          setDragOperation('none');
-          setDragBlockId(null);
-          setDragTrackId(null); // Clear track ID on mouse up
-      }
-    };
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      if (dragOperation === 'none' || !dragBlockId || !dragTrackId) return;
-      
-      const track = findTrackById(dragTrackId);
-      const block = track?.midiBlocks.find(b => b.id === dragBlockId);
-      if (!block || !track) {
-         console.error("Could not find track or block during drag move.");
-         handleMouseUp(); // Abort drag if track/block is gone
-         return;
-      }
-      
-      const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
-      if (!timelineAreaRect) return;
-      
-      const currentX = e.clientX;
-      const deltaX = currentX - dragStartX;
-      const deltaBeat = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
-      let updatedBlock = { ...block };
-      let newStartBeat: number | undefined;
-      let newEndBeat: number | undefined;
-      let changed = false;
-
-      if (dragOperation === 'start') {
-        newStartBeat = Math.max(0, Math.min(block.endBeat - GRID_SNAP, dragStartBeat + deltaBeat));
-        if (newStartBeat !== updatedBlock.startBeat) {
-            updatedBlock.startBeat = newStartBeat;
-            changed = true;
-        }
-      } else if (dragOperation === 'end') {
-        newEndBeat = Math.max(block.startBeat + GRID_SNAP, dragEndBeat + deltaBeat);
-         if (newEndBeat !== updatedBlock.endBeat) {
-            updatedBlock.endBeat = newEndBeat;
-            changed = true;
-        }
-      } else if (dragOperation === 'move') {
-        const duration = block.endBeat - block.startBeat;
-        newStartBeat = Math.max(0, dragStartBeat + deltaBeat);
-        if (newStartBeat !== updatedBlock.startBeat) {
-            updatedBlock.startBeat = newStartBeat;
-            updatedBlock.endBeat = newStartBeat + duration;
-            changed = true;
-        }
-      }
-
-      // Only update if the block actually changed
-      if (changed) {
-           updateMidiBlock(track.id, updatedBlock);
-      }
-    };
-    
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('mousemove', handleMouseMove);
-    
-    return () => {
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('mousemove', handleMouseMove);
-    };
-  }, [dragOperation, dragStartX, dragBlockId, dragTrackId, dragStartBeat, dragEndBeat, updateMidiBlock, tracks]); // Added tracks dependency
-  
-  // Start resizing from the left edge
-  const handleStartEdge = (trackId: string, blockId: string, clientX: number) => {
-    const track = findTrackById(trackId);
-    const block = track?.midiBlocks.find(b => b.id === blockId);
-    if (!block || !track) return;
-    
-    setDragOperation('start');
-    setDragStartX(clientX);
-    setDragBlockId(blockId);
-    setDragTrackId(trackId); // Store track ID
-    setDragStartBeat(block.startBeat);
-  };
-  
-  // Start resizing from the right edge
-  const handleEndEdge = (trackId: string, blockId: string, clientX: number) => {
-    const track = findTrackById(trackId);
-    const block = track?.midiBlocks.find(b => b.id === blockId);
-    if (!block || !track) return;
-    
-    setDragOperation('end');
-    setDragStartX(clientX);
-    setDragBlockId(blockId);
-    setDragTrackId(trackId); // Store track ID
-    setDragEndBeat(block.endBeat);
-  };
-  
-  // Start moving the block
-  const handleMoveBlock = (trackId: string, blockId: string, clientX: number) => {
-    const track = findTrackById(trackId);
-    const block = track?.midiBlocks.find(b => b.id === blockId);
-    if (!block || !track) return;
-    
-    setDragOperation('move');
-    console.log("clientX: ", clientX);
-    setDragStartX(clientX);
-    setDragBlockId(blockId);
-    setDragTrackId(trackId); // Store track ID
-    setDragStartBeat(block.startBeat);
-    selectBlock(blockId); // Also select the block being moved
-  };
+  // Handle mouse up to end all drag operations - REMOVED (handled by hook)
+  // useEffect(() => { ... }, [...]);
   
   // Handle double click to add a new MIDI block on a specific track
-  const handleDoubleClick = (e: React.MouseEvent, trackId: string) => {
+  const handleDoubleClick = useCallback((e: React.MouseEvent, trackId: string) => {
     console.log("handleDoubleClick: ", e, trackId);
     const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
     if (!timelineAreaRect) return;
@@ -217,7 +122,7 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
     
     addMidiBlock(targetTrack.id, newBlock);
     selectBlock(newBlock.id);
-  };
+  }, [addMidiBlock, selectBlock, findTrackById]); // Added dependencies
   
   // Handle right click on the track background or a block
   const handleContextMenu = useCallback((e: React.MouseEvent, blockId: string | null = null, trackId: string | null = null) => {
@@ -247,7 +152,7 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
     setContextMenuTrackId(targetTrackId); // Store the identified track ID
     setShowContextMenu(true);
 
-  }, [selectBlock, tracks]); // Added tracks dependency
+  }, [selectBlock, tracks, findTrackAndBlock]); // Added findTrackAndBlock dependency
   
   // Handle delete from context menu
   const handleDeleteBlock = useCallback(() => {
@@ -386,9 +291,10 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
                 isSelected={block.id === selectedBlockId}
                 pixelsPerBeat={PIXELS_PER_BEAT}
                 onSelectBlock={() => selectBlock(block.id)}
-                onStartEdge={(tId, bId, clientX) => handleStartEdge(tId, bId, clientX)}
-                onEndEdge={(tId, bId, clientX) => handleEndEdge(tId, bId, clientX)}
-                onMoveBlock={(tId, bId, clientX) => handleMoveBlock(tId, bId, clientX)}
+                // Use handlers returned from the hook
+                onStartEdge={handleStartEdge}
+                onEndEdge={handleEndEdge}
+                onMoveBlock={handleMoveBlock}
               />
             </div>
           ))}
