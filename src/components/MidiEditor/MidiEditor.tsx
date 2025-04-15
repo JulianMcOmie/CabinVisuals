@@ -45,15 +45,14 @@ interface MidiEditorProps {
 }
 
 function MidiEditor({ block, track }: MidiEditorProps) {
-  const { updateMidiBlock, selectNotes: storeSelectNotes, selectBlock } = useStore();
+  const { updateMidiBlock, selectNotes: storeSelectNotes } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // State for drag operations
   const [dragOperation, setDragOperation] = useState<DragOperation>('none');
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [dragStartBeat, setDragStartBeat] = useState(0);
-  const [dragDuration, setDragDuration] = useState(0);
+  const [initialDragStates, setInitialDragStates] = useState<Map<string, { startBeat: number, duration: number }>>(new Map());
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
   const [clickOffset, setClickOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -133,11 +132,21 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       setSelectedNoteIds(selectedIds);
       storeSelectNotes(selectedNotes);
       setDragNoteId(note.id);
-      setDragStartBeat(note.startBeat);
-      setDragDuration(note.duration);
       setDragOperation(newDragOperation);
       setHoverCursor(cursorType);
       setClickOffset(newClickOffset);
+      // Store initial drag states
+      setInitialDragStates(prev => {
+        const newStates = new Map(prev);
+        // Store initial state for all selected notes
+        selectedIds.forEach(id => {
+          const selectedNote = block.notes.find(n => n.id === id);
+          if (selectedNote) {
+            newStates.set(id, { startBeat: selectedNote.startBeat, duration: selectedNote.duration });
+          }
+        });
+        return newStates;
+      });
       
       // Handle Option/Alt key for duplication at initial click
       if (e.altKey && newDragOperation === 'move') {
@@ -350,8 +359,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           coords,
           clickOffset,
           dragStart,
-          dragStartBeat,
-          dragDuration
+          initialDragStates
         );
         
         // Only update if the block has changed
@@ -401,9 +409,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     updateMidiBlock, 
     dragNoteId, 
     dragOperation, 
-    dragStart, 
-    dragStartBeat, 
-    dragDuration, 
+    dragStart,
+    initialDragStates,
     selectionBox, 
     selectedNoteIds, 
     storeSelectNotes,

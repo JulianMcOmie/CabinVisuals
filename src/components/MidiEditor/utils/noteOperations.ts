@@ -157,59 +157,62 @@ export const moveSelectedNotes = (
 };
 
 /**
- * Resizes a note from its start edge
+ * Resizes notes from their start edge
  */
-export const resizeNoteFromStart = (
+export const resizeNotesFromStart = (
   block: MIDIBlock,
-  noteId: string,
+  noteIds: string[],
   deltaBeats: number,
-  dragStartBeat: number
+  initialDragStates: Map<string, { startBeat: number, duration: number }>
 ): MIDIBlock => {
-  const noteIndex = block.notes.findIndex(note => note.id === noteId);
-  if (noteIndex === -1) return block;
-  
-  const note = { ...block.notes[noteIndex] };
-  let newStartBeat = dragStartBeat + deltaBeats;
-  
-  // Clamp to valid range
-  newStartBeat = Math.max(0, Math.min(note.startBeat + note.duration - GRID_SNAP, newStartBeat));
-  
-  // Update note properties
-  note.duration = note.duration - (newStartBeat - note.startBeat);
-  note.startBeat = newStartBeat;
-  
-  // Create new block with updated note
   const updatedBlock = { ...block };
   updatedBlock.notes = [...block.notes];
-  updatedBlock.notes[noteIndex] = note;
+  
+  for (const noteId of noteIds) {
+    const initialState = initialDragStates.get(noteId);
+    if (!initialState) continue;
+    
+    const noteIndex = block.notes.findIndex(note => note.id === noteId);
+    if (noteIndex === -1) continue;
+    
+    const note = { ...block.notes[noteIndex] };
+    let newStartBeat = initialState.startBeat + deltaBeats;
+    
+    // Update note properties
+    note.duration = note.duration - (newStartBeat - note.startBeat);
+    note.startBeat = newStartBeat;
+    
+    updatedBlock.notes[noteIndex] = note;
+  }
   
   return updatedBlock;
 };
 
 /**
- * Resizes a note from its end edge
+ * Resizes notes from their end edge
  */
-export const resizeNoteFromEnd = (
+export const resizeNotesFromEnd = (
   block: MIDIBlock,
-  noteId: string,
+  noteIds: string[],
   deltaBeats: number,
-  dragDuration: number
+  initialDragStates: Map<string, { startBeat: number, duration: number }>
 ): MIDIBlock => {
-  const noteIndex = block.notes.findIndex(note => note.id === noteId);
-  if (noteIndex === -1) return block;
-  
-  const note = { ...block.notes[noteIndex] };
-  const blockDuration = block.endBeat - block.startBeat;
-  let newDuration = dragDuration + deltaBeats;
-  
-  // Clamp to valid range
-  newDuration = Math.max(GRID_SNAP, Math.min(blockDuration - note.startBeat, newDuration));
-  note.duration = newDuration;
-  
-  // Create new block with updated note
   const updatedBlock = { ...block };
   updatedBlock.notes = [...block.notes];
-  updatedBlock.notes[noteIndex] = note;
+  
+  for (const noteId of noteIds) {
+    const initialState = initialDragStates.get(noteId);
+    if (!initialState) continue;
+    
+    const noteIndex = block.notes.findIndex(note => note.id === noteId);
+    if (noteIndex === -1) continue;
+    
+    const note = { ...block.notes[noteIndex] };
+    let newDuration = initialState.duration + deltaBeats;
+    
+    note.duration = newDuration;
+    updatedBlock.notes[noteIndex] = note;
+  }
   
   return updatedBlock;
 };
