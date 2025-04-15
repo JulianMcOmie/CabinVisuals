@@ -15,11 +15,12 @@ export interface VisualObject3D {
 
 class VisualizerManager {
   private timeManager: TimeManager;
-  private trackManager: TrackManager;
-  
-  constructor(timeManager: TimeManager, trackManager: TrackManager) {
+  // Store the function directly instead of the TrackManager instance
+  private getObjectsAtTime: (time: number, bpm: number) => VisualObject[];
+
+  constructor(timeManager: TimeManager, getObjectsAtTime: (time: number, bpm: number) => VisualObject[]) {
     this.timeManager = timeManager;
-    this.trackManager = trackManager;
+    this.getObjectsAtTime = getObjectsAtTime;
   }
   
   // Get all visual objects to render at current time
@@ -28,8 +29,8 @@ class VisualizerManager {
     const bpm = this.timeManager.getBPM();
     const objects: VisualObject3D[] = [];
     
-    // Get visual objects from the track manager
-    const trackObjects = this.trackManager.getObjectsAtTime(time, bpm);
+    // Get visual objects using the function from the store
+    const trackObjects = this.getObjectsAtTime(time, bpm);
     
     // Convert VisualObject to VisualObject3D
     trackObjects.forEach((obj, index) => {

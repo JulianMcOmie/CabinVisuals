@@ -187,6 +187,7 @@ export function useTrackGestures({
     setDragBlockId(blockId);
     setDragTrackId(trackId);
     setDragStartBeat(block.startBeat);
+    selectBlock(blockId);
   }, [findTrackById]);
 
   // Start resizing from the right edge
@@ -200,6 +201,7 @@ export function useTrackGestures({
     setDragBlockId(blockId);
     setDragTrackId(trackId);
     setDragEndBeat(block.endBeat);
+    selectBlock(blockId);
   }, [findTrackById]);
 
   // Start moving the block

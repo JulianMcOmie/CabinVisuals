@@ -52,10 +52,10 @@ function VisualObject({ object }: { object: VisualObject3D }) {
 
 // Main VisualizerView component
 function VisualizerView() {
-  const { timeManager, trackManager, currentBeat } = useStore();
+  const { timeManager, currentBeat, getVisualObjectsAtTime } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [visualizerManager] = useState(() => new VisualizerManager(timeManager, trackManager));
+  const [visualizerManager] = useState(() => new VisualizerManager(timeManager, getVisualObjectsAtTime));
   
   // Update dimensions on resize
   useEffect(() => {

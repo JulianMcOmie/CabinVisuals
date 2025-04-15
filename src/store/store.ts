@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Track, MIDIBlock, MIDINote, Synthesizer } from '../lib/types';
+import { Track, MIDIBlock, MIDINote, VisualObject } from '../lib/types';
+import Synthesizer from '../lib/Synthesizer';
 import TimeManager from '../lib/TimeManager';
 import TrackManager from '../lib/TrackManager';
 import { AudioManager } from '../lib/AudioManager';
@@ -70,6 +71,7 @@ interface AppState {
   stop: () => void;
   setBPM: (bpm: number) => void;
   seekTo: (beat: number) => void;
+  getVisualObjectsAtTime: (time: number, bpm: number) => VisualObject[];
 
   // NEW: Action to toggle sidebar
   toggleInstrumentSidebar: () => void;
@@ -472,6 +474,11 @@ const useStore = create<AppState>((set, get) => {
               audioManager.seek(targetTime);
           }
       }
+    },
+
+    getVisualObjectsAtTime: (time: number, bpm: number): VisualObject[] => {
+        const { trackManager } = get();
+        return trackManager.getObjectsAtTime(time, bpm);
     },
 
     // NEW: Action to toggle sidebar

@@ -10,6 +10,7 @@ const TRACK_HEIGHT = 50; // Use the same height as in TimelineView
 const BLOCK_VERTICAL_PADDING = 5; // Padding above/below the block
 const BLOCK_HEIGHT = TRACK_HEIGHT - 2 * BLOCK_VERTICAL_PADDING;
 const EDGE_RESIZE_WIDTH = 8; // Width of the clickable edge area
+const BLOCK_CORNER_RADIUS = 4; // Added for rounded corners
 
 interface TrackTimelineViewProps {
   tracks: Track[]; // Changed from single track to array
@@ -51,6 +52,29 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
 
   console.log('tracks', tracks);
 
+  // Helper function to draw rounded rectangles
+  const drawRoundedRect = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+  ) => {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.arcTo(x + width, y, x + width, y + radius, radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
+    ctx.lineTo(x + radius, y + height);
+    ctx.arcTo(x, y + height, x, y + height - radius, radius);
+    ctx.lineTo(x, y + radius);
+    ctx.arcTo(x, y, x + radius, y, radius);
+    ctx.closePath();
+  };
+
+
   // Canvas Drawing Logic
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -58,30 +82,36 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
     console.log('canvas', canvas);
     if (!canvas || !context) return;
 
-    const canvasWidth = numMeasures * 4 * PIXELS_PER_BEAT; // Total width based on measures
-    const canvasHeight = tracks.length * TRACK_HEIGHT;
+    const dpr = window.devicePixelRatio || 1; // Get Device Pixel Ratio
+    const baseCanvasWidth = numMeasures * 4 * PIXELS_PER_BEAT; // Total width based on measures
+    const baseCanvasHeight = tracks.length * TRACK_HEIGHT;
 
-    // Set canvas size explicitly for drawing resolution
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-    // Style size to fit container (if needed, though width is fixed for now)
-    canvas.style.width = `${canvasWidth}px`;
-    canvas.style.height = `${canvasHeight}px`;
+    // Set canvas physical size (higher resolution)
+    canvas.width = baseCanvasWidth * dpr;
+    canvas.height = baseCanvasHeight * dpr;
+
+    // Set canvas display size (CSS pixels)
+    canvas.style.width = `${baseCanvasWidth}px`;
+    canvas.style.height = `${baseCanvasHeight}px`;
+
+    // Scale the context to account for DPR
+    context.scale(dpr, dpr);
 
 
-    // Clear canvas
+    // Clear canvas (using base dimensions)
     context.fillStyle = '#222';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    console.log('canvas.width', canvas.width);
+    context.fillRect(0, 0, baseCanvasWidth, baseCanvasHeight);
+    console.log('canvas.width (scaled)', baseCanvasWidth);
+
     // Draw Grid Lines
     context.strokeStyle = '#333';
-    context.lineWidth = 1;
+    context.lineWidth = 1; // Note: lineWidth might appear thinner due to scaling
     for (let i = 0; i <= numMeasures * 4; i++) {
       const x = i * PIXELS_PER_BEAT;
       context.strokeStyle = i % 4 === 0 ? '#555' : '#333'; // Darker lines for measure start
       context.beginPath();
       context.moveTo(x, 0);
-      context.lineTo(x, canvas.height);
+      context.lineTo(x, baseCanvasHeight); // Use base height
       context.stroke();
     }
 
@@ -89,12 +119,12 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
      tracks.forEach((track, trackIndex) => {
       const trackTopY = trackIndex * TRACK_HEIGHT;
 
-      // Draw track separator line (optional, if needed visually)
+      // Draw track separator line
       context.strokeStyle = '#333';
       context.lineWidth = 1;
       context.beginPath();
       context.moveTo(0, trackTopY + TRACK_HEIGHT);
-      context.lineTo(canvas.width, trackTopY + TRACK_HEIGHT);
+      context.lineTo(baseCanvasWidth, trackTopY + TRACK_HEIGHT); // Use base width
       context.stroke();
 
 
@@ -103,35 +133,36 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
         const isSelected = block.id === selectedBlockId;
         const leftPosition = block.startBeat * PIXELS_PER_BEAT;
         const blockWidth = (block.endBeat - block.startBeat) * PIXELS_PER_BEAT;
+        const blockTopY = trackTopY + BLOCK_VERTICAL_PADDING;
 
-        // Block background
-        context.fillStyle = isSelected ? '#4a90e2' : '#67c23a';
-        context.fillRect(leftPosition, trackTopY + BLOCK_VERTICAL_PADDING, blockWidth, BLOCK_HEIGHT);
+        // Draw rounded rectangle path
+        drawRoundedRect(context, leftPosition, blockTopY, blockWidth, BLOCK_HEIGHT, BLOCK_CORNER_RADIUS);
 
-        // Block border/selection outline
+        // Fill block background (always blue)
+        context.fillStyle = '#4a90e2'; // Consistent blue color
+        context.fill();
+
+        // Stroke border/selection outline only if selected
         if (isSelected) {
           context.strokeStyle = 'white';
-          context.lineWidth = 2;
-          context.strokeRect(leftPosition, trackTopY + BLOCK_VERTICAL_PADDING, blockWidth, BLOCK_HEIGHT);
+          context.lineWidth = 2; // Might appear as 1px on non-retina, consider adjusting if needed
+          context.stroke(); // Stroke the existing rounded path
         }
 
-        // Draw resize handles visually (optional, mainly for hit detection)
-        // context.fillStyle = 'rgba(0,0,0,0.1)'; // Subtle visual cue
-        // context.fillRect(leftPosition, trackTopY + BLOCK_VERTICAL_PADDING, EDGE_RESIZE_WIDTH, BLOCK_HEIGHT);
-        // context.fillRect(leftPosition + blockWidth - EDGE_RESIZE_WIDTH, trackTopY + BLOCK_VERTICAL_PADDING, EDGE_RESIZE_WIDTH, BLOCK_HEIGHT);
-
-
-        // Draw block text (e.g., number of notes)
+        // Draw block text (adjustments might be needed if text looks blurry)
         context.fillStyle = 'white';
-        context.font = 'bold 12px sans-serif';
+        context.font = `bold ${12 * dpr}px sans-serif`; // Scale font size? Optional, test appearance
         context.textAlign = 'left';
         context.textBaseline = 'middle';
         const text = `${block.notes.length} notes`;
         const textX = leftPosition + EDGE_RESIZE_WIDTH + 4; // Add padding
         const textY = trackTopY + TRACK_HEIGHT / 2;
+
         // Optional: Clip text if it overflows block width
+        // Clipping region also needs care with rounded corners if applied precisely
         context.save();
-        context.rect(textX, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 2 - 8, TRACK_HEIGHT); // Clipping region
+        // Simple rectangular clipping for now
+        context.rect(textX, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 2 - 8, TRACK_HEIGHT);
         context.clip();
         context.fillText(text, textX, textY);
         context.restore(); // Remove clipping
@@ -248,6 +279,54 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
     handleContextMenu(e, hitBlock?.id ?? null, clickedTrack.id);
  };
 
+ // New: Handle Mouse Move for Cursor Changes
+ const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    // Calculate mouse position relative to the *displayed* canvas size
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    const trackIndex = Math.floor(offsetY / TRACK_HEIGHT);
+    let cursorStyle = 'default'; // Default cursor
+
+    if (trackIndex >= 0 && trackIndex < tracks.length) {
+      const hoveredTrack = tracks[trackIndex];
+      // Hit detection logic similar to mouseDown
+      for (const block of hoveredTrack.midiBlocks) {
+        const leftPosition = block.startBeat * PIXELS_PER_BEAT;
+        const blockWidth = (block.endBeat - block.startBeat) * PIXELS_PER_BEAT;
+        const blockTop = trackIndex * TRACK_HEIGHT + BLOCK_VERTICAL_PADDING;
+        const blockBottom = blockTop + BLOCK_HEIGHT;
+
+        if (offsetX >= leftPosition && offsetX <= leftPosition + blockWidth &&
+            offsetY >= blockTop && offsetY <= blockBottom)
+        {
+          // Check for edge hits first
+          if (offsetX <= leftPosition + EDGE_RESIZE_WIDTH || offsetX >= leftPosition + blockWidth - EDGE_RESIZE_WIDTH) {
+            cursorStyle = 'ew-resize'; // East-West resize cursor for edges
+          } else {
+            cursorStyle = 'grab'; // Grab cursor for moving the block body
+          }
+          break; // Found a block, set cursor and stop searching
+        }
+      }
+    }
+    // Only update if style changed to avoid unnecessary DOM manipulation
+    if (canvas.style.cursor !== cursorStyle) {
+        canvas.style.cursor = cursorStyle;
+    }
+ };
+
+  // New: Handle Mouse Leave to Reset Cursor
+  const handleCanvasMouseLeave = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.style.cursor = 'default'; // Reset cursor when mouse leaves canvas
+    }
+  };
+
 
   return (
     <div
@@ -264,6 +343,8 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
         onMouseDown={handleCanvasMouseDown}
         onDoubleClick={handleCanvasDoubleClick}
         onContextMenu={handleCanvasContextMenu}
+        onMouseMove={handleCanvasMouseMove} // Added mouse move handler
+        onMouseLeave={handleCanvasMouseLeave} // Added mouse leave handler
         style={{ 
           display: 'block', // Prevents extra space below canvas
           position: 'absolute',
