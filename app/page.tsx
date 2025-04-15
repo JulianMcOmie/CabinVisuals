@@ -13,7 +13,6 @@ export default function Home() {
     <main className="main-container">
       <div className="playbar-container">
         <PlaybarView />
-        <AudioLoader />
       </div>
       
       <div className="content-container">
@@ -34,6 +33,10 @@ export default function Home() {
             <TimelineView />
           </div>
         </div>
+      </div>
+
+      <div className="audio-loader-container">
+        <AudioLoader />
       </div>
       
       <style jsx>{`
@@ -109,6 +112,21 @@ export default function Home() {
           flex: 1 1 50%;
           min-height: 0;
           overflow: hidden;
+        }
+
+        .audio-loader-container {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          height: 50px;
+          background-color: #f0f0f0;
+          border-top: 1px solid #ccc;
+          z-index: 10;
+          display: flex;
+          align-items: center;
+          padding: 0 10px;
+          box-sizing: border-box;
         }
       `}</style>
     </main>

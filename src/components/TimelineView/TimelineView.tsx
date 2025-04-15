@@ -241,9 +241,9 @@ function TimelineView() {
         </div>
       </div>
       
-      {/* Current beat indicator */}
+      {/* Current beat indicator - REMOVE TEXT */}
       <div style={{ padding: '5px 10px', borderTop: '1px solid #333', backgroundColor: '#111', color: 'white' }}>
-        Current beat: {currentBeat}
+        {/* Current beat: {currentBeat} */}
       </div>
     </div>
   );
