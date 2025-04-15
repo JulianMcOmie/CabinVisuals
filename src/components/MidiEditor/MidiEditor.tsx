@@ -66,8 +66,11 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
 
   const blockDuration = block.endBeat - block.startBeat;
-  const editorWidth = blockDuration * PIXELS_PER_BEAT;
-  const editorHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
+  const editorWidth = editorRef.current?.clientWidth || 800; // Default width if ref not available
+  const editorHeight = editorRef.current?.clientHeight || KEY_COUNT * PIXELS_PER_SEMITONE; // Default height if ref not available
+
+  const blockWidth = blockDuration * PIXELS_PER_BEAT;
+  const blockHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
 
   // Draw canvas using our extracted drawing function
   useEffect(() => {
@@ -89,6 +92,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       selectedNoteIds,
       editorWidth,
       editorHeight,
+      blockWidth,
+      blockHeight,
       blockDuration,
       selectionBox,
       isDragging
@@ -446,7 +451,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
             <canvas 
               ref={canvasRef}
               className="absolute top-0 left-0 w-full h-full"
-              width={editorWidth} 
+              width={editorWidth}
               height={editorHeight}
               style={{ cursor: hoverCursor }}
               onMouseDown={handleCanvasMouseDown}
