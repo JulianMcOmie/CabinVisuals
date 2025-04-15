@@ -196,6 +196,7 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
   
   // Handle double click to add a new MIDI block on a specific track
   const handleDoubleClick = (e: React.MouseEvent, trackId: string) => {
+    console.log("handleDoubleClick: ", e, trackId);
     const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
     if (!timelineAreaRect) return;
     
@@ -211,6 +212,8 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
       endBeat: clickBeat + 4, // Default 4 beats long
       notes: []
     };
+
+    console.log("Adding block to track: ", targetTrack.id);
     
     addMidiBlock(targetTrack.id, newBlock);
     selectBlock(newBlock.id);

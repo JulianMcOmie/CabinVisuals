@@ -20,8 +20,9 @@ const HEADER_BG_COLOR = 'black';
 function TimelineView() {
   const { currentBeat, trackManager, addTrack, selectTrack, seekTo } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
-  const playheadRef = useRef<HTMLDivElement>(null); // Ref for the playhead
-  const [isDragging, setIsDragging] = useState(false); // State for dragging
+  const playheadRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [scrollLeft, setScrollLeft] = useState(0); // State for horizontal scroll position
 
   // Handle adding a new track
   const handleAddTrack = () => {
@@ -37,24 +38,28 @@ function TimelineView() {
     selectTrack(newTrack.id);
   };
   
-  // Calculate playhead position
-  const playheadPosition = currentBeat * PIXELS_PER_BEAT + SIDEBAR_WIDTH;
+  // Calculate playhead position based on beat AND scroll
+  // Base position relative to the start of the timeline area (after sidebar)
+  const basePlayheadOffset = currentBeat * PIXELS_PER_BEAT;
+  // Adjust for the current horizontal scroll and add sidebar width for final CSS `left`
+  const playheadLeftStyle = SIDEBAR_WIDTH + basePlayheadOffset - scrollLeft;
 
-  // Mouse move handler for dragging
+  // Mouse move handler for dragging - needs to account for scroll
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!isDragging || !timelineContentRef.current) return;
 
     const containerRect = timelineContentRef.current.getBoundingClientRect();
-    // Calculate mouse X relative to the timeline content container
-    const mouseX = event.clientX - containerRect.left;
+    // Calculate mouse X relative to the timeline content container's *visible* area
+    const mouseXRelative = event.clientX - containerRect.left;
+    // Add the current scrollLeft to get the mouse position within the *scrolled content*
+    const mouseXInScrolledContent = mouseXRelative + timelineContentRef.current.scrollLeft;
     
-    // Calculate the target beat, ensuring it's not negative
-    // Subtract sidebar width before dividing by pixels per beat
-    const targetBeat = Math.max(0, (mouseX - SIDEBAR_WIDTH) / PIXELS_PER_BEAT);
+    // Calculate the target beat, subtracting sidebar width, ensuring it's not negative
+    const targetBeat = Math.max(0, (mouseXInScrolledContent - SIDEBAR_WIDTH) / PIXELS_PER_BEAT);
     
     seekTo(targetBeat);
 
-  }, [isDragging, seekTo]); // Include dependencies
+  }, [isDragging, seekTo]); // scrollLeft is implicitly handled via timelineContentRef.current
 
   // Mouse up handler to stop dragging
   const handleMouseUp = useCallback(() => {
@@ -89,6 +94,11 @@ function TimelineView() {
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  // Handler for scroll events on the timeline content
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    setScrollLeft(event.currentTarget.scrollLeft);
+  };
+
   // Get tracks from track manager
   const tracks = trackManager?.getTracks() || [];
   const totalTracksHeight = tracks.length * TRACK_HEIGHT;
@@ -99,7 +109,8 @@ function TimelineView() {
       <div className="timeline-container" style={{ 
         display: 'flex', 
         flex: 1, 
-        overflow: 'hidden'
+        overflow: 'hidden',
+        position: 'relative' // Added for absolute positioning of playhead
       }}>
         {/* Tracks header - fixed at top-left */}
         <div style={{
@@ -139,6 +150,7 @@ function TimelineView() {
         <div 
           ref={timelineContentRef}
           className="timeline-content" 
+          onScroll={handleScroll}
           style={{ 
             flex: 1, 
             overflowY: 'auto',
@@ -174,7 +186,6 @@ function TimelineView() {
           <div style={{ 
             width: '3200px', // Width to accommodate all measures
             minHeight: '100%', // Ensure it fills vertical space
-            paddingTop: '40px', // Space for the MeasuresHeader
             position: 'relative', // Context for absolute positioning of playhead
             display: 'flex', // Use flexbox for side-by-side layout
             height: `${totalTracksHeight}px` // Set explicit height for track area
@@ -233,26 +244,26 @@ function TimelineView() {
               Click the + button to add a track
             </div>
           )}
-
-          {/* Playhead - position relative to timeline-content */}
-          <div 
-            ref={playheadRef} // Assign ref
-            className="playhead" 
-            onMouseDown={handleMouseDown} // Attach mouse down handler
-            style={{
-              position: 'absolute',
-              top: '40px', // Start below the measures header
-              left: `${playheadPosition}px`,
-              width: '3px',
-              // Height should span the track area OR the visible viewport, 
-              // depending on desired behavior. Spanning total track height seems correct.
-              height: `calc(${totalTracksHeight}px)`, // Span height of all tracks
-              backgroundColor: 'red',
-              zIndex: 4, 
-              cursor: 'ew-resize' 
-            }}
-          />
         </div>
+
+        {/* Playhead - positioned relative to timeline-container, left style adjusted by scroll */}
+        <div 
+          ref={playheadRef} // Assign ref
+          className="playhead"
+          onMouseDown={handleMouseDown} // Attach mouse down handler
+          style={{
+            position: 'absolute',
+            top: '40px',
+            // Use the dynamically calculated style
+            left: `${playheadLeftStyle}px`,
+            width: '3px',
+            height: 'calc(100% - 40px)',
+            backgroundColor: 'red',
+            zIndex: 10,
+            cursor: 'ew-resize',
+            pointerEvents: 'auto'
+          }}
+        />
       </div>
       
       {/* Current beat indicator - REMOVE TEXT */}
