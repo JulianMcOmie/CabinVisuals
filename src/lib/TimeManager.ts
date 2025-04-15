@@ -119,6 +119,11 @@ class TimeManager {
       const beatsPerSecond = this.bpm / 60.0;
       return time * beatsPerSecond;
   }
+
+  // Get the current time in seconds
+  public getCurrentTime(): number {
+      return this.beatToTime(this.currentBeat);
+  }
 }
 
 export default TimeManager; 

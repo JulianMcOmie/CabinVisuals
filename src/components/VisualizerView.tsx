@@ -52,10 +52,12 @@ function VisualObject({ object }: { object: VisualObject3D }) {
 
 // Main VisualizerView component
 function VisualizerView() {
-  const { timeManager, currentBeat, getVisualObjectsAtTime } = useStore();
+  const { timeManager, currentBeat, tracks } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [visualizerManager] = useState(() => new VisualizerManager(timeManager, getVisualObjectsAtTime));
+  
+  // Initialize VisualizerManager with timeManager and initial tracks
+  const [visualizerManager] = useState(() => new VisualizerManager(timeManager, tracks));
   
   // Update dimensions on resize
   useEffect(() => {
@@ -72,6 +74,11 @@ function VisualizerView() {
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
+  
+  // Effect to update VisualizerManager when tracks change
+  useEffect(() => {
+    visualizerManager.setTracks(tracks);
+  }, [tracks, visualizerManager]); // Depend on tracks and the manager instance
   
   return (
     <div className="visualizer-view" ref={containerRef} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
