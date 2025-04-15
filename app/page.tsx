@@ -6,6 +6,7 @@ import VisualizerView from '../src/components/VisualizerView';
 import PlaybarView from '../src/components/PlaybarView';
 import DetailView from '../src/components/DetailView';
 import AudioLoader from '../src/components/AudioLoader';
+import InstrumentSidebar from '../src/components/InstrumentSidebar/InstrumentSidebar';
 
 export default function Home() {
   return (
@@ -16,17 +17,22 @@ export default function Home() {
       </div>
       
       <div className="content-container">
-        <div className="top-section">
-          <div className="detail-container">
-            <DetailView />
-          </div>
-          <div className="visualizer-container">
-            <VisualizerView />
-          </div>
+        <div className="sidebar-area">
+          <InstrumentSidebar />
         </div>
-        
-        <div className="bottom-section">
-          <TimelineView />
+        <div className="main-content-area">
+          <div className="top-section">
+            <div className="detail-container">
+              <DetailView />
+            </div>
+            <div className="visualizer-container">
+              <VisualizerView />
+            </div>
+          </div>
+          
+          <div className="bottom-section">
+            <TimelineView />
+          </div>
         </div>
       </div>
       
@@ -53,40 +59,55 @@ export default function Home() {
         
         .content-container {
           display: flex;
-          flex-direction: column;
+          flex-direction: row;
           flex: 1;
           width: 100%;
           overflow: hidden;
         }
         
+        .sidebar-area {
+          width: 250px;
+          flex: 0 0 250px;
+          height: 100%;
+          overflow: hidden;
+        }
+        
+        .main-content-area {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          height: 100%;
+          overflow: hidden;
+        }
+        
         .top-section {
           display: flex;
-          height: 50%;
           width: 100%;
-          flex: 1 0 50%;
+          flex: 1 1 50%;
+          min-height: 0;
           overflow: hidden;
         }
         
         .detail-container {
-          width: 50%;
           border-right: 1px solid #ccc;
           height: 100%;
-          flex: 0 0 50%;
+          flex: 1 1 50%;
+          min-width: 0;
           overflow: hidden;
         }
         
         .visualizer-container {
-          width: 50%;
           height: 100%;
-          flex: 0 0 50%;
+          flex: 1 1 50%;
+          min-width: 0;
           overflow: hidden;
         }
         
         .bottom-section {
-          height: 50%;
           width: 100%;
           border-top: 1px solid #ccc;
-          flex: 1 0 50%;
+          flex: 1 1 50%;
+          min-height: 0;
           overflow: hidden;
         }
       `}</style>

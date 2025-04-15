@@ -9,9 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@react-three/fiber": "^9.1.2",
     "@tonejs/midi": "^2.0.28",
     "@types/three": "^0.175.0",
+    "dynamic": "^4.2.2",
     "midi-file": "^1.2.4",
     "next": "15.2.4",
     "react": "^19.0.0",

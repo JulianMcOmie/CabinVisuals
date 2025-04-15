@@ -1,8 +1,30 @@
 import { create } from 'zustand';
-import { Track, MIDIBlock, MIDINote } from '../lib/types';
+import { Track, MIDIBlock, MIDINote, Synthesizer } from '../lib/types';
 import TimeManager from '../lib/TimeManager';
 import TrackManager from '../lib/TrackManager';
 import { AudioManager } from '../lib/AudioManager';
+
+// Import Synthesizer Classes
+import SineWaveSynth from '../lib/synthesizers/SineWaveSynth';
+import MelodicOrbitSynth from '../lib/synthesizers/MelodicOrbitSynth';
+import ApproachingCubeSynth from '../lib/synthesizers/ApproachingCubeSynth';
+import BackgroundPlaneSynth from '../lib/synthesizers/BackgroundPlaneSynth';
+import BasicSynthesizer from '../lib/synthesizers/BasicSynthesizer';
+import KickDrumSynth from '../lib/synthesizers/KickDrumSynth';
+import SnareDrumSynth from '../lib/synthesizers/SnareDrumSynth';
+import HiHatSynth from '../lib/synthesizers/HiHatSynth';
+import ShakerSynth from '../lib/synthesizers/ShakerSynth';
+
+// Define Instrument structures
+export interface InstrumentDefinition {
+  id: string; // Unique identifier, matches class name or similar
+  name: string; // User-friendly name
+  constructor: new (...args: any[]) => Synthesizer; // Store the class constructor
+}
+
+export interface InstrumentCategories {
+  [categoryName: string]: InstrumentDefinition[];
+}
 
 interface AppState {
   // Time-related state
@@ -25,6 +47,9 @@ interface AppState {
   isAudioLoaded: boolean;
   audioDuration: number | null;
   
+  // Add instrument definitions
+  availableInstruments: InstrumentCategories;
+
   // Actions
   selectTrack: (trackId: string | null) => void;
   selectBlock: (blockId: string | null) => void;
@@ -43,6 +68,23 @@ interface AppState {
   setBPM: (bpm: number) => void;
   seekTo: (beat: number) => void;
 }
+
+// Define the actual instrument data with constructors
+const availableInstrumentsData: InstrumentCategories = {
+  Melodic: [
+    { id: 'SineWaveSynth', name: 'Sine Wave Synth', constructor: SineWaveSynth },
+    { id: 'MelodicOrbitSynth', name: 'Melodic Orbit Synth', constructor: MelodicOrbitSynth },
+    { id: 'ApproachingCubeSynth', name: 'Approaching Cube Synth', constructor: ApproachingCubeSynth },
+    { id: 'BackgroundPlaneSynth', name: 'Background Plane Synth', constructor: BackgroundPlaneSynth },
+    { id: 'BasicSynthesizer', name: 'Basic Synth', constructor: BasicSynthesizer }, 
+  ],
+  Percussive: [
+    { id: 'KickDrumSynth', name: 'Kick Drum', constructor: KickDrumSynth },
+    { id: 'SnareDrumSynth', name: 'Snare Drum', constructor: SnareDrumSynth },
+    { id: 'HiHatSynth', name: 'Hi-Hat', constructor: HiHatSynth },
+    { id: 'ShakerSynth', name: 'Shaker', constructor: ShakerSynth },
+  ],
+};
 
 const useStore = create<AppState>((set, get) => {
   const timeManager = new TimeManager(120);
@@ -87,6 +129,9 @@ const useStore = create<AppState>((set, get) => {
     audioManager,
     isAudioLoaded: audioManager.isAudioLoaded,
     audioDuration: audioManager.audioDuration,
+    
+    // Add instruments to initial state
+    availableInstruments: availableInstrumentsData,
     
     // Actions
     selectTrack: (trackId: string | null) => {
@@ -243,10 +288,14 @@ const useStore = create<AppState>((set, get) => {
     updateTrack: (trackId: string, updatedProperties: Partial<Track>) => {
       const { trackManager } = get();
       trackManager.updateTrack(trackId, updatedProperties);
-      set({ 
-        trackManager: trackManager,
-        ...findSelectedItems() // Update selected items
-      });
+      // Re-fetch tracks to ensure the state reflects the update
+      const updatedTrack = trackManager.getTrack(trackId);
+      set(state => ({
+        trackManager: state.trackManager, // Keep the manager instance
+        // Update selectedTrack only if it's the one being modified
+        selectedTrack: state.selectedTrackId === trackId ? updatedTrack : state.selectedTrack,
+        // No need to update other selected items here unless updateTrack changes IDs
+      }));
     },
     
     updateCurrentBeat: (beat: number) => set({ currentBeat: beat }),
