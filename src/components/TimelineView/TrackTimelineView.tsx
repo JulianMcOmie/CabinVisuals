@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Track, MIDIBlock } from '../../lib/types';
 import useStore from '../../store/store';
-import MidiBlockView from './MidiBlockView';
-import { MidiParser } from '../../lib/MidiParser';
+// Removed MidiBlockView import
 import { useTrackGestures } from './useTrackGestures'; // Import the new hook
 
 // Import TRACK_HEIGHT or define it if not easily importable
 // Assuming TRACK_HEIGHT is defined elsewhere or passed as prop if variable
 const TRACK_HEIGHT = 50; // Use the same height as in TimelineView
+const BLOCK_VERTICAL_PADDING = 5; // Padding above/below the block
+const BLOCK_HEIGHT = TRACK_HEIGHT - 2 * BLOCK_VERTICAL_PADDING;
+const EDGE_RESIZE_WIDTH = 8; // Width of the clickable edge area
 
 interface TrackTimelineViewProps {
   tracks: Track[]; // Changed from single track to array
@@ -15,292 +17,264 @@ interface TrackTimelineViewProps {
 
 // Constants
 const PIXELS_PER_BEAT = 100; // Updated to match TimelineView and MeasuresHeader
-const GRID_SNAP = 0.25; // Snap to 1/4 beat
+// GRID_SNAP is used within useTrackGestures, keep it there or pass if needed externally
 
-function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop name
+function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
   const { selectedBlockId, numMeasures, selectBlock, addMidiBlock, updateMidiBlock, removeMidiBlock, timeManager } = useStore();
-  const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for double-click and hook
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // State for drag operations
-  const [dragOperation, setDragOperation] = useState<'none' | 'start' | 'end' | 'move'>('none');
-  const [dragStartX, setDragStartX] = useState(0);
-  const [dragStartBeat, setDragStartBeat] = useState(0);
-  const [dragEndBeat, setDragEndBeat] = useState(0);
-  const [dragBlockId, setDragBlockId] = useState<string | null>(null);
-  const [dragTrackId, setDragTrackId] = useState<string | null>(null); // Store track ID during drag
-  
-  // Use the custom hook for gesture handling
-  const { handleStartEdge, handleEndEdge, handleMoveBlock } = useTrackGestures({
+  const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for hook, points to the container
+  const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for the canvas element
+
+  // Use the custom hook for *all* gesture and interaction handling
+  const {
+    handleStartEdge,
+    handleEndEdge,
+    handleMoveBlock,
+    handleDoubleClick,
+    handleContextMenu,
+    handleDeleteBlock,
+    handleImportMidiClick,
+    handleFileSelected,
+    showContextMenu,
+    contextMenuPosition,
+    contextMenuBlockId,
+    fileInputRef,
+  } = useTrackGestures({
       tracks,
       updateMidiBlock,
+      addMidiBlock,
+      removeMidiBlock,
       selectBlock,
-      timelineAreaRef,
-      // Pass constants if they are not defined within the hook
-      // PIXELS_PER_BEAT,
-      // GRID_SNAP
+      selectedBlockId,
+      timelineAreaRef, // Pass container ref
+      timeManager,
   });
-  
-  // Context menu state
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
-  const [contextMenuBlockId, setContextMenuBlockId] = useState<string | null>(null);
-  const [contextMenuTrackId, setContextMenuTrackId] = useState<string | null>(null); // Store track ID for context actions
-  
-  // Helper to find track and block
-  const findTrackAndBlock = useCallback((blockId: string | null): { track: Track | null, block: MIDIBlock | null } => {
-    if (!blockId) return { track: null, block: null };
-    for (const track of tracks) {
-      const block = track.midiBlocks.find(b => b.id === blockId);
-      if (block) {
-        return { track, block };
-      }
-    }
-    return { track: null, block: null };
-  }, [tracks]);
-  
-  // Helper to find track by ID
-   const findTrackById = useCallback((trackId: string | null): Track | null => {
-    if (!trackId) return null;
-    return tracks.find(t => t.id === trackId) || null;
-  }, [tracks]);
-  
-  // Handle key press for delete
+
+  console.log('tracks', tracks);
+
+  // Canvas Drawing Logic
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBlockId) {
-        const { track } = findTrackAndBlock(selectedBlockId); // Find track owning the selected block
-        if (track) {
-          removeMidiBlock(track.id, selectedBlockId);
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext('2d');
+    console.log('canvas', canvas);
+    if (!canvas || !context) return;
+
+    const canvasWidth = numMeasures * 4 * PIXELS_PER_BEAT; // Total width based on measures
+    const canvasHeight = tracks.length * TRACK_HEIGHT;
+
+    // Set canvas size explicitly for drawing resolution
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    // Style size to fit container (if needed, though width is fixed for now)
+    canvas.style.width = `${canvasWidth}px`;
+    canvas.style.height = `${canvasHeight}px`;
+
+
+    // Clear canvas
+    context.fillStyle = '#222';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    console.log('canvas.width', canvas.width);
+    // Draw Grid Lines
+    context.strokeStyle = '#333';
+    context.lineWidth = 1;
+    for (let i = 0; i <= numMeasures * 4; i++) {
+      const x = i * PIXELS_PER_BEAT;
+      context.strokeStyle = i % 4 === 0 ? '#555' : '#333'; // Darker lines for measure start
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, canvas.height);
+      context.stroke();
+    }
+
+     // Draw Track Separators and Blocks
+     tracks.forEach((track, trackIndex) => {
+      const trackTopY = trackIndex * TRACK_HEIGHT;
+
+      // Draw track separator line (optional, if needed visually)
+      context.strokeStyle = '#333';
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(0, trackTopY + TRACK_HEIGHT);
+      context.lineTo(canvas.width, trackTopY + TRACK_HEIGHT);
+      context.stroke();
+
+
+      // Draw MIDI Blocks for this track
+      track.midiBlocks.forEach(block => {
+        const isSelected = block.id === selectedBlockId;
+        const leftPosition = block.startBeat * PIXELS_PER_BEAT;
+        const blockWidth = (block.endBeat - block.startBeat) * PIXELS_PER_BEAT;
+
+        // Block background
+        context.fillStyle = isSelected ? '#4a90e2' : '#67c23a';
+        context.fillRect(leftPosition, trackTopY + BLOCK_VERTICAL_PADDING, blockWidth, BLOCK_HEIGHT);
+
+        // Block border/selection outline
+        if (isSelected) {
+          context.strokeStyle = 'white';
+          context.lineWidth = 2;
+          context.strokeRect(leftPosition, trackTopY + BLOCK_VERTICAL_PADDING, blockWidth, BLOCK_HEIGHT);
         }
-      }
-      
-      // Escape key to close context menu
-      if (e.key === 'Escape') {
-        setShowContextMenu(false);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    
-    // Hide context menu on click outside
-    const handleClickOutside = () => {
-      setShowContextMenu(false);
-    };
-    
-    window.addEventListener('click', handleClickOutside);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('click', handleClickOutside);
-    };
-  }, [selectedBlockId, removeMidiBlock, tracks, findTrackAndBlock]); // Added findTrackAndBlock dependency
-  
-  // Handle mouse up to end all drag operations - REMOVED (handled by hook)
-  // useEffect(() => { ... }, [...]);
-  
-  // Handle double click to add a new MIDI block on a specific track
-  const handleDoubleClick = useCallback((e: React.MouseEvent, trackId: string) => {
-    console.log("handleDoubleClick: ", e, trackId);
-    const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
-    if (!timelineAreaRect) return;
-    
-    const clickX = e.clientX - timelineAreaRect.left;
-    const clickBeat = Math.floor(clickX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
-    
-    const targetTrack = findTrackById(trackId);
-    if (!targetTrack) return;
-    
-    const newBlock: MIDIBlock = {
-      id: `block-${Date.now()}`,
-      startBeat: clickBeat,
-      endBeat: clickBeat + 4, // Default 4 beats long
-      notes: []
-    };
 
-    console.log("Adding block to track: ", targetTrack.id);
-    
-    addMidiBlock(targetTrack.id, newBlock);
-    selectBlock(newBlock.id);
-  }, [addMidiBlock, selectBlock, findTrackById]); // Added dependencies
-  
-  // Handle right click on the track background or a block
-  const handleContextMenu = useCallback((e: React.MouseEvent, blockId: string | null = null, trackId: string | null = null) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    let targetTrackId: string | null = trackId;
+        // Draw resize handles visually (optional, mainly for hit detection)
+        // context.fillStyle = 'rgba(0,0,0,0.1)'; // Subtle visual cue
+        // context.fillRect(leftPosition, trackTopY + BLOCK_VERTICAL_PADDING, EDGE_RESIZE_WIDTH, BLOCK_HEIGHT);
+        // context.fillRect(leftPosition + blockWidth - EDGE_RESIZE_WIDTH, trackTopY + BLOCK_VERTICAL_PADDING, EDGE_RESIZE_WIDTH, BLOCK_HEIGHT);
 
-    // If right-clicked on a block, find its track
-    if (blockId) {
-      const { track } = findTrackAndBlock(blockId);
-      if (track) {
-        targetTrackId = track.id;
-        selectBlock(blockId); // Select the block
-      } else {
-         console.error("Could not find track for context menu block");
-         return; // Don't show menu if track not found
+
+        // Draw block text (e.g., number of notes)
+        context.fillStyle = 'white';
+        context.font = 'bold 12px sans-serif';
+        context.textAlign = 'left';
+        context.textBaseline = 'middle';
+        const text = `${block.notes.length} notes`;
+        const textX = leftPosition + EDGE_RESIZE_WIDTH + 4; // Add padding
+        const textY = trackTopY + TRACK_HEIGHT / 2;
+        // Optional: Clip text if it overflows block width
+        context.save();
+        context.rect(textX, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 2 - 8, TRACK_HEIGHT); // Clipping region
+        context.clip();
+        context.fillText(text, textX, textY);
+        context.restore(); // Remove clipping
+      });
+    });
+
+  }, [tracks, numMeasures, selectedBlockId]); // Redraw when these change
+
+
+  // Canvas Event Handlers
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    const trackIndex = Math.floor(offsetY / TRACK_HEIGHT);
+    if (trackIndex < 0 || trackIndex >= tracks.length) return; // Click outside track bounds
+
+    const clickedTrack = tracks[trackIndex];
+    let hitBlock: MIDIBlock | null = null;
+    let hitEdge: 'start' | 'end' | null = null;
+
+    // Hit detection for blocks within the clicked track
+    for (const block of clickedTrack.midiBlocks) {
+      const leftPosition = block.startBeat * PIXELS_PER_BEAT;
+      const blockWidth = (block.endBeat - block.startBeat) * PIXELS_PER_BEAT;
+      const blockTop = trackIndex * TRACK_HEIGHT + BLOCK_VERTICAL_PADDING;
+      const blockBottom = blockTop + BLOCK_HEIGHT;
+
+      if (offsetX >= leftPosition && offsetX <= leftPosition + blockWidth &&
+          offsetY >= blockTop && offsetY <= blockBottom)
+      {
+        hitBlock = block;
+        // Check for edge hits
+        if (offsetX <= leftPosition + EDGE_RESIZE_WIDTH) {
+          hitEdge = 'start';
+        } else if (offsetX >= leftPosition + blockWidth - EDGE_RESIZE_WIDTH) {
+          hitEdge = 'end';
+        }
+        break; // Found a block, stop searching
       }
-    } else if (!targetTrackId) {
-       console.error("Context menu opened without target track ID");
-       return; // Don't show menu if no track context
     }
 
-    // Position context menu at cursor position
-    setContextMenuPosition({ x: e.clientX, y: e.clientY });
-    setContextMenuBlockId(blockId);
-    setContextMenuTrackId(targetTrackId); // Store the identified track ID
-    setShowContextMenu(true);
-
-  }, [selectBlock, tracks, findTrackAndBlock]); // Added findTrackAndBlock dependency
-  
-  // Handle delete from context menu
-  const handleDeleteBlock = useCallback(() => {
-    if (contextMenuBlockId && contextMenuTrackId) {
-      removeMidiBlock(contextMenuTrackId, contextMenuBlockId);
-      setShowContextMenu(false);
-      setContextMenuBlockId(null);
-      setContextMenuTrackId(null);
+    // Call appropriate gesture handler
+    if (hitBlock && hitEdge === 'start') {
+        e.stopPropagation();
+        handleStartEdge(clickedTrack.id, hitBlock.id, e.clientX);
+    } else if (hitBlock && hitEdge === 'end') {
+        e.stopPropagation();
+        handleEndEdge(clickedTrack.id, hitBlock.id, e.clientX);
+    } else if (hitBlock) {
+        e.stopPropagation();
+        selectBlock(hitBlock.id); // Select the block first
+        handleMoveBlock(clickedTrack.id, hitBlock.id, e.clientX);
+    } else {
+        // Clicked on empty track space
+        selectBlock(null); // Deselect any selected block
+        // Potentially initiate rubber-band selection here in the future
     }
-  }, [contextMenuBlockId, contextMenuTrackId, removeMidiBlock]);
+  };
 
-  // Handle clicking the "Import MIDI" context menu item
-  const handleImportMidiClick = useCallback(() => {
-    if (!contextMenuTrackId) {
-        console.error("Cannot import MIDI: target track ID unknown.");
-        setShowContextMenu(false);
+  const handleCanvasDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+     const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left; // Use clientX for consistency with hook if needed
+    const offsetY = e.clientY - rect.top;
+
+    const trackIndex = Math.floor(offsetY / TRACK_HEIGHT);
+     if (trackIndex < 0 || trackIndex >= tracks.length) return;
+
+    const clickedTrackId = tracks[trackIndex].id;
+    // Pass the original event and trackId to the hook
+    handleDoubleClick(e, clickedTrackId);
+  };
+
+ const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault(); // Prevent default browser context menu
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    const trackIndex = Math.floor(offsetY / TRACK_HEIGHT);
+    if (trackIndex < 0 || trackIndex >= tracks.length) {
+        // Context menu outside tracks (e.g., for global actions like import)
+        handleContextMenu(e, null, null); // Pass null trackId
         return;
     }
-    fileInputRef.current?.click();
-    setShowContextMenu(false);
-  }, [contextMenuTrackId]); // Depends on the track ID stored from context menu open
 
-  // Handle file selection from the hidden input
-  const handleFileSelected = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    const targetTrackId = contextMenuTrackId;
+    const clickedTrack = tracks[trackIndex];
+    let hitBlock: MIDIBlock | null = null;
 
-    if (!file || !targetTrackId) {
-      if (event.target) event.target.value = ''; // Clear input
-      console.error("MIDI file selected but target track ID is missing.");
-      setContextMenuTrackId(null); // Clear potentially stale ID
-      return;
+    // Hit detection (simplified for context menu - just need block ID)
+    for (const block of clickedTrack.midiBlocks) {
+      const leftPosition = block.startBeat * PIXELS_PER_BEAT;
+      const blockWidth = (block.endBeat - block.startBeat) * PIXELS_PER_BEAT;
+       const blockTop = trackIndex * TRACK_HEIGHT + BLOCK_VERTICAL_PADDING;
+       const blockBottom = blockTop + BLOCK_HEIGHT;
+
+
+      if (offsetX >= leftPosition && offsetX <= leftPosition + blockWidth &&
+          offsetY >= blockTop && offsetY <= blockBottom)
+      {
+        hitBlock = block;
+        break;
+      }
     }
 
-    const reader = new FileReader();
+    // Call context menu handler from hook, passing event, blockId (or null), and trackId
+    handleContextMenu(e, hitBlock?.id ?? null, clickedTrack.id);
+ };
 
-    reader.onload = async (e) => {
-        const arrayBuffer = e.target?.result as ArrayBuffer;
-        if (!arrayBuffer) {
-            console.error('Failed to read MIDI file.');
-            return;
-        }
-
-        try {
-            console.log("Parsing MIDI file...");
-            const parsedBlocks = await MidiParser.parse(arrayBuffer, timeManager);
-            console.log(`Parsed ${parsedBlocks.length} MIDI blocks.`);
-            
-            if (parsedBlocks.length > 0) {
-                parsedBlocks.forEach(block => {
-                    console.log(`Adding block to track ${targetTrackId}: ${block.id}, Start: ${block.startBeat}, End: ${block.endBeat}, Notes: ${block.notes.length}`);
-                    addMidiBlock(targetTrackId, block);
-                });
-            } else {
-                 console.log("No valid note data found in MIDI file to create blocks.");
-            }
-
-        } catch (err) {
-            console.error("Error parsing MIDI file:", err);
-        } finally {
-            if (event.target) {
-                 event.target.value = '';
-            }
-            setContextMenuTrackId(null); // Clear context menu track ID after import attempt
-        }
-    };
-
-    reader.onerror = () => {
-        console.error('Error reading MIDI file.');
-        if (event.target) {
-           event.target.value = '';
-        }
-        setContextMenuTrackId(null); // Clear context menu track ID on error
-    };
-
-    reader.readAsArrayBuffer(file);
-
-  }, [addMidiBlock, timeManager, contextMenuTrackId]); // Depends on the context menu track ID
 
   return (
-    <div 
-      ref={timelineAreaRef}
-      className="all-tracks-timeline-view"
+    <div
+      ref={timelineAreaRef} // Keep this ref on the container div
+      className="all-tracks-timeline-view-container" // Renamed class for clarity
       style={{
-        width: '100%',
-        height: `${tracks.length * TRACK_HEIGHT}px`,
+        width: '100%', // Container takes full width
         backgroundColor: '#222',
-        display: 'flex',
-        flexDirection: 'column'
+        position: 'absolute' // Needed for positioning context menu correctly relative to scroll
       }}
     >
-      <div className="grid-lines-container" style={{ 
-        position: 'absolute',
-        top: 0, 
-        left: 0, 
-        width: '100%', 
-        height: '100%',
-        zIndex: 0, 
-        pointerEvents: 'none'
-      }}>
-        {Array.from({ length: numMeasures * 4 }).map((_, i) => (
-          <div key={`grid-${i}`} style={{
-            position: 'absolute',
-            left: `${i * PIXELS_PER_BEAT}px`,
-            top: 0,
-            bottom: 0,
-            width: '1px',
-            backgroundColor: i % 4 === 0 ? '#555' : '#333',
-          }} />
-        ))}
-      </div>
+      <canvas
+        ref={canvasRef}
+        onMouseDown={handleCanvasMouseDown}
+        onDoubleClick={handleCanvasDoubleClick}
+        onContextMenu={handleCanvasContextMenu}
+        style={{ 
+          display: 'block', // Prevents extra space below canvas
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%', // Make canvas fill the container width
+          // height: '100%', // Remove percentage height; useEffect sets explicit pixel height
+        }}
+      />
 
-      {tracks.map((track, index) => (
-        <div
-          key={track.id}
-          className="track-lane"
-          style={{
-            height: `${TRACK_HEIGHT}px`,
-            borderBottom: '1px solid #333',
-            left: 0,
-            width: '100%',
-            boxSizing: 'border-box',
-            position: 'relative'
-          }}
-          onDoubleClick={(e) => handleDoubleClick(e, track.id)}
-          onContextMenu={(e) => handleContextMenu(e, null, track.id)}
-        >
-          {track.midiBlocks.map(block => (
-            <div
-              key={block.id}
-              onContextMenu={(e) => handleContextMenu(e, block.id)}
-            >
-              <MidiBlockView
-                block={block}
-                trackId={track.id}
-                isSelected={block.id === selectedBlockId}
-                pixelsPerBeat={PIXELS_PER_BEAT}
-                onSelectBlock={() => selectBlock(block.id)}
-                // Use handlers returned from the hook
-                onStartEdge={handleStartEdge}
-                onEndEdge={handleEndEdge}
-                onMoveBlock={handleMoveBlock}
-              />
-            </div>
-          ))}
-        </div>
-      ))}
-
+      {/* Keep File Input and Context Menu */}
       <input
         type="file"
         ref={fileInputRef}
@@ -310,9 +284,10 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
       />
 
       {showContextMenu && (
-        <div 
+        <div
+          className="context-menu-class" // Keep existing styling/logic
           style={{
-            position: 'fixed',
+            position: 'fixed', // Use fixed position based on hook's calculation
             top: `${contextMenuPosition.y}px`,
             left: `${contextMenuPosition.x}px`,
             backgroundColor: '#333',
@@ -320,29 +295,27 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) { // Changed prop
             borderRadius: '4px',
             padding: '4px 0',
             boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-            zIndex: 100
+            zIndex: 100,
+            cursor: 'pointer',
+            color: 'white',
+            fontSize: '14px',
+            whiteSpace: 'nowrap'
           }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()} // Prevent closing menu when clicking inside
         >
-           <div 
-            style={{
-              padding: '6px 14px',
-              cursor: 'pointer',
-              color: 'white',
-              fontSize: '14px'
-            }}
+           <div
+            style={{ padding: '6px 14px', cursor: 'pointer' }}
             onClick={handleImportMidiClick}
           >
             Import MIDI...
           </div>
 
           {contextMenuBlockId && (
-              <div 
+              <div
                 style={{
                   padding: '6px 14px',
                   cursor: 'pointer',
                   color: '#ff8080',
-                  fontSize: '14px',
                   borderTop: '1px solid #555'
                 }}
                 onClick={handleDeleteBlock}
