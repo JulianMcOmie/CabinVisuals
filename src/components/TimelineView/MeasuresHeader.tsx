@@ -7,11 +7,20 @@ function MeasuresHeader() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const pixelsPerMeasure = 400;
+  const beatsPerMeasure = 4;
 
-  const handleMeasureClick = (measure: number) => {
-    // Set current beat to the start of the clicked measure (assuming 4 beats per measure)
-    seekTo((measure - 1) * 4);
-  };
+  const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const clickX = event.nativeEvent.offsetX;
+    const clickedBeat = (clickX / pixelsPerMeasure) * beatsPerMeasure;
+    
+    seekTo(clickedBeat * 4);
+
+    console.log('clickedBeat', clickedBeat);
+  }
+  
 
   // Draw canvas when dimensions change
   useEffect(() => {
@@ -64,11 +73,13 @@ function MeasuresHeader() {
             height: '100%'
         }}
       />
-      <div style={{ position: 'relative', width: '100%', height: '100%', zIndex: 1 }}>
+      <div 
+        onClick={handleCanvasClick} 
+        style={{ position: 'relative', width: '100%', height: '100%', zIndex: 1 }}
+      >
         {Array.from({ length: 8 }).map((_, i) => (
           <div 
             key={i}
-            onClick={() => handleMeasureClick(i + 1)}
             style={{
               position: 'absolute',
               left: `${i * pixelsPerMeasure + 10}px`,

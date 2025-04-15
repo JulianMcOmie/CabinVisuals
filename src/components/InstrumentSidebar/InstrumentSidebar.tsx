@@ -119,6 +119,7 @@ const InstrumentSidebar: React.FC = () => {
           margin-bottom: 15px;
           border-bottom: 1px solid #eee;
           padding-bottom: 5px;
+          color: #000;
         }
         .category-section {
           margin-bottom: 10px;
@@ -127,6 +128,7 @@ const InstrumentSidebar: React.FC = () => {
           margin: 5px 0;
           font-weight: bold;
           user-select: none; /* Prevent text selection on click */
+          color: #000;
         }
         .instrument-list {
           list-style: none;
@@ -138,6 +140,7 @@ const InstrumentSidebar: React.FC = () => {
           cursor: pointer;
           border-radius: 3px;
           margin: 1px 0; /* Added tiny margin */
+          color: #000;
         }
         .instrument-item:hover {
           background-color: #e0e0e0;
@@ -150,6 +153,9 @@ const InstrumentSidebar: React.FC = () => {
         }
         .instrument-item.selected:hover {
           background-color: #b8daff; /* Slightly darker blue on hover */
+        }
+        .instrument-item:hover {
+          color: #000;
         }
       `}</style>
     </div>
