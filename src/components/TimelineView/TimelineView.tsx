@@ -18,7 +18,7 @@ const SIDEBAR_BG_COLOR = '#1a1a1a';
 const HEADER_BG_COLOR = 'black';
 
 function TimelineView() {
-  const { currentBeat, trackManager, addTrack, selectTrack, seekTo } = useStore();
+  const { currentBeat, tracks, addTrack, selectTrack, seekTo } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -26,7 +26,7 @@ function TimelineView() {
 
   // Handle adding a new track
   const handleAddTrack = () => {
-    const trackNumber = trackManager?.getTracks().length + 1 || 1;
+    const trackNumber = tracks.length + 1 || 1;
     const newTrack: Track = {
       id: `track-${Date.now()}`,
       name: `Track ${trackNumber}`,
@@ -100,7 +100,6 @@ function TimelineView() {
   };
 
   // Get tracks from track manager
-  const tracks = trackManager?.getTracks() || [];
   const totalTracksHeight = tracks.length * TRACK_HEIGHT;
 
   return (
