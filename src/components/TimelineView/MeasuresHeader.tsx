@@ -132,8 +132,8 @@ function MeasuresHeader() {
   }, [loopDragState, loopStartBeat, loopEndBeat, numMeasures, setLoopRange, calculateBeatFromX]); // Added loopStartBeat/EndBeat dependencies
 
   const handleLoopEnd = useCallback((event: MouseEvent) => {
-      // Check if it was a click (minimal movement) for toggling
-      if (loopDragState.type === 'creating' && overlayRef.current) {
+      // Check if drag type was 'creating' OR 'moving' and it was a click
+      if ((loopDragState.type === 'creating' || loopDragState.type === 'moving') && overlayRef.current) {
           const overlayRect = overlayRef.current.getBoundingClientRect();
           const finalMouseX = event.clientX - overlayRect.left;
           // Use a small pixel threshold to determine a "click"
