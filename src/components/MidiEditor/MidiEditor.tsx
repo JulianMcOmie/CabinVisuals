@@ -13,44 +13,29 @@ import {
   PIXELS_PER_BEAT,
   PIXELS_PER_SEMITONE,
   KEY_COUNT,
-  GRID_SNAP,
   DragOperation,
   CursorType,
   SelectionBox,
-  LOWEST_NOTE,
-  NOTE_COLOR,
-  SELECTED_NOTE_COLOR,
-  SELECTION_BOX_COLOR,
-  SELECTION_BOX_BORDER_COLOR,
-  PASTE_OFFSET
 } from './utils/constants';
 
 import {
-  isNoteInSelectionBox,
   getCoordsFromEvent,
   findNoteAt,
-  generateNoteId
 } from './utils/utils';
 
 import { drawMidiEditor } from './utils/canvas';
-import { 
-  createNewNote, 
-  deleteSelectedNotes, 
-  duplicateNotes,
-  pasteNotes,
-  moveSelectedNotes,
-  resizeNoteFromStart,
-  resizeNoteFromEnd,
-  toggleNoteSelection,
-  processSelectionBoxNotes,
-  copyNotes,
+
+import {
   handleNoteClick,
-  handleOptionDrag,
-  handleDragMove,
-  isDragThresholdMet,
   handleSelectionBoxComplete,
   handleContextMenuOnNote
-} from './utils/noteOperations';
+} from './utils/clickOperations';
+
+import {
+  handleOptionDrag,
+  handleDragMove,
+  isDragThresholdMet
+} from './utils/dragOperations';
 
 import { handleKeyboardShortcuts } from './utils/keyboardHandlers';
 
@@ -60,15 +45,14 @@ interface MidiEditorProps {
 }
 
 function MidiEditor({ block, track }: MidiEditorProps) {
-  const { updateMidiBlock, selectNotes: storeSelectNotes, selectBlock } = useStore();
+  const { updateMidiBlock, selectNotes: storeSelectNotes } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // State for drag operations
   const [dragOperation, setDragOperation] = useState<DragOperation>('none');
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [dragStartBeat, setDragStartBeat] = useState(0);
-  const [dragDuration, setDragDuration] = useState(0);
+  const [initialDragStates, setInitialDragStates] = useState<Map<string, { startBeat: number, duration: number }>>(new Map());
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
   const [clickOffset, setClickOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -82,8 +66,11 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
 
   const blockDuration = block.endBeat - block.startBeat;
-  const editorWidth = blockDuration * PIXELS_PER_BEAT;
-  const editorHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
+  const editorWidth = editorRef.current?.clientWidth || 800; // Default width if ref not available
+  const editorHeight = editorRef.current?.clientHeight || KEY_COUNT * PIXELS_PER_SEMITONE; // Default height if ref not available
+
+  const blockWidth = blockDuration * PIXELS_PER_BEAT;
+  const blockHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
 
   // Draw canvas using our extracted drawing function
   useEffect(() => {
@@ -105,6 +92,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       selectedNoteIds,
       editorWidth,
       editorHeight,
+      blockWidth,
+      blockHeight,
       blockDuration,
       selectionBox,
       isDragging
@@ -117,15 +106,15 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     if (!coords) return;
     
     const { x, y, beat, pitch } = coords;
-    const result = findNoteAt(x, y, block.notes, selectedNoteIds);
+    const clickResult = findNoteAt(x, y, block.notes, selectedNoteIds);
     
     setIsDragging(false);
     setDragStart({ x: e.clientX, y: e.clientY });
     
-    if (result) {
+    if (clickResult) {
       // Clicked on a note
       e.stopPropagation();
-      const { note, area } = result;
+      const { note, area } = clickResult;
       
       // Use the utility function to handle note click
       const { 
@@ -148,11 +137,21 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       setSelectedNoteIds(selectedIds);
       storeSelectNotes(selectedNotes);
       setDragNoteId(note.id);
-      setDragStartBeat(note.startBeat);
-      setDragDuration(note.duration);
       setDragOperation(newDragOperation);
       setHoverCursor(cursorType);
       setClickOffset(newClickOffset);
+      // Store initial drag states
+      setInitialDragStates(prev => {
+        const newStates = new Map(prev);
+        // Store initial state for all selected notes
+        selectedIds.forEach(id => {
+          const selectedNote = block.notes.find(n => n.id === id);
+          if (selectedNote) {
+            newStates.set(id, { startBeat: selectedNote.startBeat, duration: selectedNote.duration });
+          }
+        });
+        return newStates;
+      });
       
       // Handle Option/Alt key for duplication at initial click
       if (e.altKey && newDragOperation === 'move') {
@@ -365,8 +364,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           coords,
           clickOffset,
           dragStart,
-          dragStartBeat,
-          dragDuration
+          initialDragStates
         );
         
         // Only update if the block has changed
@@ -416,9 +414,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     updateMidiBlock, 
     dragNoteId, 
     dragOperation, 
-    dragStart, 
-    dragStartBeat, 
-    dragDuration, 
+    dragStart,
+    initialDragStates,
     selectionBox, 
     selectedNoteIds, 
     storeSelectNotes,
@@ -454,7 +451,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
             <canvas 
               ref={canvasRef}
               className="absolute top-0 left-0 w-full h-full"
-              width={editorWidth} 
+              width={editorWidth}
               height={editorHeight}
               style={{ cursor: hoverCursor }}
               onMouseDown={handleCanvasMouseDown}

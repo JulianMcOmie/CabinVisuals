@@ -21,6 +21,8 @@ export const drawMidiEditor = (
   selectedNoteIds: string[],
   editorWidth: number,
   editorHeight: number,
+  blockWidth: number,
+  blockHeight: number,
   blockDuration: number,
   selectionBox: SelectionBox,
   isDragging: boolean
@@ -29,6 +31,9 @@ export const drawMidiEditor = (
   
   // Draw grid
   drawGrid(ctx, editorWidth, editorHeight, blockDuration);
+
+  // Draw block box
+  drawBlockBox(ctx, blockWidth, blockHeight);
   
   // Draw notes
   drawNotes(ctx, notes, selectedNoteIds);
@@ -68,7 +73,7 @@ const drawGrid = (
   }
   
   // Draw vertical lines (beats)
-  for (let i = 0; i <= Math.ceil(blockDuration / GRID_SNAP); i++) {
+  for (let i = 0; i <= Math.ceil(editorWidth / (GRID_SNAP * PIXELS_PER_BEAT)); i++) {
     const x = i * GRID_SNAP * PIXELS_PER_BEAT;
     ctx.beginPath();
     ctx.moveTo(x, 0);
@@ -88,6 +93,20 @@ const drawGrid = (
     
     ctx.stroke();
   }
+};
+
+/**
+ * Draws the block box
+ */
+const drawBlockBox = (
+  ctx: CanvasRenderingContext2D,
+  editorWidth: number,
+  editorHeight: number
+): void => {
+  // Draw block box
+  ctx.strokeStyle = '#00FF00'; // Green color
+  ctx.lineWidth = 3;
+  ctx.strokeRect(0, 0, editorWidth, editorHeight);
 };
 
 /**
