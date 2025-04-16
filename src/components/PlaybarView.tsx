@@ -36,11 +36,13 @@ const TransportButton: React.FC<{
   onClick: () => void;
   active?: boolean;
   disabled?: boolean;
-}> = ({ icon, onClick, active = false, disabled = false }) => {
+  title?: string;
+}> = ({ icon, onClick, active = false, disabled = false, title }) => {
   return (
     <button 
       onClick={onClick} 
       disabled={disabled}
+      title={title}
       style={{ 
         width: '40px',
         height: '40px',
@@ -200,6 +202,8 @@ const PlaybarView: React.FC = () => {
     stop, 
     setBPM, 
     seekTo,
+    loopEnabled,
+    toggleLoop,
     isInstrumentSidebarVisible,
     toggleInstrumentSidebar
   } = useStore();
@@ -262,6 +266,12 @@ const PlaybarView: React.FC = () => {
               onClick={play}
             />
           )}
+          <TransportButton
+            icon="🔁"
+            onClick={toggleLoop}
+            active={loopEnabled}
+            title={loopEnabled ? "Disable Loop" : "Enable Loop"}
+          />
         </div>
         
         <TimeDisplay beat={currentBeat} />
