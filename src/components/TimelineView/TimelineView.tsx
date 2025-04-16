@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import useStore from '../../store/store';
 import InstrumentView from './InstrumentView';
 import TrackTimelineView from './TrackTimelineView';
@@ -10,7 +10,8 @@ import { Track } from '../../lib/types';
 
 // Fixed height for each track
 const TRACK_HEIGHT = 50;
-const PIXELS_PER_BEAT = 25; // From TrackTimelineView
+const PIXELS_PER_BEAT = 100; // Updated to match MeasuresHeader
+const SIDEBAR_WIDTH = 200; // Define sidebar width as a constant
 
 // Color constants
 const SIDEBAR_BG_COLOR = '#1a1a1a';
@@ -19,7 +20,9 @@ const HEADER_BG_COLOR = 'black';
 function TimelineView() {
   const { currentBeat, trackManager, addTrack, selectTrack, seekTo } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
+  const playheadRef = useRef<HTMLDivElement>(null); // Ref for the playhead
   const [trackHeight, setTrackHeight] = useState(TRACK_HEIGHT);
+  const [isDragging, setIsDragging] = useState(false); // State for dragging
 
   // Handle adding a new track
   const handleAddTrack = () => {
@@ -36,7 +39,56 @@ function TimelineView() {
   };
   
   // Calculate playhead position
-  const playheadPosition = currentBeat * PIXELS_PER_BEAT + 200; // Add 200px for instrument sidebar
+  const playheadPosition = currentBeat * PIXELS_PER_BEAT + SIDEBAR_WIDTH;
+
+  // Mouse move handler for dragging
+  const handleMouseMove = useCallback((event: MouseEvent) => {
+    if (!isDragging || !timelineContentRef.current) return;
+
+    const containerRect = timelineContentRef.current.getBoundingClientRect();
+    // Calculate mouse X relative to the timeline content container
+    const mouseX = event.clientX - containerRect.left;
+    
+    // Calculate the target beat, ensuring it's not negative
+    // Subtract sidebar width before dividing by pixels per beat
+    const targetBeat = Math.max(0, (mouseX - SIDEBAR_WIDTH) / PIXELS_PER_BEAT);
+    
+    seekTo(targetBeat);
+
+  }, [isDragging, seekTo]); // Include dependencies
+
+  // Mouse up handler to stop dragging
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+      // Optional: Reset cursor or styles if changed during drag
+    }
+  }, [isDragging]);
+
+  // Mouse down handler to start dragging
+  const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent default text selection behavior during drag
+    event.preventDefault(); 
+    setIsDragging(true);
+    // Optional: Set initial styles like cursor
+  };
+
+  // Add/Remove global listeners when dragging state changes
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    } else {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    }
+
+    // Cleanup function to remove listeners if component unmounts while dragging
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Get tracks from track manager
   const tracks = trackManager?.getTracks() || [];
@@ -170,16 +222,22 @@ function TimelineView() {
           </div>
           
           {/* Playhead - positioned absolutely within the scrollable area */}
-          <div className="playhead" style={{
-            position: 'absolute',
-            top: '40px', // Start below the measures header
-            left: `${playheadPosition}px`,
-            width: '2px',
-            height: 'calc(100% - 40px)', // Extend full height below header
-            backgroundColor: 'red',
-            zIndex: 4, // Ensure it's above other elements
-            pointerEvents: 'none' // Make it non-interactive
-          }} />
+          <div 
+            ref={playheadRef} // Assign ref
+            className="playhead" 
+            onMouseDown={handleMouseDown} // Attach mouse down handler
+            style={{
+              position: 'absolute',
+              top: '40px', // Start below the measures header
+              left: `${playheadPosition}px`,
+              width: '3px', // Slightly wider for easier grabbing
+              height: 'calc(100% - 40px)', // Extend full height below header
+              backgroundColor: 'red',
+              zIndex: 4, // Ensure it's above other elements
+              // pointerEvents: 'none' // REMOVE this to allow interaction
+              cursor: 'ew-resize' // Add resize cursor
+            }}
+          />
         </div>
       </div>
       

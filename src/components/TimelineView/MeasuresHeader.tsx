@@ -1,17 +1,72 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import useStore from '../../store/store';
 
 function MeasuresHeader() {
   const { seekTo, numMeasures } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const [isDragging, setIsDragging] = useState(false);
 
   const pixelsPerMeasure = 400;
+  const beatsPerMeasure = 4;
 
-  const handleMeasureClick = (measure: number) => {
-    // Set current beat to the start of the clicked measure (assuming 4 beats per measure)
-    seekTo((measure - 1) * 4);
+  // Function to calculate beat from mouse X position relative to the overlay
+  const calculateBeatFromX = (mouseX: number): number => {
+    const clickedBeat = (mouseX / pixelsPerMeasure) * beatsPerMeasure;
+    // Ensure beat is within valid range (0 to total beats)
+    const totalBeats = numMeasures * beatsPerMeasure;
+    return Math.max(0, Math.min(clickedBeat, totalBeats));
   };
+
+  // Combined handler for mouse move (during drag)
+  const handleMouseMove = useCallback((event: MouseEvent) => {
+    if (!isDragging || !overlayRef.current) return;
+
+    const overlayRect = overlayRef.current.getBoundingClientRect();
+    const mouseX = event.clientX - overlayRect.left; // Position relative to the overlay div
+    const targetBeat = calculateBeatFromX(mouseX);
+    seekTo(targetBeat);
+
+  }, [isDragging, seekTo, numMeasures]); // Add numMeasures dependency for totalBeats calc
+
+  // Handler for mouse up (stop drag)
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+    }
+  }, [isDragging]);
+
+  // Handler for mouse down (start drag AND initial seek)
+  const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault(); // Prevent text selection etc.
+    setIsDragging(true);
+
+    // Perform initial seek based on the mousedown position
+    const mouseX = event.nativeEvent.offsetX; // Position relative to the target div
+    const targetBeat = calculateBeatFromX(mouseX);
+    seekTo(targetBeat);
+    
+    // Add listeners for mouse move and up on the window
+    // These will be handled by the useEffect below
+  };
+
+  // Effect to manage global mouse listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    } else {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    }
+    // Cleanup listeners on unmount
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Draw canvas when dimensions change
   useEffect(() => {
@@ -64,11 +119,20 @@ function MeasuresHeader() {
             height: '100%'
         }}
       />
-      <div style={{ position: 'relative', width: '100%', height: '100%', zIndex: 1 }}>
+      <div 
+        ref={overlayRef}
+        onMouseDown={handleMouseDown}
+        style={{ 
+          position: 'relative', 
+          width: '100%', 
+          height: '100%', 
+          zIndex: 1,
+          cursor: 'pointer'
+        }}
+      >
         {Array.from({ length: 8 }).map((_, i) => (
           <div 
             key={i}
-            onClick={() => handleMeasureClick(i + 1)}
             style={{
               position: 'absolute',
               left: `${i * pixelsPerMeasure + 10}px`,
