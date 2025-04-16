@@ -10,6 +10,10 @@ export interface TimeState {
   numMeasures: number;
   isPlaying: boolean;
   bpm: number;
+  // --- Loop State ---
+  loopEnabled: boolean;
+  loopStartBeat: number | null;
+  loopEndBeat: number | null;
 }
 
 export interface TimeActions {
@@ -19,6 +23,10 @@ export interface TimeActions {
   stop: () => void;
   setBPM: (bpm: number) => void;
   seekTo: (beat: number) => void;
+  // --- Loop Actions ---
+  toggleLoop: () => void;
+  setLoopRange: (startBeat: number, endBeat: number) => void;
+  clearLoop: () => void;
 }
 
 export type TimeSlice = TimeState & TimeActions;
@@ -33,7 +41,14 @@ export const createTimeSlice: StateCreator<
 
   // Set up beat update subscription
   timeManager.onUpdate((beat) => {
-    set({ currentBeat: beat });
+    // --- Loop Handling in Update ---
+    const { loopEnabled, loopStartBeat, loopEndBeat } = get();
+    if (loopEnabled && loopStartBeat !== null && loopEndBeat !== null && beat >= loopEndBeat) {
+      // If looping enabled and beat reaches/exceeds loop end, jump back to start
+      get().seekTo(loopStartBeat); 
+    } else {
+      set({ currentBeat: beat });
+    }
   });
 
   return {
@@ -42,23 +57,39 @@ export const createTimeSlice: StateCreator<
     numMeasures: timeManager.getNumMeasures(),
     isPlaying: false,
     bpm: 120,
+    // --- Loop State Defaults ---
+    loopEnabled: false,
+    loopStartBeat: null,
+    loopEndBeat: null,
+    // --- Actions ---
     updateCurrentBeat: (beat: number) => set({ currentBeat: beat }),
     play: () => {
       // Access state/methods from other slices via get()
-      const { audioManager, isAudioLoaded, currentBeat } = get();
+      const { audioManager, isAudioLoaded, currentBeat, loopEnabled, loopStartBeat, loopEndBeat } = get();
+      let startBeat = currentBeat;
+
+      // If looping is enabled and playback starts *outside* the loop, jump to loop start
+      if (loopEnabled && loopStartBeat !== null && loopEndBeat !== null) {
+          if(currentBeat < loopStartBeat || currentBeat >= loopEndBeat) {
+            startBeat = loopStartBeat;
+            set({ currentBeat: startBeat }); // Update state immediately
+          }
+      }
+
+
       // Ensure AudioContext is running before trying to play
       if (audioManager.context && audioManager.context.state === 'suspended') {
            console.warn("AudioContext is suspended. Attempting to resume...");
            audioManager.context.resume().then(() => {
                console.log("AudioContext resumed successfully.");
                 if (isAudioLoaded) {
-                    const offset = timeManager.beatToTime(currentBeat);
+                    const offset = timeManager.beatToTime(startBeat); // Use potentially adjusted startBeat
                     const startTime = audioManager.context!.currentTime + 0.05;
                     audioManager.play(startTime, offset);
                 }
            }).catch(err => console.error("Failed to resume AudioContext:", err));
       } else if (isAudioLoaded && audioManager.context) {
-          const offset = timeManager.beatToTime(currentBeat);
+          const offset = timeManager.beatToTime(startBeat); // Use potentially adjusted startBeat
           const startTime = audioManager.context.currentTime + 0.05;
           audioManager.play(startTime, offset);
       } else if (!isAudioLoaded) {
@@ -67,7 +98,8 @@ export const createTimeSlice: StateCreator<
            console.warn("Play called but AudioContext not available or in unexpected state.");
       }
 
-      timeManager.play();
+      timeManager.seekTo(startBeat);
+      timeManager.play(); // Start TimeManager from the correct beat
       set({ isPlaying: true });
     },
     pause: () => {
@@ -119,6 +151,20 @@ export const createTimeSlice: StateCreator<
               audioManager.seek(targetTime);
           }
       }
+    },
+    // --- Loop Action Implementations ---
+    toggleLoop: () => {
+      set((state) => ({ loopEnabled: !state.loopEnabled }));
+    },
+    setLoopRange: (startBeat: number, endBeat: number) => {
+       // Ensure start is less than or equal to end
+       const validStart = Math.min(startBeat, endBeat);
+       const validEnd = Math.max(startBeat, endBeat);
+       
+       set({ loopStartBeat: validStart, loopEndBeat: validEnd, loopEnabled: true }); // Enable loop when range is set
+    },
+    clearLoop: () => {
+      set({ loopStartBeat: null, loopEndBeat: null, loopEnabled: false });
     },
   }
 } 
