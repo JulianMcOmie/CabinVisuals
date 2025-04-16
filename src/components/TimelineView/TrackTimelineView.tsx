@@ -2,25 +2,30 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Track, MIDIBlock } from '../../lib/types';
 import useStore from '../../store/store';
 // Removed MidiBlockView import
-import { useTrackGestures } from './useTrackGestures'; // Import the new hook
+import { useTrackGestures, UseTrackGesturesProps } from './useTrackGestures'; // Import the new hook and its props type
 
-// Import TRACK_HEIGHT or define it if not easily importable
-// Assuming TRACK_HEIGHT is defined elsewhere or passed as prop if variable
-const TRACK_HEIGHT = 50; // Use the same height as in TimelineView
-const BLOCK_VERTICAL_PADDING = 5; // Padding above/below the block
-const BLOCK_HEIGHT = TRACK_HEIGHT - 2 * BLOCK_VERTICAL_PADDING;
-const EDGE_RESIZE_WIDTH = 8; // Width of the clickable edge area
-const BLOCK_CORNER_RADIUS = 4; // Added for rounded corners
+
+// Padding/geometry constants (relative to track height)
+const BLOCK_VERTICAL_PADDING_FACTOR = 0.1; // e.g., 10% of track height
+const EDGE_RESIZE_WIDTH = 8; // Width of the clickable edge area (keep fixed pixels?)
+const BLOCK_CORNER_RADIUS = 4; // Added for rounded corners (keep fixed pixels?)
 
 interface TrackTimelineViewProps {
-  tracks: Track[]; // Changed from single track to array
+  tracks: Track[];
+  horizontalZoom: number;
+  verticalZoom: number;
+  pixelsPerBeatBase: number;
+  trackHeightBase: number;
 }
 
-// Constants
-const PIXELS_PER_BEAT = 100; // Updated to match TimelineView and MeasuresHeader
-// GRID_SNAP is used within useTrackGestures, keep it there or pass if needed externally
 
-function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
+function TrackTimelineView({ 
+  tracks, 
+  horizontalZoom, 
+  verticalZoom, 
+  pixelsPerBeatBase, 
+  trackHeightBase 
+}: TrackTimelineViewProps) {
   const { 
     selectedBlockId, 
     numMeasures, 
@@ -33,6 +38,12 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
   } = useStore();
   const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for hook, points to the container
   const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for the canvas element
+
+  // Calculate effective values based on zoom
+  const effectiveTrackHeight = trackHeightBase * verticalZoom;
+  const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;
+  const effectiveBlockVerticalPadding = effectiveTrackHeight * BLOCK_VERTICAL_PADDING_FACTOR;
+  const effectiveBlockHeight = effectiveTrackHeight - 2 * effectiveBlockVerticalPadding;
 
   // Use the custom hook for *all* gesture and interaction handling
   const {
@@ -56,9 +67,14 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
       moveMidiBlock,
       selectBlock,
       selectedBlockId,
-      timelineAreaRef, // Pass container ref
+      timelineAreaRef,
       timeManager,
-  });
+      // Pass zoom-related props to the hook
+      horizontalZoom,
+      verticalZoom,
+      pixelsPerBeatBase,
+      trackHeightBase,
+  } as UseTrackGesturesProps); // Cast to satisfy hook's expected props
 
   // Helper function to draw rounded rectangles
   const drawRoundedRect = (
@@ -91,8 +107,9 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
     if (!canvas || !context) return;
 
     const dpr = window.devicePixelRatio || 1; // Get Device Pixel Ratio
-    const baseCanvasWidth = numMeasures * 4 * PIXELS_PER_BEAT; // Total width based on measures
-    const baseCanvasHeight = tracks.length * TRACK_HEIGHT;
+    // Calculate width/height based on base constants, measures, and zoom
+    const baseCanvasWidth = numMeasures * 4 * effectivePixelsPerBeat; // Use effective value
+    const baseCanvasHeight = tracks.length * effectiveTrackHeight; // Use effective value
 
     // Set canvas physical size (higher resolution)
     canvas.width = baseCanvasWidth * dpr;
@@ -115,7 +132,7 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
     context.strokeStyle = '#333';
     context.lineWidth = 1; // Note: lineWidth might appear thinner due to scaling
     for (let i = 0; i <= numMeasures * 4; i++) {
-      const x = i * PIXELS_PER_BEAT;
+      const x = i * effectivePixelsPerBeat; // Use effective value
       context.strokeStyle = i % 4 === 0 ? '#555' : '#333'; // Darker lines for measure start
       context.beginPath();
       context.moveTo(x, 0);
@@ -125,26 +142,26 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
 
      // Draw Track Separators and Blocks
      tracks.forEach((track, trackIndex) => {
-      const trackTopY = trackIndex * TRACK_HEIGHT;
+      const trackTopY = trackIndex * effectiveTrackHeight; // Use effective value
 
       // Draw track separator line
       context.strokeStyle = '#333';
       context.lineWidth = 1;
       context.beginPath();
-      context.moveTo(0, trackTopY + TRACK_HEIGHT);
-      context.lineTo(baseCanvasWidth, trackTopY + TRACK_HEIGHT); // Use base width
+      context.moveTo(0, trackTopY + effectiveTrackHeight); // Use effective value
+      context.lineTo(baseCanvasWidth, trackTopY + effectiveTrackHeight); // Use base width, effective height
       context.stroke();
 
 
       // Draw MIDI Blocks for this track
       track.midiBlocks.forEach(block => {
         const isSelected = block.id === selectedBlockId;
-        const leftPosition = block.startBeat * PIXELS_PER_BEAT;
-        const blockWidth = (block.endBeat - block.startBeat) * PIXELS_PER_BEAT;
-        const blockTopY = trackTopY + BLOCK_VERTICAL_PADDING;
+        const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
+        const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
+        const blockTopY = trackTopY + effectiveBlockVerticalPadding; // Use effective padding
 
         // Draw rounded rectangle path
-        drawRoundedRect(context, leftPosition, blockTopY, blockWidth, BLOCK_HEIGHT, BLOCK_CORNER_RADIUS);
+        drawRoundedRect(context, leftPosition, blockTopY, blockWidth, effectiveBlockHeight, BLOCK_CORNER_RADIUS); // Use effective height
 
         // Fill block background (always blue)
         context.fillStyle = '#4a90e2'; // Consistent blue color
@@ -164,20 +181,20 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
         context.textBaseline = 'middle';
         const text = `${block.notes.length} notes`;
         const textX = leftPosition + EDGE_RESIZE_WIDTH + 4; // Add padding
-        const textY = trackTopY + TRACK_HEIGHT / 2;
+        const textY = trackTopY + effectiveTrackHeight / 2; // Center vertically in track
 
         // Optional: Clip text if it overflows block width
         // Clipping region also needs care with rounded corners if applied precisely
         context.save();
         // Simple rectangular clipping for now
-        context.rect(textX, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 2 - 8, TRACK_HEIGHT);
+        context.rect(textX, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 2 - 8, effectiveTrackHeight); // Use effective height
         context.clip();
         context.fillText(text, textX, textY);
         context.restore(); // Remove clipping
       });
     });
 
-  }, [tracks, numMeasures, selectedBlockId]); // Redraw when these change
+  }, [tracks, numMeasures, selectedBlockId, horizontalZoom, verticalZoom, pixelsPerBeatBase, trackHeightBase]); // Add zoom dependencies
 
 
   // Canvas Event Handlers
@@ -188,7 +205,7 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
 
-    const trackIndex = Math.floor(offsetY / TRACK_HEIGHT);
+    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
     if (trackIndex < 0 || trackIndex >= tracks.length) return; // Click outside track bounds
 
     const clickedTrack = tracks[trackIndex];
@@ -197,10 +214,10 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
 
     // Hit detection for blocks within the clicked track
     for (const block of clickedTrack.midiBlocks) {
-      const leftPosition = block.startBeat * PIXELS_PER_BEAT;
-      const blockWidth = (block.endBeat - block.startBeat) * PIXELS_PER_BEAT;
-      const blockTop = trackIndex * TRACK_HEIGHT + BLOCK_VERTICAL_PADDING;
-      const blockBottom = blockTop + BLOCK_HEIGHT;
+      const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
+      const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
+      const blockTop = trackIndex * effectiveTrackHeight + effectiveBlockVerticalPadding; // Use effective values
+      const blockBottom = blockTop + effectiveBlockHeight; // Use effective height
 
       if (offsetX >= leftPosition && offsetX <= leftPosition + blockWidth &&
           offsetY >= blockTop && offsetY <= blockBottom)
@@ -241,7 +258,7 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
     const offsetX = e.clientX - rect.left; // Use clientX for consistency with hook if needed
     const offsetY = e.clientY - rect.top;
 
-    const trackIndex = Math.floor(offsetY / TRACK_HEIGHT);
+    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
      if (trackIndex < 0 || trackIndex >= tracks.length) return;
 
     const clickedTrackId = tracks[trackIndex].id;
@@ -257,7 +274,7 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
 
-    const trackIndex = Math.floor(offsetY / TRACK_HEIGHT);
+    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
     if (trackIndex < 0 || trackIndex >= tracks.length) {
         // Context menu outside tracks (e.g., for global actions like import)
         handleContextMenu(e, null, null); // Pass null trackId
@@ -269,10 +286,10 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
 
     // Hit detection (simplified for context menu - just need block ID)
     for (const block of clickedTrack.midiBlocks) {
-      const leftPosition = block.startBeat * PIXELS_PER_BEAT;
-      const blockWidth = (block.endBeat - block.startBeat) * PIXELS_PER_BEAT;
-       const blockTop = trackIndex * TRACK_HEIGHT + BLOCK_VERTICAL_PADDING;
-       const blockBottom = blockTop + BLOCK_HEIGHT;
+      const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
+      const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
+       const blockTop = trackIndex * effectiveTrackHeight + effectiveBlockVerticalPadding; // Use effective values
+       const blockBottom = blockTop + effectiveBlockHeight; // Use effective height
 
 
       if (offsetX >= leftPosition && offsetX <= leftPosition + blockWidth &&
@@ -296,17 +313,17 @@ function TrackTimelineView({ tracks }: TrackTimelineViewProps) {
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
 
-    const trackIndex = Math.floor(offsetY / TRACK_HEIGHT);
+    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
     let cursorStyle = 'default'; // Default cursor
 
     if (trackIndex >= 0 && trackIndex < tracks.length) {
       const hoveredTrack = tracks[trackIndex];
       // Hit detection logic similar to mouseDown
       for (const block of hoveredTrack.midiBlocks) {
-        const leftPosition = block.startBeat * PIXELS_PER_BEAT;
-        const blockWidth = (block.endBeat - block.startBeat) * PIXELS_PER_BEAT;
-        const blockTop = trackIndex * TRACK_HEIGHT + BLOCK_VERTICAL_PADDING;
-        const blockBottom = blockTop + BLOCK_HEIGHT;
+        const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
+        const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
+        const blockTop = trackIndex * effectiveTrackHeight + effectiveBlockVerticalPadding; // Use effective values
+        const blockBottom = blockTop + effectiveBlockHeight; // Use effective height
 
         if (offsetX >= leftPosition && offsetX <= leftPosition + blockWidth &&
             offsetY >= blockTop && offsetY <= blockBottom)

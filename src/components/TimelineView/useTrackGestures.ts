@@ -5,11 +5,10 @@ import { MidiParser } from '../../lib/MidiParser'; // Import MidiParser
 import TimeManager from '../../lib/TimeManager'; // Import TimeManager type if needed
 
 // Constants from TrackTimelineView - consider moving these to a shared location if used elsewhere
-const PIXELS_PER_BEAT = 100;
 const GRID_SNAP = 0.25;
-const TRACK_HEIGHT = 50; // Assuming constant TRACK_HEIGHT, move if needed
 
-interface UseTrackGesturesProps {
+// Export the props interface
+export interface UseTrackGesturesProps {
   tracks: Track[];
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
   addMidiBlock: (trackId: string, block: MIDIBlock) => void;
@@ -19,6 +18,11 @@ interface UseTrackGesturesProps {
   selectedBlockId: string | null;
   timelineAreaRef: RefObject<HTMLDivElement | null>;
   timeManager: TimeManager; // Add TimeManager
+  // Zoom props
+  horizontalZoom: number;
+  verticalZoom: number;
+  pixelsPerBeatBase: number;
+  trackHeightBase: number;
 }
 
 export function useTrackGestures({
@@ -31,7 +35,16 @@ export function useTrackGestures({
   selectedBlockId,
   timelineAreaRef,
   timeManager,
+  // Destructure zoom props
+  horizontalZoom,
+  verticalZoom,
+  pixelsPerBeatBase,
+  trackHeightBase,
 }: UseTrackGesturesProps) {
+  // Calculate effective values based on zoom
+  const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;
+  const effectiveTrackHeight = trackHeightBase * verticalZoom;
+
   // State for drag operations
   const [dragOperation, setDragOperation] = useState<'none' | 'start' | 'end' | 'move'>('none');
   const [dragStartX, setDragStartX] = useState(0);
@@ -136,8 +149,8 @@ export function useTrackGestures({
       const currentX = e.clientX; // Horizontal position
       const currentY = e.clientY - timelineAreaRect.top; // Vertical position relative to timeline area
       const deltaX = currentX - dragStartX;
-      // Use Math.round for snapping
-      const deltaBeat = Math.round(deltaX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
+      // Use Math.round for snapping, considering zoom
+      const deltaBeat = Math.round(deltaX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP; // Use effective value
       let updatedBlock = { ...block };
       let newStartBeat: number | undefined;
       let newEndBeat: number | undefined;
@@ -165,8 +178,8 @@ export function useTrackGestures({
             changed = true;
         }
         
-        // Determine target track based on vertical position
-        const targetTrackIndex = Math.floor(Math.max(0, currentY) / TRACK_HEIGHT);
+        // Determine target track based on vertical position and zoom
+        const targetTrackIndex = Math.floor(Math.max(0, currentY) / effectiveTrackHeight); // Use effective value
         const potentialTargetTrack = tracks[targetTrackIndex];
         if (potentialTargetTrack) {
           targetTrackId = potentialTargetTrack.id;
@@ -198,8 +211,8 @@ export function useTrackGestures({
       window.removeEventListener('mouseup', handleMouseUp);
       window.removeEventListener('mousemove', handleMouseMove);
     };
-    // Dependencies now include props passed to the hook
-  }, [dragOperation, dragStartX, dragBlockId, dragTrackId, dragStartBeat, dragEndBeat, updateMidiBlock, findTrackById, timelineAreaRef, moveMidiBlock, originalDragTrackId]);
+    // Dependencies now include props passed to the hook and calculated effective values
+  }, [dragOperation, dragStartX, dragBlockId, dragTrackId, dragStartBeat, dragEndBeat, updateMidiBlock, findTrackById, timelineAreaRef, moveMidiBlock, originalDragTrackId, effectivePixelsPerBeat, effectiveTrackHeight, tracks]);
 
   // Start resizing from the left edge
   const handleStartEdge = useCallback((trackId: string, blockId: string, clientX: number) => {
@@ -214,7 +227,7 @@ export function useTrackGestures({
     setDragStartBeat(block.startBeat);
     selectBlock(blockId);
     setOriginalDragTrackId(trackId); // Store the original track ID
-  }, [findTrackById]);
+  }, [findTrackById, selectBlock]);
 
   // Start resizing from the right edge
   const handleEndEdge = useCallback((trackId: string, blockId: string, clientX: number) => {
@@ -229,7 +242,7 @@ export function useTrackGestures({
     setDragEndBeat(block.endBeat);
     selectBlock(blockId);
     setOriginalDragTrackId(trackId); // Store the original track ID
-  }, [findTrackById]);
+  }, [findTrackById, selectBlock]);
 
   // Start moving the block
   const handleMoveBlock = useCallback((trackId: string, blockId: string, clientX: number) => {
@@ -251,7 +264,7 @@ export function useTrackGestures({
     if (!timelineAreaRect) return;
 
     const clickX = e.clientX - timelineAreaRect.left;
-    const clickBeat = Math.floor(clickX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
+    const clickBeat = Math.floor(clickX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP;
 
     const targetTrack = findTrackById(trackId);
     if (!targetTrack) return;
@@ -286,7 +299,7 @@ export function useTrackGestures({
         const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
         if (timelineAreaRect) {
             const clickY = e.clientY - timelineAreaRect.top;
-            const trackIndex = Math.floor(clickY / TRACK_HEIGHT);
+            const trackIndex = Math.floor(clickY / effectiveTrackHeight);
             if (tracks[trackIndex]) {
                 targetTrackId = tracks[trackIndex].id;
             }

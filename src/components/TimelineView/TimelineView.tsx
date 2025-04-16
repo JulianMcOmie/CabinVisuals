@@ -9,8 +9,8 @@ import BasicSynthesizer from '../../lib/synthesizers/BasicSynthesizer';
 import { Track } from '../../lib/types';
 
 // Fixed height for each track
-const TRACK_HEIGHT = 50;
-const PIXELS_PER_BEAT = 100; // Updated to match MeasuresHeader
+const TRACK_HEIGHT_BASE = 50; // Renamed base height
+const PIXELS_PER_BEAT_BASE = 100; // Renamed base pixels per beat
 const SIDEBAR_WIDTH = 200; // Define sidebar width as a constant
 
 // Color constants
@@ -23,6 +23,13 @@ function TimelineView() {
   const playheadRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [scrollLeft, setScrollLeft] = useState(0); // State for horizontal scroll position
+  const [scrollTop, setScrollTop] = useState(0); // State for vertical scroll position
+  const [horizontalZoom, setHorizontalZoom] = useState(1); // Initial horizontal zoom
+  const [verticalZoom, setVerticalZoom] = useState(1); // Initial vertical zoom
+
+  // Calculate effective values based on zoom
+  const effectiveTrackHeight = TRACK_HEIGHT_BASE * verticalZoom;
+  const effectivePixelsPerBeat = PIXELS_PER_BEAT_BASE * horizontalZoom;
 
   // Handle adding a new track
   const handleAddTrack = () => {
@@ -38,13 +45,13 @@ function TimelineView() {
     selectTrack(newTrack.id);
   };
   
-  // Calculate playhead position based on beat AND scroll
+  // Calculate playhead position based on beat, zoom AND scroll
   // Base position relative to the start of the timeline area (after sidebar)
-  const basePlayheadOffset = currentBeat * PIXELS_PER_BEAT;
+  const basePlayheadOffset = currentBeat * effectivePixelsPerBeat; // Use effective value
   // Adjust for the current horizontal scroll and add sidebar width for final CSS `left`
   const playheadLeftStyle = SIDEBAR_WIDTH + basePlayheadOffset - scrollLeft;
 
-  // Mouse move handler for dragging - needs to account for scroll
+  // Mouse move handler for dragging - needs to account for scroll and zoom
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!isDragging || !timelineContentRef.current) return;
 
@@ -55,11 +62,11 @@ function TimelineView() {
     const mouseXInScrolledContent = mouseXRelative + timelineContentRef.current.scrollLeft;
     
     // Calculate the target beat, subtracting sidebar width, ensuring it's not negative
-    const targetBeat = Math.max(0, (mouseXInScrolledContent - SIDEBAR_WIDTH) / PIXELS_PER_BEAT);
+    const targetBeat = Math.max(0, (mouseXInScrolledContent - SIDEBAR_WIDTH) / effectivePixelsPerBeat); // Use effective value
     
     seekTo(targetBeat);
 
-  }, [isDragging, seekTo]); // scrollLeft is implicitly handled via timelineContentRef.current
+  }, [isDragging, seekTo, effectivePixelsPerBeat]);
 
   // Mouse up handler to stop dragging
   const handleMouseUp = useCallback(() => {
@@ -97,10 +104,49 @@ function TimelineView() {
   // Handler for scroll events on the timeline content
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     setScrollLeft(event.currentTarget.scrollLeft);
+    setScrollTop(event.currentTarget.scrollTop);
   };
 
+  // Handler for wheel events (zoom)
+  const handleWheel = useCallback((event: WheelEvent) => {
+    if (event.altKey) {
+      event.preventDefault(); // Prevent default scroll behavior when zooming
+
+      // Determine zoom direction and update state
+      const zoomFactor = 1.1;
+      if (event.deltaY < 0) {
+        // Zoom in vertically
+        setVerticalZoom(prev => Math.min(prev * zoomFactor, 10)); // Max zoom 10x
+      } else if (event.deltaY > 0) {
+        // Zoom out vertically
+        setVerticalZoom(prev => Math.max(prev / zoomFactor, 0.1)); // Min zoom 0.1x
+      }
+
+      // Note: Using deltaY for horizontal zoom might feel more natural on touchpads
+      if (event.deltaX < 0) {
+        // Zoom in horizontally (scrolling left)
+        setHorizontalZoom(prev => Math.min(prev * zoomFactor, 10));
+      } else if (event.deltaX > 0) {
+        // Zoom out horizontally (scrolling right)
+        setHorizontalZoom(prev => Math.max(prev / zoomFactor, 0.1));
+      }
+    }
+    // Allow normal scrolling if Alt key is not pressed
+  }, []);
+
+  // Attach wheel listener to the timeline content area
+  useEffect(() => {
+    const timelineElement = timelineContentRef.current;
+    if (timelineElement) {
+      timelineElement.addEventListener('wheel', handleWheel, { passive: false });
+      return () => {
+        timelineElement.removeEventListener('wheel', handleWheel);
+      };
+    }
+  }, [handleWheel]);
+
   // Get tracks from track manager
-  const totalTracksHeight = tracks.length * TRACK_HEIGHT;
+  const totalTracksHeight = tracks.length * effectiveTrackHeight; // Use effective height
 
   return (
     <div className="timeline-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -183,11 +229,12 @@ function TimelineView() {
           
           {/* Combined content area for instruments and timelines */}
           <div style={{ 
-            width: '3200px', // Width to accommodate all measures
+            // Adjust width based on measures and zoom
+            width: `${(useStore.getState().numMeasures * 4 * effectivePixelsPerBeat)}px`, 
             minHeight: '100%', // Ensure it fills vertical space
             position: 'relative', // Context for absolute positioning of playhead
             display: 'flex', // Use flexbox for side-by-side layout
-            height: `${totalTracksHeight}px` // Set explicit height for track area
+            height: `${totalTracksHeight}px` // Set explicit height for track area based on zoom
           }}>
             {/* Instrument Views Column - sticky */}
             <div 
@@ -207,12 +254,15 @@ function TimelineView() {
                 <div 
                   key={`${track.id}-instrument`} // Unique key
                   style={{ 
-                    height: `${TRACK_HEIGHT}px`, // Use fixed track height
+                    height: `${effectiveTrackHeight}px`, // Use effective track height
                     borderBottom: '1px solid #333', // Add border between instruments
                     boxSizing: 'border-box'
                   }}
                 >
-                  <InstrumentView track={track} />
+                  <InstrumentView 
+                    track={track} 
+                    // Pass verticalZoom if needed, or let it use effectiveTrackHeight for layout
+                  />
                 </div>
               ))}
             </div>
@@ -226,7 +276,13 @@ function TimelineView() {
                 height: '100%' // Takes full height of the container (totalTracksHeight)
               }}
             >
-              <TrackTimelineView tracks={tracks} />
+              <TrackTimelineView 
+                tracks={tracks} 
+                horizontalZoom={horizontalZoom}
+                verticalZoom={verticalZoom}
+                pixelsPerBeatBase={PIXELS_PER_BEAT_BASE} // Pass base value
+                trackHeightBase={TRACK_HEIGHT_BASE} // Pass base value
+              />
             </div>
           </div>
           
