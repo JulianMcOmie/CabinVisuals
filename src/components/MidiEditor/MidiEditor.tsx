@@ -50,7 +50,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const editorWidth = editorRef.current?.clientWidth || 800; // Default width if ref not available
+  const editorWidth = 650; // Default width if ref not available
   const editorHeight = editorRef.current?.clientHeight || KEY_COUNT * PIXELS_PER_SEMITONE; // Default height if ref not available
   
   // State for drag operations
@@ -70,7 +70,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [scrollY, setScrollY] = useState(0);
   const [zoomX, setZoomX] = useState(1);
   const [zoomY, setZoomY] = useState(1);
-  const [pixelsPerBeat, setPixelsPerBeat] = useState(PIXELS_PER_BEAT);
+  const [pixelsPerBeat, setPixelsPerBeat] = useState(PIXELS_PER_BEAT); //useState(editorWidth / (numMeasures * BEATS_PER_MEASURE));
   const [pixelsPerSemitone, setPixelsPerSemitone] = useState(PIXELS_PER_SEMITONE);
   
   // Copy/paste related state
@@ -110,7 +110,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       pixelsPerBeat,
       pixelsPerSemitone
     );
-    console.log(`[MidiEditor useEffect] Block ID: ${block.id}, Start Beat: ${block.startBeat}, End Beat: ${block.endBeat}, Duration: ${blockDuration}`);
   }, [block.notes, blockDuration, editorWidth, editorHeight, selectionBox, isDragging, selectedNoteIds]);
 
   // Mouse event handlers
@@ -291,11 +290,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       setHoverCursor('default');
       return;
     }
-
-    const { x, y } = coords;
-    console.log(`[handleCanvasMouseMove] Current Block - Start Beat: ${block.startBeat}, Duration: ${blockDuration}`);
-    console.log(`[handleCanvasMouseMove] Coords from event: x=${x}, y=${y}`);
-
+    
+    const { x, y, beat, pitch } = coords;
+    
     // Update selection box if in select mode
     if (dragOperation === 'select' && selectionBox) {
       setSelectionBox({
@@ -313,38 +310,22 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     }
     
     // Skip hover effects if we're already in a drag operation
-    if (dragOperation !== 'none') {
-        console.log(`[handleCanvasMouseMove] Skipping hover check, dragOperation=${dragOperation}`);
-        return;
-    }
+    if (dragOperation !== 'none') return;
     
     // Handle hover cursor
-    console.log(`[handleCanvasMouseMove] Calling findNoteAt with x=${x}, y=${y}, blockStartBeat: ${block.startBeat}`);
-    const cursorResult = findNoteAt(
-        x,
-        y,
-        block.notes,
-        selectedNoteIds,
-        pixelsPerBeat,
-        pixelsPerSemitone,
-        block.startBeat, // Pass block start beat
-        blockDuration 
-    );
-    console.log(`[handleCanvasMouseMove] findNoteAt result:`, cursorResult); // Log the whole result object
-
+    const cursorResult = findNoteAt(x, y, block.notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat, blockDuration);
+    
     if (cursorResult) {
       // Cursor is over a note, set the appropriate cursor style
-      let newCursor: CursorType = 'move'; // Default if body
       if (cursorResult.area === 'start') {
-        newCursor = 'w-resize';
+        setHoverCursor('w-resize');
       } else if (cursorResult.area === 'end') {
-        newCursor = 'e-resize';
+        setHoverCursor('e-resize');
+      } else {
+        setHoverCursor('move');
       }
-      console.log(`[handleCanvasMouseMove] Setting cursor to: ${newCursor}`);
-      setHoverCursor(newCursor);
     } else {
       // Not over a note
-      console.log(`[handleCanvasMouseMove] Setting cursor to: default`);
       setHoverCursor('default');
     }
   };
