@@ -112,31 +112,37 @@ function TimelineView() {
     if (event.altKey) {
       event.preventDefault(); // Prevent default scroll behavior when zooming
 
-      // Vertical Zoom (unchanged - multiplicative)
-      const verticalZoomFactor = 1.1;
-      if (event.deltaY < 0) {
+      // Vertical Zoom (multiplicative but with linear response to wheel)
+      const verticalZoomFactor = 1.15;
+      if (event.deltaY < 0 && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
         // Zoom in vertically
-        setVerticalZoom(prev => Math.min(prev * verticalZoomFactor, 10)); // Max zoom 10x
+        const zoomSteps = Math.min(Math.abs(event.deltaY) / 100, 1); // Normalize wheel delta
+        const effectiveFactor = Math.pow(verticalZoomFactor, zoomSteps);
+        setVerticalZoom(prev => Math.min(prev * effectiveFactor, 10)); // Max zoom 10x
       } else if (event.deltaY > 0) {
         // Zoom out vertically
-        setVerticalZoom(prev => Math.max(prev / verticalZoomFactor, 0.1)); // Min zoom 0.1x
+        const zoomSteps = Math.min(Math.abs(event.deltaY) / 100, 1); // Normalize wheel delta
+        const effectiveFactor = Math.pow(verticalZoomFactor, zoomSteps);
+        setVerticalZoom(prev => Math.max(prev / effectiveFactor, 0.1)); // Min zoom 0.1x
       }
 
-      // Horizontal Zoom (changed - linear step based on deltaX)
-      if (event.deltaX !== 0) {
-        // Define a sensitivity factor for horizontal zoom adjustment
-        const horizontalZoomSensitivity = 0.005; // Adjust this value for desired speed
-        // Calculate the change in zoom based on deltaX
-        // Negative deltaX (scroll left/up) zooms in (increases zoom value)
-        // Positive deltaX (scroll right/down) zooms out (decreases zoom value)
-        const deltaZoom = -event.deltaX * horizontalZoomSensitivity;
-
-        // Update horizontal zoom additively, clamping between min/max values
-        setHorizontalZoom(prev => Math.max(0.1, Math.min(prev + deltaZoom, 10)));
+      // Horizontal Zoom (multiplicative but with linear response to wheel)
+      if (event.deltaX !== 0 && Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        const horizontalZoomFactor = 1.15;
+        const zoomSteps = Math.min(Math.abs(event.deltaX) / 100, 1); // Normalize wheel delta
+        const effectiveFactor = Math.pow(horizontalZoomFactor, zoomSteps);
+        
+        if (event.deltaX < 0) {
+          // Zoom in horizontally (scroll left)
+          setHorizontalZoom(prev => Math.min(prev * effectiveFactor, 10)); // Max zoom 10x
+        } else {
+          // Zoom out horizontally (scroll right)
+          setHorizontalZoom(prev => Math.max(prev / effectiveFactor, 0.1)); // Min zoom 0.1x
+        }
       }
     }
     // Allow normal scrolling if Alt key is not pressed
-  }, []); // Dependencies remain empty as sensitivity is constant
+  }, []); // Dependencies remain empty as zoom factors are constant
 
   // Attach wheel listener to the timeline content area
   useEffect(() => {
