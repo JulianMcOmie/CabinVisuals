@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, RefObject, useRef } from 'react';
 import { Track, MIDIBlock } from '../../lib/types';
-import { UseBoundStore, StoreApi } from 'zustand'; // Assuming Zustand types
 import { MidiParser } from '../../lib/MidiParser'; // Import MidiParser
 import TimeManager from '../../lib/TimeManager'; // Import TimeManager type if needed
 
@@ -45,14 +44,13 @@ export function useTrackGestures({
   const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;
   const effectiveTrackHeight = trackHeightBase * verticalZoom;
 
-  // State for drag operations
   const [dragOperation, setDragOperation] = useState<'none' | 'start' | 'end' | 'move'>('none');
   const [dragStartX, setDragStartX] = useState(0);
-  const [dragStartBeat, setDragStartBeat] = useState(0);
-  const [dragEndBeat, setDragEndBeat] = useState(0);
-  const [dragBlockId, setDragBlockId] = useState<string | null>(null);
-  const [dragTrackId, setDragTrackId] = useState<string | null>(null);
   const [originalDragTrackId, setOriginalDragTrackId] = useState<string | null>(null);
+
+  const [dragInitialBlockState, setDragInitialBlockState] = useState<MIDIBlock | null>(null);
+  const [pendingUpdateBlock, setPendingUpdateBlock] = useState<MIDIBlock | null>(null);
+  const [pendingTargetTrackId, setPendingTargetTrackId] = useState<string | null>(null);
 
   // State for context menu
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -63,8 +61,14 @@ export function useTrackGestures({
   // Ref for file input
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Helper to find track and block
-  const findTrackAndBlock = useCallback((blockId: string | null): { track: Track | null, block: MIDIBlock | null } => {
+  // Helper to find track by ID
+  const findTrackById = useCallback((trackId: string | null): Track | null => {
+    if (!trackId) return null;
+    return tracks.find(t => t.id === trackId) || null;
+  }, [tracks]);
+
+   // Helper to find track and block by block ID (used for delete, context menu, etc)
+   const findTrackAndBlock = useCallback((blockId: string | null): { track: Track | null, block: MIDIBlock | null } => {
     if (!blockId) return { track: null, block: null };
     for (const track of tracks) {
       const block = track.midiBlocks.find(b => b.id === blockId);
@@ -75,11 +79,6 @@ export function useTrackGestures({
     return { track: null, block: null };
   }, [tracks]);
 
-  // Helper to find track by ID (moved from component)
-  const findTrackById = useCallback((trackId: string | null): Track | null => {
-    if (!trackId) return null;
-    return tracks.find(t => t.id === trackId) || null;
-  }, [tracks]);
 
   // Handle key press for delete & escape
   useEffect(() => {
@@ -89,7 +88,7 @@ export function useTrackGestures({
         const { track } = findTrackAndBlock(selectedBlockId);
         if (track) {
           removeMidiBlock(track.id, selectedBlockId);
-          selectBlock(null); // Deselect after deleting
+          selectBlock(null);
         }
       }
       // Escape key to close context menu
@@ -124,84 +123,71 @@ export function useTrackGestures({
   // Handle mouse up and move for drag operations
   useEffect(() => {
     const handleMouseUp = () => {
-      if (dragOperation !== 'none') {
-        setDragOperation('none');
-        setDragBlockId(null);
-        setDragTrackId(null);
-        setOriginalDragTrackId(null);
+      // Apply pending update only if a drag was active and there's a pending block
+      if (dragOperation !== 'none' && pendingUpdateBlock && originalDragTrackId) {
+         // Apply the pending update based on the operation type
+         if (dragOperation === 'move' && pendingTargetTrackId && pendingTargetTrackId !== originalDragTrackId) {
+             moveMidiBlock(originalDragTrackId, pendingTargetTrackId, pendingUpdateBlock);
+         } else {
+             updateMidiBlock(originalDragTrackId, pendingUpdateBlock);
+         }
       }
+      // Reset drag states
+      setDragOperation('none');
+      setOriginalDragTrackId(null);
+      setDragInitialBlockState(null); // Reset initial block state
+      setPendingUpdateBlock(null);
+      setPendingTargetTrackId(null);
+      setDragStartX(0); // Reset start X
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (dragOperation === 'none' || !dragBlockId || !dragTrackId || !timelineAreaRef.current) return;
+       // Only proceed if a drag is active and we have the initial block state
+      if (dragOperation === 'none' || !dragInitialBlockState || !originalDragTrackId || !timelineAreaRef.current) return;
 
-      const track = findTrackById(dragTrackId);
-      const block = track?.midiBlocks.find(b => b.id === dragBlockId);
-      if (!block || !track) {
-        console.error("Could not find track or block during drag move.");
-        handleMouseUp(); // Abort drag if track/block is gone
-        return;
-      }
+      // Get the original block state directly
+      const originalBlock = dragInitialBlockState;
 
       const timelineAreaRect = timelineAreaRef.current.getBoundingClientRect();
       if (!timelineAreaRect) return;
 
-      const currentX = e.clientX; // Horizontal position
-      const currentY = e.clientY - timelineAreaRect.top; // Vertical position relative to timeline area
+      const currentX = e.clientX;
+      const currentY = e.clientY - timelineAreaRect.top;
       const deltaX = currentX - dragStartX;
-      // Use Math.round for snapping, considering zoom
-      const deltaBeat = Math.round(deltaX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP; // Use effective value
-      let updatedBlock = { ...block };
+      const deltaBeat = Math.round(deltaX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP;
+
+      // Create a temporary block based on the *original* block's state
+      let tempBlock = { ...originalBlock };
       let newStartBeat: number | undefined;
       let newEndBeat: number | undefined;
-      let changed = false;
-      let targetTrackId = dragTrackId; // Assume current track unless mouse moves over another
+      let tempTargetTrackId = originalDragTrackId; // Start with original track
 
       if (dragOperation === 'start') {
-        newStartBeat = Math.max(0, Math.min(block.endBeat - GRID_SNAP, dragStartBeat + deltaBeat));
-        if (newStartBeat !== updatedBlock.startBeat) {
-            updatedBlock.startBeat = newStartBeat;
-            changed = true;
-        }
+        // Use the original block's endBeat and startBeat
+        newStartBeat = Math.max(0, Math.min(originalBlock.endBeat - GRID_SNAP, originalBlock.startBeat + deltaBeat));
+        tempBlock.startBeat = newStartBeat;
       } else if (dragOperation === 'end') {
-        newEndBeat = Math.max(block.startBeat + GRID_SNAP, dragEndBeat + deltaBeat);
-         if (newEndBeat !== updatedBlock.endBeat) {
-            updatedBlock.endBeat = newEndBeat;
-            changed = true;
-        }
+        // Use the original block's startBeat and endBeat
+        newEndBeat = Math.max(originalBlock.startBeat + GRID_SNAP, originalBlock.endBeat + deltaBeat);
+        tempBlock.endBeat = newEndBeat;
       } else if (dragOperation === 'move') {
-        const duration = block.endBeat - block.startBeat;
-        newStartBeat = Math.max(0, dragStartBeat + deltaBeat);
-        if (newStartBeat !== updatedBlock.startBeat) {
-            updatedBlock.startBeat = newStartBeat;
-            updatedBlock.endBeat = newStartBeat + duration;
-            changed = true;
-        }
-        
-        // Determine target track based on vertical position and zoom
-        const targetTrackIndex = Math.floor(Math.max(0, currentY) / effectiveTrackHeight); // Use effective value
+        const duration = originalBlock.endBeat - originalBlock.startBeat;
+        // Use the original block's startBeat
+        newStartBeat = Math.max(0, originalBlock.startBeat + deltaBeat);
+        tempBlock.startBeat = newStartBeat;
+        tempBlock.endBeat = newStartBeat + duration;
+
+        // Determine target track based on vertical position
+        const targetTrackIndex = Math.floor(Math.max(0, currentY) / effectiveTrackHeight);
         const potentialTargetTrack = tracks[targetTrackIndex];
         if (potentialTargetTrack) {
-          targetTrackId = potentialTargetTrack.id;
-        }
-        if (targetTrackId !== dragTrackId) {
-            changed = true;
+          tempTargetTrackId = potentialTargetTrack.id;
         }
       }
 
-      // Decide whether to move or update based on target track
-      if (changed) {
-         if (dragOperation === 'move' && targetTrackId !== track.id && originalDragTrackId) {
-             // Call moveMidiBlock if dragging to a different track
-             moveMidiBlock(originalDragTrackId, targetTrackId, updatedBlock);
-             // Update the dragTrackId state to reflect the new track for subsequent updates
-             setOriginalDragTrackId(targetTrackId);
-             setDragTrackId(targetTrackId);
-         } else {
-             // Call updateMidiBlock if resizing or moving within the same track
-             updateMidiBlock(track.id, updatedBlock);
-         }
-      }
+       // Update pending state
+       setPendingUpdateBlock(tempBlock);
+       setPendingTargetTrackId(tempTargetTrackId);
     };
 
     window.addEventListener('mouseup', handleMouseUp);
@@ -211,8 +197,15 @@ export function useTrackGestures({
       window.removeEventListener('mouseup', handleMouseUp);
       window.removeEventListener('mousemove', handleMouseMove);
     };
-    // Dependencies now include props passed to the hook and calculated effective values
-  }, [dragOperation, dragStartX, dragBlockId, dragTrackId, dragStartBeat, dragEndBeat, updateMidiBlock, findTrackById, timelineAreaRef, moveMidiBlock, originalDragTrackId, effectivePixelsPerBeat, effectiveTrackHeight, tracks]);
+  }, [
+      dragOperation, dragStartX, originalDragTrackId, dragInitialBlockState, // Use initial block state here
+      updateMidiBlock, moveMidiBlock,
+      timelineAreaRef,
+      effectivePixelsPerBeat, effectiveTrackHeight,
+      tracks,
+      pendingUpdateBlock, pendingTargetTrackId,
+      setPendingUpdateBlock, setPendingTargetTrackId
+  ]);
 
   // Start resizing from the left edge
   const handleStartEdge = useCallback((trackId: string, blockId: string, clientX: number) => {
@@ -222,11 +215,12 @@ export function useTrackGestures({
 
     setDragOperation('start');
     setDragStartX(clientX);
-    setDragBlockId(blockId);
-    setDragTrackId(trackId);
-    setDragStartBeat(block.startBeat);
+    setOriginalDragTrackId(trackId);
+    setDragInitialBlockState({ ...block }); // Store copy of initial block state
+
+    setPendingUpdateBlock({ ...block });
+    setPendingTargetTrackId(trackId);
     selectBlock(blockId);
-    setOriginalDragTrackId(trackId); // Store the original track ID
   }, [findTrackById, selectBlock]);
 
   // Start resizing from the right edge
@@ -237,11 +231,12 @@ export function useTrackGestures({
 
     setDragOperation('end');
     setDragStartX(clientX);
-    setDragBlockId(blockId);
-    setDragTrackId(trackId);
-    setDragEndBeat(block.endBeat);
+    setOriginalDragTrackId(trackId);
+    setDragInitialBlockState({ ...block });
+
+    setPendingUpdateBlock({ ...block });
+    setPendingTargetTrackId(trackId);
     selectBlock(blockId);
-    setOriginalDragTrackId(trackId); // Store the original track ID
   }, [findTrackById, selectBlock]);
 
   // Start moving the block
@@ -252,14 +247,17 @@ export function useTrackGestures({
 
     setDragOperation('move');
     setDragStartX(clientX);
-    setDragBlockId(blockId);
-    setDragTrackId(trackId);
-    setDragStartBeat(block.startBeat);
-    selectBlock(blockId); // Also select the block being moved
-    setOriginalDragTrackId(trackId); // Store the original track ID
+    setOriginalDragTrackId(trackId);
+    setDragInitialBlockState({ ...block });
+
+    setPendingUpdateBlock({ ...block });
+    setPendingTargetTrackId(trackId);
+    selectBlock(blockId);
   }, [findTrackById, selectBlock]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent, trackId: string) => {
+    if (dragOperation !== 'none') return;
+
     const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
     if (!timelineAreaRect) return;
 
@@ -272,50 +270,54 @@ export function useTrackGestures({
     const newBlock: MIDIBlock = {
       id: `block-${Date.now()}`,
       startBeat: clickBeat,
-      endBeat: clickBeat + 4, // Default 4 beats long
+      endBeat: clickBeat + 4,
       notes: []
     };
 
     addMidiBlock(targetTrack.id, newBlock);
     selectBlock(newBlock.id);
-  }, [addMidiBlock, selectBlock, findTrackById, timelineAreaRef]);
+  }, [addMidiBlock, selectBlock, findTrackById, timelineAreaRef, effectivePixelsPerBeat, dragOperation]);
+
 
   const handleContextMenu = useCallback((e: React.MouseEvent, blockId: string | null = null, trackId: string | null = null) => {
     e.preventDefault();
     e.stopPropagation();
 
-    let targetTrackId: string | null = trackId;
+    let targetTrackIdForMenu: string | null = trackId;
 
     if (blockId) {
       const { track } = findTrackAndBlock(blockId);
       if (track) {
-        targetTrackId = track.id;
+        targetTrackIdForMenu = track.id;
         selectBlock(blockId);
       } else {
          console.error("Could not find track for context menu block");
+         setShowContextMenu(false);
          return;
       }
-    } else if (!targetTrackId) {
+    } else if (!targetTrackIdForMenu) {
         const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
         if (timelineAreaRect) {
             const clickY = e.clientY - timelineAreaRect.top;
             const trackIndex = Math.floor(clickY / effectiveTrackHeight);
             if (tracks[trackIndex]) {
-                targetTrackId = tracks[trackIndex].id;
+                targetTrackIdForMenu = tracks[trackIndex].id;
             }
         }
-        if (!targetTrackId) {
-            console.error("Context menu opened without target track ID and couldn't determine from position");
-            return;
+        if (!targetTrackIdForMenu) {
+             console.warn("Context menu opened without a specific track context.");
+             setShowContextMenu(false);
+             return;
         }
     }
 
     setContextMenuPosition({ x: e.clientX, y: e.clientY });
     setContextMenuBlockId(blockId);
-    setContextMenuTrackId(targetTrackId);
+    setContextMenuTrackId(targetTrackIdForMenu);
     setShowContextMenu(true);
 
-  }, [selectBlock, tracks, findTrackAndBlock, timelineAreaRef]);
+  }, [selectBlock, tracks, findTrackAndBlock, timelineAreaRef, effectiveTrackHeight, dragOperation]);
+
 
   const handleDeleteBlock = useCallback(() => {
     if (contextMenuBlockId && contextMenuTrackId) {
@@ -397,5 +399,8 @@ export function useTrackGestures({
     contextMenuPosition,
     contextMenuBlockId,
     fileInputRef,
+    pendingUpdateBlock,
+    pendingTargetTrackId,
+    dragOperation
   };
 }
