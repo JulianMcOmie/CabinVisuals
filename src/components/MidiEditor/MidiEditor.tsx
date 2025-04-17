@@ -120,7 +120,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setSelectedWindow('midiEditor');
-    const coords = getCoordsFromEvent(e, canvasRef);
+    const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
     if (!coords) return;
     
     const { x, y, beat, pitch } = coords;
