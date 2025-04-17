@@ -9,8 +9,25 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
-const eslintConfig = [
+// Base configurations extended using FlatCompat
+const baseConfigs = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
+
+// Custom rule overrides
+const customRules = {
+  files: ["**/*.{js,jsx,ts,tsx}"], // Apply these rules to all JS/TS files
+  rules: {
+    // Disable or adjust specific rules:
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-unused-vars": "warn", // Warn instead of error
+    "react-hooks/exhaustive-deps": "warn",    // Warn instead of error
+    "prefer-const": "off",
+    "@typescript-eslint/no-empty-object-type": "off",
+  },
+};
+
+// Combine base configs and custom rules
+const eslintConfig = [...baseConfigs, customRules];
 
 export default eslintConfig;

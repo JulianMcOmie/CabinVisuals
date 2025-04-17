@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../../store/store'; // Import the actual store hook
+import { InstrumentDefinition } from '@/src/store/instrumentSlice';
 // import { InstrumentDefinition } from '../../store/store'; // Commented out - likely type is inferred or comes from a slice
 
 const InstrumentSidebar: React.FC = () => {
