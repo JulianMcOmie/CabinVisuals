@@ -27,7 +27,6 @@ const AudioLoader: React.FC = () => {
 
             try {
                 await loadAudioAction(arrayBuffer);
-                // State update (isAudioLoaded, audioDuration) happens within the store action
             } catch (err) {
                 console.error("Error loading audio:", err);
                 setError(err instanceof Error ? err.message : 'An unknown error occurred during audio loading.');
@@ -42,31 +41,40 @@ const AudioLoader: React.FC = () => {
         };
 
         reader.readAsArrayBuffer(file);
-
-        // Reset file input to allow reloading the same file if needed
         event.target.value = '';
-
     }, [loadAudioAction]);
 
     return (
-        <div style={{ margin: '10px', padding: '10px', border: '1px solid #ccc' }}>
-            <label htmlFor="audio-upload">Load Background Audio:</label>
+        <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '15px',
+            width: '100%',
+            height: '100%',
+            padding: '0 15px',
+            backgroundColor: '#e9e9e9',
+            color: '#333',
+            border: 'none',
+            boxSizing: 'border-box'
+        }}>
+            <label htmlFor="audio-upload" style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>Load Background Audio:</label>
             <input
                 id="audio-upload"
                 type="file"
                 accept="audio/*"
                 onChange={handleFileChange}
                 disabled={isLoading}
-                style={{ marginLeft: '10px' }}
             />
-            {isLoading && <p>Loading audio...</p>}
-            {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-            {isAudioLoaded && !isLoading && (
-                <p style={{ color: 'green' }}>
-                    Audio loaded successfully! Duration: {audioDuration?.toFixed(2)}s
-                </p>
-            )}
-             {!isAudioLoaded && !isLoading && !error && <p>No audio loaded.</p>}
+            <div style={{ flexShrink: 0 }}>
+                {isLoading && <span>Loading...</span>}
+                {error && <span style={{ color: 'red' }}>Error: {error}</span>}
+                {isAudioLoaded && !isLoading && (
+                    <span style={{ color: 'green' }}>
+                        Loaded! Duration: {audioDuration?.toFixed(2)}s
+                    </span>
+                )}
+                {!isAudioLoaded && !isLoading && !error && <span>No audio loaded.</span>}
+            </div>
         </div>
     );
 };

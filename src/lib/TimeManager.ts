@@ -3,7 +3,6 @@ class TimeManager {
   private bpm: number = 120;
   private isPlaying: boolean = false;
   private currentBeat: number = 0;
-  private numMeasures: number = 8;
   private lastUpdateTime: number | null = null;
   private animationFrameId: number | null = null;
   private onUpdateCallbacks: ((beat: number) => void)[] = [];
@@ -30,10 +29,6 @@ class TimeManager {
 
   getCurrentBeat(): number {
     return this.currentBeat;
-  }
-
-  getNumMeasures(): number {
-    return this.numMeasures;
   }
 
   play(): void {
@@ -118,6 +113,11 @@ class TimeManager {
       if (this.bpm <= 0 || time <= 0) return 0;
       const beatsPerSecond = this.bpm / 60.0;
       return time * beatsPerSecond;
+  }
+
+  // Get the current time in seconds
+  public getCurrentTime(): number {
+      return this.beatToTime(this.currentBeat);
   }
 }
 
