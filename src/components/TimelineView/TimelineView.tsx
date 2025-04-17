@@ -12,6 +12,7 @@ import { Track } from '../../lib/types';
 const TRACK_HEIGHT_BASE = 50; // Renamed base height
 const PIXELS_PER_BEAT_BASE = 100; // Renamed base pixels per beat
 const SIDEBAR_WIDTH = 200; // Define sidebar width as a constant
+const MIN_VISIBLE_MEASURES_BUFFER = 1; // Show slightly more than the target minimum measures
 
 // Color constants
 const SIDEBAR_BG_COLOR = '#1a1a1a';
@@ -137,7 +138,20 @@ function TimelineView() {
           setHorizontalZoom(prev => Math.min(prev * effectiveFactor, 10)); // Max zoom 10x
         } else {
           // Zoom out horizontally (scroll right)
-          setHorizontalZoom(prev => Math.max(prev / effectiveFactor, 0.1)); // Min zoom 0.1x
+          const visibleWidth = timelineContentRef.current?.clientWidth;
+          const numMeasures = useStore.getState().numMeasures;
+          const targetMeasures = Math.max(64, numMeasures);
+          
+          let minHorizontalZoom = 0.1; // Default minimum zoom
+
+          if (visibleWidth && visibleWidth > 0) {
+            const targetBeats = (targetMeasures + MIN_VISIBLE_MEASURES_BUFFER) * 4;
+            const minWidthToDisplay = targetBeats * PIXELS_PER_BEAT_BASE;
+            // Calculate the zoom level required to make the target width fit the visible area
+            minHorizontalZoom = Math.max(0.01, visibleWidth / minWidthToDisplay); // Ensure zoom doesn't become too small or zero
+          }
+
+          setHorizontalZoom(prev => Math.max(prev / effectiveFactor, minHorizontalZoom)); 
         }
       }
     }
