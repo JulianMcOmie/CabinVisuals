@@ -9,6 +9,7 @@ import { useTrackGestures, UseTrackGesturesProps } from './useTrackGestures'; //
 const BLOCK_VERTICAL_PADDING_FACTOR = 0.1; // e.g., 10% of track height
 const EDGE_RESIZE_WIDTH = 8; // Width of the clickable edge area (keep fixed pixels?)
 const BLOCK_CORNER_RADIUS = 4; // Added for rounded corners (keep fixed pixels?)
+const DISABLED_AREA_COLOR = 'rgba(0, 0, 0, 0.3)'; // Color for dimming extra measures (same as header)
 
 interface TrackTimelineViewProps {
   tracks: Track[];
@@ -16,25 +17,28 @@ interface TrackTimelineViewProps {
   verticalZoom: number;
   pixelsPerBeatBase: number;
   trackHeightBase: number;
+  numMeasures: number; // Actual measures in the song
+  renderMeasures: number; // Total measures to render visually
 }
 
 
-function TrackTimelineView({ 
-  tracks, 
-  horizontalZoom, 
-  verticalZoom, 
-  pixelsPerBeatBase, 
-  trackHeightBase 
+function TrackTimelineView({
+  tracks,
+  horizontalZoom,
+  verticalZoom,
+  pixelsPerBeatBase,
+  trackHeightBase,
+  numMeasures, // Actual song measures
+  renderMeasures // Total measures to render
 }: TrackTimelineViewProps) {
-  const { 
-    selectedBlockId, 
-    numMeasures, 
-    selectBlock, 
-    addMidiBlock, 
-    updateMidiBlock, 
-    removeMidiBlock, 
+  const {
+    selectedBlockId,
+    selectBlock,
+    addMidiBlock,
+    updateMidiBlock,
+    removeMidiBlock,
     moveMidiBlock,
-    timeManager 
+    timeManager
   } = useStore();
   const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for hook, points to the container
   const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for the canvas element
@@ -44,6 +48,8 @@ function TrackTimelineView({
   const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;
   const effectiveBlockVerticalPadding = effectiveTrackHeight * BLOCK_VERTICAL_PADDING_FACTOR;
   const effectiveBlockHeight = effectiveTrackHeight - 2 * effectiveBlockVerticalPadding;
+  const actualSongBeats = numMeasures * 4; // Use prop
+  const totalRenderBeats = renderMeasures * 4; // Use prop
 
   // Use the custom hook for *all* gesture and interaction handling
   const {
@@ -74,6 +80,8 @@ function TrackTimelineView({
       verticalZoom,
       pixelsPerBeatBase,
       trackHeightBase,
+      numMeasures, // Pass actual numMeasures to hook if needed for its logic
+      renderMeasures, // Pass renderMeasures to hook if needed
   } as UseTrackGesturesProps); // Cast to satisfy hook's expected props
 
   // Helper function to draw rounded rectangles
@@ -107,8 +115,8 @@ function TrackTimelineView({
     if (!canvas || !context) return;
 
     const dpr = window.devicePixelRatio || 1; // Get Device Pixel Ratio
-    // Calculate width/height based on base constants, measures, and zoom
-    const baseCanvasWidth = numMeasures * 4 * effectivePixelsPerBeat; // Use effective value
+    // Calculate width/height based on RENDER measures and zoom
+    const baseCanvasWidth = totalRenderBeats * effectivePixelsPerBeat; // Use render beats
     const baseCanvasHeight = tracks.length * effectiveTrackHeight; // Use effective value
 
     // Set canvas physical size (higher resolution)
@@ -128,32 +136,41 @@ function TrackTimelineView({
     context.fillRect(0, 0, baseCanvasWidth, baseCanvasHeight);
     console.log('canvas.width (scaled)', baseCanvasWidth);
 
-    // Draw Grid Lines
-    context.strokeStyle = '#333';
+    // Draw Grid Lines (up to renderMeasures)
     context.lineWidth = 1; // Note: lineWidth might appear thinner due to scaling
-    for (let i = 0; i <= numMeasures * 4; i++) {
+    for (let i = 0; i <= totalRenderBeats; i++) { // Loop up to render beats
       const x = i * effectivePixelsPerBeat; // Use effective value
-      context.strokeStyle = i % 4 === 0 ? '#555' : '#333'; // Darker lines for measure start
+      const isMeasureLine = i % 4 === 0;
+      const isBeyondSong = i > actualSongBeats; // Check if beat is beyond actual song
+
+      // Use dimmer colors for lines beyond the song length
+      let strokeStyle = '#333'; // Default beat line
+      if (isMeasureLine) {
+        strokeStyle = isBeyondSong ? '#444' : '#555'; // Dimmer measure line if beyond song
+      } else if (isBeyondSong) {
+        strokeStyle = '#282828'; // Dimmer beat line if beyond song
+      }
+
+      context.strokeStyle = strokeStyle;
       context.beginPath();
       context.moveTo(x, 0);
       context.lineTo(x, baseCanvasHeight); // Use base height
       context.stroke();
     }
 
-     // Draw Track Separators and Blocks
+     // Draw Track Separators (only need one color)
      tracks.forEach((track, trackIndex) => {
       const trackTopY = trackIndex * effectiveTrackHeight; // Use effective value
 
-      // Draw track separator line
-      context.strokeStyle = '#333';
+      // Draw track separator line across the full render width
+      context.strokeStyle = '#333'; // Consistent separator color
       context.lineWidth = 1;
       context.beginPath();
       context.moveTo(0, trackTopY + effectiveTrackHeight); // Use effective value
-      context.lineTo(baseCanvasWidth, trackTopY + effectiveTrackHeight); // Use base width, effective height
+      context.lineTo(baseCanvasWidth, trackTopY + effectiveTrackHeight); // Use base render width
       context.stroke();
 
-
-      // Draw MIDI Blocks for this track
+      // Draw MIDI Blocks for this track (Blocks should only exist within numMeasures)
       track.midiBlocks.forEach(block => {
         const isSelected = block.id === selectedBlockId;
         const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
@@ -194,7 +211,29 @@ function TrackTimelineView({
       });
     });
 
-  }, [tracks, numMeasures, selectedBlockId, horizontalZoom, verticalZoom, pixelsPerBeatBase, trackHeightBase]); // Add zoom dependencies
+    // Draw Disabled Area Overlay
+    const disabledAreaStartX = actualSongBeats * effectivePixelsPerBeat; // Position where song ends
+    context.fillStyle = DISABLED_AREA_COLOR;
+    context.fillRect(disabledAreaStartX, 0, baseCanvasWidth - disabledAreaStartX, baseCanvasHeight);
+
+  }, [
+      tracks,
+      // Include new props in dependencies
+      numMeasures,
+      renderMeasures,
+      // Existing dependencies
+      selectedBlockId,
+      horizontalZoom,
+      verticalZoom,
+      pixelsPerBeatBase,
+      trackHeightBase,
+      effectivePixelsPerBeat, // Derived from zoom
+      effectiveTrackHeight, // Derived from zoom
+      effectiveBlockVerticalPadding, // Derived from zoom
+      effectiveBlockHeight, // Derived from zoom
+      actualSongBeats, // Derived from numMeasures
+      totalRenderBeats // Derived from renderMeasures
+  ]); // Add zoom dependencies
 
 
   // Canvas Event Handlers
@@ -274,9 +313,13 @@ function TrackTimelineView({
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
 
+    const clickedBeat = offsetX / effectivePixelsPerBeat;
     const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
+
+    // Allow context menu anywhere
+
     if (trackIndex < 0 || trackIndex >= tracks.length) {
-        // Context menu outside tracks (e.g., for global actions like import)
+        // Context menu outside tracks
         handleContextMenu(e, null, null); // Pass null trackId
         return;
     }
@@ -313,9 +356,9 @@ function TrackTimelineView({
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
 
-    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
     let cursorStyle = 'default'; // Default cursor
 
+    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
     if (trackIndex >= 0 && trackIndex < tracks.length) {
       const hoveredTrack = tracks[trackIndex];
       // Hit detection logic similar to mouseDown

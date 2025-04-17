@@ -12,7 +12,8 @@ import { Track } from '../../lib/types';
 const TRACK_HEIGHT_BASE = 50; // Renamed base height
 const PIXELS_PER_BEAT_BASE = 100; // Renamed base pixels per beat
 const SIDEBAR_WIDTH = 200; // Define sidebar width as a constant
-const MIN_VISIBLE_MEASURES_BUFFER = 1; // Show slightly more than the target minimum measures
+const MIN_VIEWPORT_MEASURES = 64; // Minimum measures to allow zooming out to see
+const EXTRA_RENDER_MEASURES = 1; // Render this many extra measures beyond content or min viewport
 
 // Color constants
 const SIDEBAR_BG_COLOR = '#1a1a1a';
@@ -145,18 +146,18 @@ function TimelineView() {
           let minHorizontalZoom = 0.1; // Default minimum zoom
 
           if (visibleWidth && visibleWidth > 0) {
-            const targetBeats = (targetMeasures + MIN_VISIBLE_MEASURES_BUFFER) * 4;
+            // Calculate zoom based on making targetVisibleMeasures fit
+            const targetBeats = (targetMeasures + EXTRA_RENDER_MEASURES) * 4; // Add buffer for zoom target
             const minWidthToDisplay = targetBeats * PIXELS_PER_BEAT_BASE;
-            // Calculate the zoom level required to make the target width fit the visible area
-            minHorizontalZoom = Math.max(0.01, visibleWidth / minWidthToDisplay); // Ensure zoom doesn't become too small or zero
+            minHorizontalZoom = Math.max(0.01, visibleWidth / minWidthToDisplay);
           }
 
-          setHorizontalZoom(prev => Math.max(prev / effectiveFactor, minHorizontalZoom)); 
+          setHorizontalZoom(prev => Math.max(prev / effectiveFactor, minHorizontalZoom));
         }
       }
     }
     // Allow normal scrolling if Alt key is not pressed
-  }, []); // Dependencies remain empty as zoom factors are constant
+  }, [setHorizontalZoom, setVerticalZoom]); // Added zoom setters to dependencies
 
   // Attach wheel listener to the timeline content area
   useEffect(() => {
@@ -168,6 +169,9 @@ function TimelineView() {
       };
     }
   }, [handleWheel]);
+
+  const numMeasures = useStore(state => state.numMeasures);
+  const renderMeasures = Math.max(MIN_VIEWPORT_MEASURES, numMeasures) + EXTRA_RENDER_MEASURES;
 
   // Get tracks from track manager
   const totalTracksHeight = tracks.length * effectiveTrackHeight; // Use effective height
@@ -251,13 +255,15 @@ function TimelineView() {
             <MeasuresHeader
               horizontalZoom={horizontalZoom}
               pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
+              numMeasures={numMeasures} // Actual song measures
+              renderMeasures={renderMeasures} // Total measures to render visually
             />
           </div>
           
           {/* Combined content area for instruments and timelines */}
-          <div style={{ 
-            // Adjust width based on measures and zoom
-            width: `${(useStore.getState().numMeasures * 4 * effectivePixelsPerBeat)}px`, 
+          <div style={{
+            // Adjust width based on RENDERED measures and zoom
+            width: `${(renderMeasures * 4 * effectivePixelsPerBeat)}px`, // Use renderMeasures
             minHeight: '100%', // Ensure it fills vertical space
             position: 'relative', // Context for absolute positioning of playhead
             display: 'flex', // Use flexbox for side-by-side layout
@@ -303,12 +309,14 @@ function TimelineView() {
                 height: '100%' // Takes full height of the container (totalTracksHeight)
               }}
             >
-              <TrackTimelineView 
-                tracks={tracks} 
+              <TrackTimelineView
+                tracks={tracks}
                 horizontalZoom={horizontalZoom}
                 verticalZoom={verticalZoom}
                 pixelsPerBeatBase={PIXELS_PER_BEAT_BASE} // Pass base value
                 trackHeightBase={TRACK_HEIGHT_BASE} // Pass base value
+                numMeasures={numMeasures} // Actual song measures
+                renderMeasures={renderMeasures} // Total measures to render visually
               />
             </div>
           </div>

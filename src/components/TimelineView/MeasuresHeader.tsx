@@ -14,22 +14,28 @@ const TOP_SECTION_HEIGHT = HEADER_HEIGHT / 2;
 const HANDLE_PIXEL_THRESHOLD = 10; // Pixel sensitivity for grabbing handles
 const MIN_LABEL_SPACING_PIXELS = 40; // Minimum pixels between measure/beat labels
 const MIN_SUBDIVISION_SPACING_PIXELS = 10; // Minimum pixels between beat subdivision lines
+const DISABLED_AREA_COLOR = 'rgba(0, 0, 0, 0.3)'; // Color for dimming extra measures
 
 interface MeasuresHeaderProps {
   horizontalZoom: number;
   pixelsPerBeatBase: number;
+  numMeasures: number; // Actual measures in the song
+  renderMeasures: number; // Total measures to render visually
 }
 
-function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderProps) {
+function MeasuresHeader({
+  horizontalZoom,
+  pixelsPerBeatBase,
+  numMeasures, // Actual song measures
+  renderMeasures // Total measures to render
+}: MeasuresHeaderProps) {
   const {
     seekTo,
-    numMeasures,
     loopEnabled,
     loopStartBeat,
     loopEndBeat,
     setLoopRange,
     toggleLoop,
-    currentBeat // Need currentBeat for final check in handleLoopEnd
   } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,16 +53,18 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
 
   // Calculate effective pixels per beat based on zoom
   const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;
+  const actualSongBeats = numMeasures * BEATS_PER_MEASURE; // Use prop
+  const totalRenderBeats = renderMeasures * BEATS_PER_MEASURE; // Use prop
 
   // --- Utility Functions (using effectivePixelsPerBeat) ---
   const calculateBeatFromX = useCallback((mouseX: number): number => {
-    const totalWidth = effectivePixelsPerBeat * BEATS_PER_MEASURE * numMeasures;
+    const totalWidth = effectivePixelsPerBeat * totalRenderBeats; // Use render width
     const clampedMouseX = Math.max(0, Math.min(mouseX, totalWidth));
     // Avoid division by zero if totalWidth is 0
-    const clickedBeat = totalWidth > 0 ? (clampedMouseX / totalWidth) * (numMeasures * BEATS_PER_MEASURE) : 0;
-    const totalBeats = numMeasures * BEATS_PER_MEASURE;
-    return Math.max(0, Math.min(clickedBeat, totalBeats));
-  }, [numMeasures, effectivePixelsPerBeat]);
+    const clickedBeat = totalWidth > 0 ? (clampedMouseX / totalWidth) * totalRenderBeats : 0; // Use render beats
+    // Clamp click/seek actions to actual song beats
+    return Math.max(0, Math.min(clickedBeat, actualSongBeats));
+  }, [totalRenderBeats, effectivePixelsPerBeat, actualSongBeats]);
 
   // Convert beat number to pixel X coordinate
   const beatToX = useCallback((beat: number): number => {
@@ -111,15 +119,15 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
                   newStart = 0;
               }
               newEnd = newStart + loopDuration;
-              const totalBeats = numMeasures * BEATS_PER_MEASURE;
-              if (newEnd > totalBeats) {
-                  newEnd = totalBeats;
+              // Clamp movement to actual song beats
+              if (newEnd > actualSongBeats) {
+                  newEnd = actualSongBeats;
                   newStart = newEnd - loopDuration;
               }
               // Ensure start doesn't become negative after adjustment
               newStart = Math.max(0, newStart);
-              // Ensure loop still meets minimum duration after clamping
-              newEnd = Math.max(newStart + minLoopDurationBeats, newEnd);
+              // Ensure loop still meets minimum duration after clamping (and within song bounds)
+              newEnd = Math.min(actualSongBeats, Math.max(newStart + minLoopDurationBeats, newEnd));
             }
             break;
         case 'resizing-start':
@@ -133,8 +141,8 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
              if (initialStartBeat !== null) {
               newStart = initialStartBeat;
               newEnd = Math.max(currentBeat, initialStartBeat + minLoopDurationBeats); // Prevent end passing start (with min duration)
-              const totalBeats = numMeasures * BEATS_PER_MEASURE;
-              newEnd = Math.min(newEnd, totalBeats); // Prevent end > totalBeats
+              // Clamp end resizing to actual song beats
+              newEnd = Math.min(newEnd, actualSongBeats);
              }
             break;
     }
@@ -143,7 +151,7 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
       setLoopRange(newStart, newEnd);
     }
 
-  }, [loopDragState, loopStartBeat, loopEndBeat, numMeasures, setLoopRange, calculateBeatFromX]); // Added loopStartBeat/EndBeat dependencies
+  }, [loopDragState, loopStartBeat, loopEndBeat, numMeasures, setLoopRange, calculateBeatFromX, actualSongBeats]); // Added loopStartBeat/EndBeat dependencies
 
   const handleLoopEnd = useCallback((event: MouseEvent) => {
       // Check if drag type was 'creating' OR 'moving' and it was a click
@@ -283,7 +291,7 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const logicalWidth = effectivePixelsPerBeat * BEATS_PER_MEASURE * numMeasures;
+    const logicalWidth = effectivePixelsPerBeat * totalRenderBeats; // Use render beats
     const logicalHeight = HEADER_HEIGHT;
 
     // Prevent rendering if width is zero or negative
@@ -309,7 +317,12 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
     // --- Clear canvas ---
     ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
-    // --- Draw Loop Region (Top Half) ---
+    // --- Draw Disabled Area Background ---
+    const disabledAreaStartX = beatToX(actualSongBeats);
+    ctx.fillStyle = DISABLED_AREA_COLOR;
+    ctx.fillRect(disabledAreaStartX, 0, logicalWidth - disabledAreaStartX, logicalHeight);
+
+    // --- Draw Loop Region (Top Half) - Constrained by actualSongBeats ---
     if (loopStartBeat !== null && loopEndBeat !== null) {
       const loopStartX = beatToX(loopStartBeat);
       const loopEndX = beatToX(loopEndBeat);
@@ -333,7 +346,6 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
     ctx.stroke();
 
     // --- Dynamic Grid Lines and Labels ---
-    const totalBeats = numMeasures * BEATS_PER_MEASURE;
     let lastLabelX = -Infinity; // Track the last drawn label position
 
     // Determine subdivision level based on pixels per beat
@@ -362,16 +374,21 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
 
-    for (let beat = 0; beat <= totalBeats; beat += 0.25) { // Iterate smallest unit
+    for (let beat = 0; beat <= totalRenderBeats; beat += 0.25) { // Iterate smallest unit up to render limit
         const x = beatToX(beat) + 0.5; // +0.5 for sharpness
         const isMeasureStart = beat % BEATS_PER_MEASURE === 0;
         const isBeatStart = beat % 1 === 0;
         const measureNumber = Math.floor(beat / BEATS_PER_MEASURE) + 1;
+        const isBeyondSong = beat > actualSongBeats; // Check if beyond actual song length
 
         let drawLine = false;
         let lineLength = 5; // Default shortest line (sub-beat)
         let lineWidth = 0.5;
-        let strokeStyle = '#444'; // Lightest lines
+        // Dimmer colors for lines beyond the song length
+        let baseStrokeStyle = isBeyondSong ? '#333' : '#444'; // Base style lighter for active area
+        let measureStrokeStyle = isBeyondSong ? '#555' : '#888';
+        let beatStrokeStyle = isBeyondSong ? '#444' : '#666';
+        let strokeStyle = baseStrokeStyle;
         let drawLabel = false;
 
         if (isMeasureStart) {
@@ -379,7 +396,7 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
             drawLine = true;
             lineLength = HEADER_HEIGHT - TOP_SECTION_HEIGHT; // Full height in bottom
             lineWidth = 1;
-            strokeStyle = '#888'; // Darker measure line
+            strokeStyle = measureStrokeStyle;
 
             // Check label spacing for measures based on subdivision level
             if ((subdivisionLevel === 'measure' && (beat / BEATS_PER_MEASURE) % 1 === 0) ||
@@ -396,7 +413,7 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
                      drawLine = true;
                      lineLength = HEADER_HEIGHT - TOP_SECTION_HEIGHT - 5; // Medium length
                      lineWidth = 0.75;
-                     strokeStyle = '#666';
+                     strokeStyle = beatStrokeStyle;
                  }
                  // Check label spacing for beats
                  if (subdivisionLevel === 'beat' && x - lastLabelX >= MIN_LABEL_SPACING_PIXELS) {
@@ -408,8 +425,7 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
                  if (effectivePixelsPerBeat * 0.25 >= MIN_SUBDIVISION_SPACING_PIXELS) {
                      drawLine = true;
                      lineLength = HEADER_HEIGHT - TOP_SECTION_HEIGHT - 10; // Shortest length
-                     // lineWidth = 0.5; (already default)
-                     // strokeStyle = '#444'; (already default)
+                     strokeStyle = baseStrokeStyle; // Use the base subdivision style
                  }
                  // Check label spacing for sub-beats
                  if (x - lastLabelX >= MIN_LABEL_SPACING_PIXELS) {
@@ -428,6 +444,8 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
         }
 
         if (drawLabel) {
+            // Dimmer color for labels beyond the song length
+            ctx.fillStyle = isBeyondSong ? '#666' : 'white';
             let label = '';
             if (subdivisionLevel === 'sub_beat') {
                 const beatInMeasure = beat % BEATS_PER_MEASURE;
@@ -438,15 +456,24 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
                  label = measureNumber.toString();
             }
 
-            // Check text width to avoid overlap near the end? (optional)
-            // const textWidth = ctx.measureText(label).width;
-            // if (x + textWidth < logicalWidth - 5) { ... }
             ctx.fillText(label, x + 4, 2); // Padding
             lastLabelX = x; // Update last label position
         }
     }
 
-  }, [numMeasures, loopEnabled, loopStartBeat, loopEndBeat, beatToX, effectivePixelsPerBeat]); // Added dependencies
+  }, [
+      // Include new props in dependencies
+      numMeasures,
+      renderMeasures,
+      // Existing dependencies
+      loopEnabled,
+      loopStartBeat,
+      loopEndBeat,
+      beatToX,
+      effectivePixelsPerBeat,
+      actualSongBeats, // Derived from numMeasures
+      totalRenderBeats // Derived from renderMeasures
+  ]);
 
   // --- Component Render ---
   return (
@@ -460,7 +487,7 @@ function MeasuresHeader({ horizontalZoom, pixelsPerBeatBase }: MeasuresHeaderPro
         backgroundColor: 'black',
         position: 'relative', // Needed for absolute canvas positioning
         overflow: 'hidden', // Hide canvas overflow
-        width: `${effectivePixelsPerBeat * BEATS_PER_MEASURE * numMeasures}px` // Dynamic width
+        width: `${effectivePixelsPerBeat * totalRenderBeats}px` // Use render beats for width
       }}
     >
       <canvas
