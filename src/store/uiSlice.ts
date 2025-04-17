@@ -1,9 +1,10 @@
 import { StateCreator } from 'zustand';
-import { AppState } from './store'; // Import the combined AppState
+import { AppState } from './store';
 
-// UI Slice
+export type SelectedWindowType = 'midiEditor' | 'playbar' | 'visualizerView' | 'trackTimelineView' | null;
 export interface UIState {
     isInstrumentSidebarVisible: boolean;
+    selectedWindow: SelectedWindowType;
 }
 
 export interface UIActions {
@@ -19,7 +20,9 @@ export const createUISlice: StateCreator<
   UISlice
 > = (set, get) => ({
   isInstrumentSidebarVisible: true,
+  selectedWindow: null,
   toggleInstrumentSidebar: () => set((state) => ({ 
     isInstrumentSidebarVisible: !state.isInstrumentSidebarVisible 
   })),
+  setSelectedWindow: (window: SelectedWindowType) => set({ selectedWindow: window }), // Implement the action
 }); 
