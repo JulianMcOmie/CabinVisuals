@@ -10,6 +10,7 @@ const BLOCK_VERTICAL_PADDING_FACTOR = 0.1; // e.g., 10% of track height
 const EDGE_RESIZE_WIDTH = 8; // Width of the clickable edge area (keep fixed pixels?)
 const BLOCK_CORNER_RADIUS = 4; // Added for rounded corners (keep fixed pixels?)
 const DISABLED_AREA_COLOR = 'rgba(0, 0, 0, 0.3)'; // Color for dimming extra measures (same as header)
+const DRAGGED_BLOCK_OPACITY = 0.5; // Opacity for the original block being dragged AND the ghost block
 
 interface TrackTimelineViewProps {
   tracks: Track[];
@@ -65,6 +66,9 @@ function TrackTimelineView({
     contextMenuPosition,
     contextMenuBlockId,
     fileInputRef,
+    pendingUpdateBlock,    // The potential state of the block being dragged
+    pendingTargetTrackId,  // The potential track ID if moved
+    dragOperation          // Current drag operation ('move', 'start', 'end', or 'none')
   } = useTrackGestures({
       tracks,
       updateMidiBlock,
@@ -105,6 +109,66 @@ function TrackTimelineView({
     ctx.arcTo(x, y, x + radius, y, radius);
     ctx.closePath();
   };
+
+  // Refactored Block Drawing Helper
+  const drawMidiBlock = (
+    ctx: CanvasRenderingContext2D,
+    blockData: MIDIBlock,
+    trackTopY: number,
+    isSelected: boolean,
+    alpha: number, // Alpha transparency (0 to 1)
+    isGhost: boolean = false // Optional flag for ghost-specific styling (e.g., dashed line)
+  ) => {
+      // Use passed-in blockData instead of block from closure
+      const leftPosition = blockData.startBeat * effectivePixelsPerBeat;
+      const blockWidth = (blockData.endBeat - blockData.startBeat) * effectivePixelsPerBeat;
+      const blockTopY = trackTopY + effectiveBlockVerticalPadding;
+
+      // Save context state before potentially changing alpha or line dash
+      ctx.save();
+
+      ctx.globalAlpha = alpha;
+
+      // Draw the block shape
+      drawRoundedRect(ctx, leftPosition, blockTopY, blockWidth, effectiveBlockHeight, BLOCK_CORNER_RADIUS);
+      ctx.fillStyle = '#4a90e2';
+      ctx.fill();
+
+      // Stroke border
+      if (isSelected && !isGhost) { // Only show solid selection border on non-ghost blocks
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([]); // Ensure solid line
+          ctx.stroke();
+      } else if (isGhost) { // Dashed border for ghost block
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+      }
+
+      // Draw block text
+      if (!isGhost) {
+          ctx.fillStyle = 'white';
+          // Adjust font size if needed based on DPR or zoom
+          const baseFontSize = 12;
+          ctx.font = `bold ${baseFontSize * (window.devicePixelRatio || 1)}px sans-serif`; 
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          const text = `${blockData.notes.length} notes`;
+          const textX = leftPosition + EDGE_RESIZE_WIDTH + 4;
+          const textY = trackTopY + effectiveTrackHeight / 2;
+
+          // Simple rectangular clipping for text
+          ctx.beginPath(); // Start a new path for clipping
+          ctx.rect(textX - 4, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 1.5, effectiveTrackHeight); 
+          ctx.clip();
+          ctx.fillText(text, textX, textY);
+      }
+
+      // Restore context state (removes clipping and resets globalAlpha/lineDash)
+      ctx.restore();
+  }
 
 
   // Canvas Drawing Logic
@@ -173,41 +237,22 @@ function TrackTimelineView({
       // Draw MIDI Blocks for this track (Blocks should only exist within numMeasures)
       track.midiBlocks.forEach(block => {
         const isSelected = block.id === selectedBlockId;
+        // Check if this block is the one being dragged
+        const isBeingDragged = dragOperation !== 'none' && block.id === pendingUpdateBlock?.id;
+
         const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
         const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
         const blockTopY = trackTopY + effectiveBlockVerticalPadding; // Use effective padding
 
-        // Draw rounded rectangle path
-        drawRoundedRect(context, leftPosition, blockTopY, blockWidth, effectiveBlockHeight, BLOCK_CORNER_RADIUS); // Use effective height
-
-        // Fill block background (always blue)
-        context.fillStyle = '#4a90e2'; // Consistent blue color
-        context.fill();
-
-        // Stroke border/selection outline only if selected
-        if (isSelected) {
-          context.strokeStyle = 'white';
-          context.lineWidth = 2; // Might appear as 1px on non-retina, consider adjusting if needed
-          context.stroke(); // Stroke the existing rounded path
-        }
-
-        // Draw block text (adjustments might be needed if text looks blurry)
-        context.fillStyle = 'white';
-        context.font = `bold ${12 * dpr}px sans-serif`; // Scale font size? Optional, test appearance
-        context.textAlign = 'left';
-        context.textBaseline = 'middle';
-        const text = `${block.notes.length} notes`;
-        const textX = leftPosition + EDGE_RESIZE_WIDTH + 4; // Add padding
-        const textY = trackTopY + effectiveTrackHeight / 2; // Center vertically in track
-
-        // Optional: Clip text if it overflows block width
-        // Clipping region also needs care with rounded corners if applied precisely
-        context.save();
-        // Simple rectangular clipping for now
-        context.rect(textX, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 2 - 8, effectiveTrackHeight); // Use effective height
-        context.clip();
-        context.fillText(text, textX, textY);
-        context.restore(); // Remove clipping
+        // Call the helper function to draw the block
+        drawMidiBlock(
+            context,
+            block, // Block data
+            trackTopY,
+            isSelected,
+            isBeingDragged ? DRAGGED_BLOCK_OPACITY : 1, // Calculated alpha
+            false // Not a ghost block
+        );
       });
     });
 
@@ -215,6 +260,26 @@ function TrackTimelineView({
     const disabledAreaStartX = actualSongBeats * effectivePixelsPerBeat; // Position where song ends
     context.fillStyle = DISABLED_AREA_COLOR;
     context.fillRect(disabledAreaStartX, 0, baseCanvasWidth - disabledAreaStartX, baseCanvasHeight);
+
+    // --- Draw Pending ("Ghost") Block if Dragging --- 
+    if (dragOperation !== 'none' && pendingUpdateBlock && pendingTargetTrackId) {
+        const targetTrackIndex = tracks.findIndex(t => t.id === pendingTargetTrackId);
+        
+        // Only draw if the target track is found
+        if (targetTrackIndex !== -1) {
+            const targetTrackTopY = targetTrackIndex * effectiveTrackHeight;
+            
+            // Call the helper function to draw the ghost block
+            drawMidiBlock(
+                context,
+                pendingUpdateBlock, // Pending block data
+                targetTrackTopY,    // Target track Y position
+                false,              // Ghost block is never selected visually
+                DRAGGED_BLOCK_OPACITY, // Alpha for ghost block
+                true                // Indicate it's a ghost block for styling
+            );
+        }
+    }
 
   }, [
       tracks,
@@ -232,7 +297,12 @@ function TrackTimelineView({
       effectiveBlockVerticalPadding, // Derived from zoom
       effectiveBlockHeight, // Derived from zoom
       actualSongBeats, // Derived from numMeasures
-      totalRenderBeats // Derived from renderMeasures
+      totalRenderBeats, // Derived from renderMeasures
+      // Add pending state dependencies
+      pendingUpdateBlock,
+      pendingTargetTrackId,
+      dragOperation,
+      drawMidiBlock // Add drawMidiBlock as dependency (or wrap in useCallback)
   ]); // Add zoom dependencies
 
 
