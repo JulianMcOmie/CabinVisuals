@@ -9,6 +9,7 @@ export interface UIState {
 
 export interface UIActions {
     toggleInstrumentSidebar: () => void;
+    setSelectedWindow: (window: SelectedWindowType) => void;
 }
 
 export type UISlice = UIState & UIActions;
@@ -24,5 +25,5 @@ export const createUISlice: StateCreator<
   toggleInstrumentSidebar: () => set((state) => ({ 
     isInstrumentSidebarVisible: !state.isInstrumentSidebarVisible 
   })),
-  setSelectedWindow: (window: SelectedWindowType) => set({ selectedWindow: window }), // Implement the action
+  setSelectedWindow: (window: SelectedWindowType) => set({ selectedWindow: window }),
 }); 

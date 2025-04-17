@@ -38,7 +38,7 @@ const synthesizerOptions: { [key: string]: { class: new () => Synthesizer, name:
 };
 
 function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
-  const { updateTrack } = useStore(); 
+  const { updateTrack, setSelectedWindow } = useStore(); 
   const synthesizer = track.synthesizer; // Get current synthesizer
 
   // --- Handler for changing the main synthesizer type ---
@@ -105,8 +105,12 @@ function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
     }
   };
 
+  const handleViewClick = () => {
+    setSelectedWindow(null);
+  };
+
   return (
-    <div style={{ padding: '20px', color: '#ddd' }}>
+    <div style={{ padding: '20px', color: '#ddd' }} onClick={handleViewClick}>
       <h3>Instrument Settings: {track.name}</h3>
       
       {/* Synthesizer Type Selector */}

@@ -45,7 +45,11 @@ interface MidiEditorProps {
 }
 
 function MidiEditor({ block, track }: MidiEditorProps) {
-  const { updateMidiBlock, selectNotes: storeSelectNotes } = useStore();
+  const { 
+    updateMidiBlock, 
+    selectNotes: storeSelectNotes, 
+    setSelectedWindow
+  } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -102,6 +106,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
 
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    setSelectedWindow('midiEditor');
     const coords = getCoordsFromEvent(e, canvasRef);
     if (!coords) return;
     
@@ -240,6 +245,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    setSelectedWindow('midiEditor');
     
     const coords = getCoordsFromEvent(e, canvasRef);
     if (!coords) return;
@@ -424,9 +430,17 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     copiedNotes,
     setCopiedNotes
   ]);
+
+  const handleEditorClick = () => {
+      setSelectedWindow('midiEditor');
+  }
   
   return (
-    <div ref={editorRef} className="midi-editor relative overflow-auto border border-gray-700 rounded-md">
+    <div 
+        ref={editorRef} 
+        className="midi-editor relative overflow-auto border border-gray-700 rounded-md" 
+        onClick={handleEditorClick}
+    >
       <div className="piano-roll flex flex-col">
         <div className="flex">
           <div className="piano-roll-header">

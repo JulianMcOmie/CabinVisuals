@@ -205,22 +205,31 @@ const PlaybarView: React.FC = () => {
     loopEnabled,
     toggleLoop,
     isInstrumentSidebarVisible,
-    toggleInstrumentSidebar
+    toggleInstrumentSidebar,
+    setSelectedWindow
   } = useStore();
   
   // For demo purposes, set total measure length to 16 bars (64 beats in 4/4)
   const totalBeats = 64;
+
+  const handlePlaybarClick = () => {
+    setSelectedWindow(null);
+  };
   
   return (
-    <div className="playbar-view" style={{ 
-      width: '100%',
-      height: '100%', 
-      padding: '0 15px', 
-      display: 'flex', 
-      alignItems: 'center',
-      backgroundColor: 'gray',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.12)'
-    }}>
+    <div 
+      className="playbar-view" 
+      onClick={handlePlaybarClick}
+      style={{ 
+        width: '100%',
+        height: '100%', 
+        padding: '0 15px', 
+        display: 'flex', 
+        alignItems: 'center',
+        backgroundColor: 'gray',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.12)'
+      }}
+    >
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
@@ -229,7 +238,7 @@ const PlaybarView: React.FC = () => {
         gap: '15px'
       }}>
         <button 
-          onClick={toggleInstrumentSidebar}
+          onClick={(e) => { e.stopPropagation(); toggleInstrumentSidebar(); }}
           title={isInstrumentSidebarVisible ? "Hide Instruments" : "Show Instruments"}
           style={{
             background: isInstrumentSidebarVisible ? '#555' : '#333',
@@ -252,23 +261,23 @@ const PlaybarView: React.FC = () => {
         }}>
           <TransportButton
             icon="⏹️"
-            onClick={stop}
+            onClick={() => { stop(); setSelectedWindow(null); }}
           />
           {isPlaying ? (
             <TransportButton
               icon="⏸️"
-              onClick={pause}
+              onClick={() => { pause(); setSelectedWindow(null); }}
               active={true}
             />
           ) : (
             <TransportButton
               icon="▶️"
-              onClick={play}
+              onClick={() => { play(); setSelectedWindow(null); }}
             />
           )}
           <TransportButton
             icon="🔁"
-            onClick={toggleLoop}
+            onClick={() => { toggleLoop(); setSelectedWindow(null); }}
             active={loopEnabled}
             title={loopEnabled ? "Disable Loop" : "Enable Loop"}
           />
@@ -280,12 +289,12 @@ const PlaybarView: React.FC = () => {
           currentBeat={currentBeat}
           isPlaying={isPlaying}
           totalBeats={totalBeats}
-          onSeek={seekTo}
+          onSeek={(beat) => { seekTo(beat); setSelectedWindow(null); }}
         />
         
         <BPMControl
           bpm={bpm}
-          onChange={setBPM}
+          onChange={(newBpm) => { setBPM(newBpm); setSelectedWindow(null); }}
         />
       </div>
     </div>

@@ -52,7 +52,7 @@ function VisualObject({ object }: { object: VisualObject3D }) {
 
 // Main VisualizerView component
 function VisualizerView() {
-  const { timeManager, currentBeat, tracks } = useStore();
+  const { timeManager, currentBeat, tracks, setSelectedWindow } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   
@@ -80,8 +80,17 @@ function VisualizerView() {
     visualizerManager.setTracks(tracks);
   }, [tracks, visualizerManager]); // Depend on tracks and the manager instance
   
+  const handleVisualizerClick = () => {
+    setSelectedWindow(null);
+  };
+  
   return (
-    <div className="visualizer-view" ref={containerRef} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div 
+      className="visualizer-view" 
+      ref={containerRef} 
+      onClick={handleVisualizerClick} 
+      style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+    >
       <h2 style={{ padding: '10px', margin: 0 }}>Visualizer View (Beat: {currentBeat.toFixed(2)})</h2>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {dimensions.width > 0 && dimensions.height > 0 && (
