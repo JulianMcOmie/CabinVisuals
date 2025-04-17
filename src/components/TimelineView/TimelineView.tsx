@@ -20,7 +20,15 @@ const SIDEBAR_BG_COLOR = '#1a1a1a';
 const HEADER_BG_COLOR = 'black';
 
 function TimelineView() {
-  const { currentBeat, tracks, addTrack, selectTrack, seekTo } = useStore();
+  const { 
+    currentBeat, 
+    tracks, 
+    addTrack, 
+    selectTrack, 
+    seekTo, 
+    setSelectedWindow,
+    selectedWindow
+  } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -45,12 +53,11 @@ function TimelineView() {
     
     addTrack(newTrack);
     selectTrack(newTrack.id);
+    setSelectedWindow('timelineView'); // Set window on add track
   };
   
   // Calculate playhead position based on beat, zoom AND scroll
-  // Base position relative to the start of the timeline area (after sidebar)
   const basePlayheadOffset = currentBeat * effectivePixelsPerBeat; // Use effective value
-  // Adjust for the current horizontal scroll and add sidebar width for final CSS `left`
   const playheadLeftStyle = SIDEBAR_WIDTH + basePlayheadOffset - scrollLeft;
 
   // Mouse move handler for dragging - needs to account for scroll and zoom
@@ -58,13 +65,10 @@ function TimelineView() {
     if (!isDragging || !timelineContentRef.current) return;
 
     const containerRect = timelineContentRef.current.getBoundingClientRect();
-    // Calculate mouse X relative to the timeline content container's *visible* area
     const mouseXRelative = event.clientX - containerRect.left;
-    // Add the current scrollLeft to get the mouse position within the *scrolled content*
     const mouseXInScrolledContent = mouseXRelative + timelineContentRef.current.scrollLeft;
     
-    // Calculate the target beat, subtracting sidebar width, ensuring it's not negative
-    const targetBeat = Math.max(0, (mouseXInScrolledContent - SIDEBAR_WIDTH) / effectivePixelsPerBeat); // Use effective value
+    const targetBeat = Math.max(0, (mouseXInScrolledContent - SIDEBAR_WIDTH) / effectivePixelsPerBeat);
     
     seekTo(targetBeat);
 
@@ -74,16 +78,17 @@ function TimelineView() {
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
       setIsDragging(false);
-      // Optional: Reset cursor or styles if changed during drag
     }
   }, [isDragging]);
 
   // Mouse down handler to start dragging
   const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent default text selection behavior during drag
+    setSelectedWindow('timelineView'); // Set window on interaction
+
+    // Only drag on left click
+    if (event.button !== 0) return;
     event.preventDefault(); 
     setIsDragging(true);
-    // Optional: Set initial styles like cursor
   };
 
   // Add/Remove global listeners when dragging state changes
@@ -96,7 +101,6 @@ function TimelineView() {
       window.removeEventListener('mouseup', handleMouseUp);
     }
 
-    // Cleanup function to remove listeners if component unmounts while dragging
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
@@ -112,6 +116,7 @@ function TimelineView() {
   // Handler for wheel events (zoom)
   const handleWheel = useCallback((event: WheelEvent) => {
     if (event.altKey) {
+      setSelectedWindow('timelineView'); // Set window on zoom interaction
       event.preventDefault(); // Prevent default scroll behavior when zooming
 
       // Vertical Zoom (multiplicative but with linear response to wheel)
@@ -156,8 +161,7 @@ function TimelineView() {
         }
       }
     }
-    // Allow normal scrolling if Alt key is not pressed
-  }, [setHorizontalZoom, setVerticalZoom]); // Added zoom setters to dependencies
+  }, [setHorizontalZoom, setVerticalZoom, setSelectedWindow]); // Added setSelectedWindow
 
   // Attach wheel listener to the timeline content area
   useEffect(() => {
@@ -173,11 +177,30 @@ function TimelineView() {
   const numMeasures = useStore(state => state.numMeasures);
   const renderMeasures = Math.max(MIN_VIEWPORT_MEASURES, numMeasures) + EXTRA_RENDER_MEASURES;
 
-  // Get tracks from track manager
-  const totalTracksHeight = tracks.length * effectiveTrackHeight; // Use effective height
+  const totalTracksHeight = tracks.length * effectiveTrackHeight;
+
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent setting if the click originated from the playhead
+    if (playheadRef.current && playheadRef.current.contains(e.target as Node)) {
+        return;
+    }
+    setSelectedWindow('timelineView');
+  };
 
   return (
-    <div className="timeline-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div 
+      className="timeline-view" 
+      onClick={handleTimelineClick}
+      style={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+        border: selectedWindow === 'timelineView' 
+          ? '2px solid rgba(255, 255, 255, 0.3)'
+          : '2px solid transparent'
+      }}
+    >
       {/* Timeline container */}
       <div className="timeline-container" style={{ 
         display: 'flex', 
@@ -204,7 +227,7 @@ function TimelineView() {
         }}>
           <span>Tracks</span>
           <button 
-            onClick={handleAddTrack}
+            onClick={(e) => { e.stopPropagation(); handleAddTrack(); }}
             style={{
               background: 'none',
               border: 'none',
@@ -236,7 +259,7 @@ function TimelineView() {
           <div style={{
             position: 'absolute',
             left: 0,
-            top: '40px', // Start below the header
+            top: '40px',
             bottom: 0,
             width: '200px',
             backgroundColor: SIDEBAR_BG_COLOR,
@@ -248,38 +271,37 @@ function TimelineView() {
           <div style={{
             position: 'sticky',
             top: 0,
-            paddingLeft: '200px', // Space for instrument column
+            paddingLeft: '200px',
             zIndex: 2,
             backgroundColor: HEADER_BG_COLOR
           }}>
             <MeasuresHeader
               horizontalZoom={horizontalZoom}
               pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
-              numMeasures={numMeasures} // Actual song measures
-              renderMeasures={renderMeasures} // Total measures to render visually
+              numMeasures={numMeasures}
+              renderMeasures={renderMeasures}
             />
           </div>
           
           {/* Combined content area for instruments and timelines */}
           <div style={{
-            // Adjust width based on RENDERED measures and zoom
-            width: `${(renderMeasures * 4 * effectivePixelsPerBeat)}px`, // Use renderMeasures
-            minHeight: '100%', // Ensure it fills vertical space
-            position: 'relative', // Context for absolute positioning of playhead
-            display: 'flex', // Use flexbox for side-by-side layout
-            height: `${totalTracksHeight}px` // Set explicit height for track area based on zoom
+            width: `${(renderMeasures * 4 * effectivePixelsPerBeat)}px`,
+            minHeight: '100%',
+            position: 'relative',
+            display: 'flex',
+            height: `${totalTracksHeight}px`
           }}>
             {/* Instrument Views Column - sticky */}
             <div 
               className="instruments-column"
               style={{
-                position: 'sticky', // Make this column sticky
-                left: 0, // Stick to the left edge
-                width: `${SIDEBAR_WIDTH}px`, // Use constant width
-                zIndex: 1, // Above timeline background, below header/playhead
-                backgroundColor: SIDEBAR_BG_COLOR, // Match sidebar background
-                borderRight: '1px solid #333', // Keep the border
-                height: '100%' // Takes full height of the container (totalTracksHeight)
+                position: 'sticky',
+                left: 0,
+                width: `${SIDEBAR_WIDTH}px`,
+                zIndex: 1,
+                backgroundColor: SIDEBAR_BG_COLOR,
+                borderRight: '1px solid #333',
+                height: '100%'
               }}
             >
               {/* Map over tracks to render InstrumentView */}
@@ -304,30 +326,29 @@ function TimelineView() {
             <div 
               className="timelines-column"
               style={{
-                flex: 1, // Take remaining horizontal space
-                position: 'relative', // Needed for positioning blocks correctly
-                height: '100%' // Takes full height of the container (totalTracksHeight)
+                flex: 1,
+                position: 'relative',
+                height: '100%'
               }}
             >
               <TrackTimelineView
                 tracks={tracks}
                 horizontalZoom={horizontalZoom}
                 verticalZoom={verticalZoom}
-                pixelsPerBeatBase={PIXELS_PER_BEAT_BASE} // Pass base value
-                trackHeightBase={TRACK_HEIGHT_BASE} // Pass base value
-                numMeasures={numMeasures} // Actual song measures
-                renderMeasures={renderMeasures} // Total measures to render visually
+                pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
+                trackHeightBase={TRACK_HEIGHT_BASE}
+                numMeasures={numMeasures}
+                renderMeasures={renderMeasures}
               />
             </div>
           </div>
           
-          {/* Message when no tracks exist - Adjust positioning if needed */}
+          {/* Message when no tracks exist */}
           {tracks.length === 0 && (
             <div style={{ 
-              // Position relative to the scrollable container, below header
               position: 'absolute', 
-              top: '60px', // Adjust as needed (below header + some padding)
-              left: `${SIDEBAR_WIDTH + 20}px`, // Position to the right of the sidebar area
+              top: '60px',
+              left: `${SIDEBAR_WIDTH + 20}px`,
               color: 'white', 
               fontStyle: 'italic' 
             }}>
@@ -336,15 +357,14 @@ function TimelineView() {
           )}
         </div>
 
-        {/* Playhead - positioned relative to timeline-container, left style adjusted by scroll */}
+        {/* Playhead */} 
         <div 
-          ref={playheadRef} // Assign ref
+          ref={playheadRef}
           className="playhead"
-          onMouseDown={handleMouseDown} // Attach mouse down handler
+          onMouseDown={handleMouseDown}
           style={{
             position: 'absolute',
             top: '40px',
-            // Use the dynamically calculated style
             left: `${playheadLeftStyle}px`,
             width: '3px',
             height: 'calc(100% - 40px)',
@@ -355,11 +375,7 @@ function TimelineView() {
           }}
         />
       </div>
-      
-      {/* Current beat indicator - REMOVE TEXT */}
-      <div style={{ padding: '5px 10px', borderTop: '1px solid #333', backgroundColor: '#111', color: 'white' }}>
-        {/* Current beat: {currentBeat} */}
-      </div>
+    
     </div>
   );
 }

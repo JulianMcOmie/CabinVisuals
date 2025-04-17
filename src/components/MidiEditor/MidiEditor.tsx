@@ -46,7 +46,12 @@ interface MidiEditorProps {
 }
 
 function MidiEditor({ block, track }: MidiEditorProps) {
-  const { updateMidiBlock, selectNotes: storeSelectNotes, numMeasures } = useStore();
+  const { 
+    updateMidiBlock, 
+    selectNotes: storeSelectNotes, 
+    setSelectedWindow,
+    selectedWindow
+  } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -114,13 +119,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
 
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCoordsFromEvent(
-      e,
-      canvasRef,
-      pixelsPerBeat,
-      pixelsPerSemitone
-    );
-
+    setSelectedWindow('midiEditor');
+    const coords = getCoordsFromEvent(e, canvasRef);
     if (!coords) return;
     
     const { x, y, beat, pitch } = coords;
@@ -271,6 +271,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    setSelectedWindow('midiEditor');
     
     const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
     if (!coords) return;
@@ -416,6 +417,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     };
     
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle keyboard shortcuts if this window is selected
+      if (selectedWindow !== 'midiEditor') return;
+
       // Use the handler from keyboardHandlers.ts
       handleKeyboardShortcuts(
         e,
@@ -455,11 +459,20 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     isDragging,
     clickOffset,
     copiedNotes,
-    setCopiedNotes
+    setCopiedNotes,
+    selectedWindow
   ]);
+
+  const handleEditorClick = () => {
+      setSelectedWindow('midiEditor');
+  }
   
   return (
-    <div ref={editorRef} className="midi-editor relative overflow-auto border border-gray-700 rounded-md">
+    <div 
+        ref={editorRef} 
+        className="midi-editor relative overflow-auto border border-gray-700 rounded-md" 
+        onClick={handleEditorClick}
+    >
       <div className="piano-roll flex flex-col">
         <div className="flex">
           <div className="piano-roll-header">

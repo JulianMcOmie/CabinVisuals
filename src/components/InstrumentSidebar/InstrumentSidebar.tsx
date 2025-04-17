@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../../store/store'; // Import the actual store hook
-import { InstrumentDefinition } from '../../store/store'; // Import InstrumentDefinition type
+// import { InstrumentDefinition } from '../../store/store'; // Commented out - likely type is inferred or comes from a slice
 
 const InstrumentSidebar: React.FC = () => {
   // Select needed state and actions from the store
@@ -8,7 +8,8 @@ const InstrumentSidebar: React.FC = () => {
     availableInstruments,
     selectedTrackId,
     updateTrack,
-    selectedTrack // Select the currently selected track object
+    selectedTrack,
+    setSelectedWindow
   } = useStore();
 
   // State to track the ID of the highlighted instrument in the sidebar
@@ -80,8 +81,13 @@ const InstrumentSidebar: React.FC = () => {
     }
   };
 
+  // Function to handle clicks on the sidebar itself
+  const handleSidebarClick = () => {
+      setSelectedWindow(null);
+  };
+
   return (
-    <div className="instrument-sidebar">
+    <div className="instrument-sidebar" onClick={handleSidebarClick}>
       <h3>Instruments</h3>
       {Object.entries(availableInstruments).map(([category, instruments]) => (
         <div key={category} className="category-section">

@@ -39,7 +39,8 @@ function TrackTimelineView({
     updateMidiBlock,
     removeMidiBlock,
     moveMidiBlock,
-    timeManager
+    timeManager,
+    selectedWindow
   } = useStore();
   const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for hook, points to the container
   const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for the canvas element
@@ -85,7 +86,8 @@ function TrackTimelineView({
       pixelsPerBeatBase,
       trackHeightBase,
       numMeasures, // Pass actual numMeasures to hook if needed for its logic
-      renderMeasures, // Pass renderMeasures to hook if needed
+      renderMeasures,
+      selectedWindow
   } as UseTrackGesturesProps); // Cast to satisfy hook's expected props
 
   // Helper function to draw rounded rectangles

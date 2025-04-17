@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, RefObject, useRef } from 'react';
 import { Track, MIDIBlock } from '../../lib/types';
 import { MidiParser } from '../../lib/MidiParser'; // Import MidiParser
 import TimeManager from '../../lib/TimeManager'; // Import TimeManager type if needed
+import { SelectedWindowType } from '../../store/uiSlice'; // <-- Import SelectedWindowType
 
 // Constants from TrackTimelineView - consider moving these to a shared location if used elsewhere
 const GRID_SNAP = 0.25;
@@ -22,6 +23,7 @@ export interface UseTrackGesturesProps {
   verticalZoom: number;
   pixelsPerBeatBase: number;
   trackHeightBase: number;
+  selectedWindow: SelectedWindowType; // <-- Add selectedWindow prop
 }
 
 export function useTrackGestures({
@@ -39,6 +41,7 @@ export function useTrackGestures({
   verticalZoom,
   pixelsPerBeatBase,
   trackHeightBase,
+  selectedWindow,
 }: UseTrackGesturesProps) {
   // Calculate effective values based on zoom
   const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;
@@ -94,8 +97,9 @@ export function useTrackGestures({
   // Handle key press for delete & escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Delete/Backspace
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBlockId) {
+      // Delete/Backspace (only if timelineView is selected)
+      if (selectedWindow === 'timelineView' && (e.key === 'Delete' || e.key === 'Backspace') && selectedBlockId) {
+        e.preventDefault(); // Prevent browser back navigation on Backspace
         const { track } = findTrackAndBlock(selectedBlockId);
         if (track) {
           removeMidiBlock(track.id, selectedBlockId);
@@ -126,7 +130,8 @@ export function useTrackGestures({
       selectedBlockId, removeMidiBlock, tracks, findTrackAndBlock, selectBlock, // For delete
       showContextMenu, setShowContextMenu, // For context menu close
       dragOperation, setDragOperation, setOriginalDragTrackId, setDragInitialBlockState, // For drag cancel
-      setPendingUpdateBlock, setPendingTargetTrackId // Need setters for drag cancel reset
+      setPendingUpdateBlock, setPendingTargetTrackId, // Need setters for drag cancel reset
+      selectedWindow
   ]);
 
 
