@@ -189,10 +189,19 @@ export const createTrackSlice: StateCreator<
 
             const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
 
+            // Make sure numMeasures is extended if the block is moved outside the current track length
+            const currentNumMeasures = get().numMeasures; // Get current numMeasures from timeSlice
+            const requiredBeats = updatedBlock.endBeat;
+            const requiredMeasures = Math.ceil(requiredBeats / 4); // Calculate measures needed for the block
+
+            if (requiredMeasures > currentNumMeasures) {
+                get().setNumMeasures(requiredMeasures); // Call action from timeSlice
+            }
+
             return {
                 tracks: newTracks,
                 selectedTrack: selections.selectedTrack,
-                selectedBlock: selections.selectedBlock 
+                selectedBlock: selections.selectedBlock
             };
         });
     },

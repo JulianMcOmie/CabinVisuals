@@ -22,6 +22,7 @@ export interface TimeActions {
   pause: () => void;
   stop: () => void;
   setBPM: (bpm: number) => void;
+  setNumMeasures: (measures: number) => void;
   seekTo: (beat: number) => void;
   // --- Loop Actions ---
   toggleLoop: () => void;
@@ -54,7 +55,7 @@ export const createTimeSlice: StateCreator<
   return {
     timeManager,
     currentBeat: 0,
-    numMeasures: timeManager.getNumMeasures(),
+    numMeasures: 8,
     isPlaying: false,
     bpm: 120,
     // --- Loop State Defaults ---
@@ -135,6 +136,9 @@ export const createTimeSlice: StateCreator<
           }
       }
     },
+    setNumMeasures: (measures: number) => {
+        set({ numMeasures: Math.max(1, measures) });
+    },
     seekTo: (beat: number) => {
       const { audioManager, isPlaying, isAudioLoaded } = get();
       const targetTime = timeManager.beatToTime(beat);
@@ -157,11 +161,14 @@ export const createTimeSlice: StateCreator<
       set((state) => ({ loopEnabled: !state.loopEnabled }));
     },
     setLoopRange: (startBeat: number, endBeat: number) => {
-       // Ensure start is less than or equal to end
-       const validStart = Math.min(startBeat, endBeat);
-       const validEnd = Math.max(startBeat, endBeat);
-       
-       set({ loopStartBeat: validStart, loopEndBeat: validEnd, loopEnabled: true }); // Enable loop when range is set
+       const validStart = Math.max(0, Math.min(startBeat, endBeat));
+       const validEnd = Math.max(validStart, endBeat);
+       const maxBeat = get().numMeasures * 4;
+
+       const clampedStart = Math.min(validStart, maxBeat);
+       const clampedEnd = Math.min(validEnd, maxBeat);
+
+       set({ loopStartBeat: clampedStart, loopEndBeat: clampedEnd, loopEnabled: true });
     },
     clearLoop: () => {
       set({ loopStartBeat: null, loopEndBeat: null, loopEnabled: false });
