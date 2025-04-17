@@ -1,7 +1,5 @@
 import { MIDIBlock, MIDINote } from '../../../lib/types';
 import { 
-  PIXELS_PER_BEAT,
-  PIXELS_PER_SEMITONE,
   KEY_COUNT,
   LOWEST_NOTE 
 } from './constants';
@@ -17,7 +15,9 @@ export const handleNoteClick = (
   selectedNoteIds: string[],
   shiftKey: boolean,
   x: number,
-  y: number
+  y: number,
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): {
   selectedIds: string[],
   selectedNotes: MIDINote[],
@@ -60,8 +60,8 @@ export const handleNoteClick = (
   }
   
   // Calculate click offset within the note for smooth dragging (only needed for move operation)
-  const noteX = note.startBeat * PIXELS_PER_BEAT;
-  const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
+  const noteX = note.startBeat * pixelsPerBeat;
+  const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * pixelsPerSemitone;
   const clickOffset = { x: x - noteX, y: y - noteY };
   
   return {
@@ -81,7 +81,9 @@ export const handleSelectionBoxComplete = (
   selectionBox: { startX: number, startY: number, endX: number, endY: number },
   selectedNoteIds: string[],
   isDragging: boolean,
-  coords: { beat: number, pitch: number }
+  coords: { beat: number, pitch: number },
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): {
   action: 'create-note' | 'selection',
   newNote?: MIDINote,
@@ -98,7 +100,7 @@ export const handleSelectionBoxComplete = (
     
     // Create a new note
     const blockDuration = block.endBeat - block.startBeat;
-    const newNote = createNewNote(block.id, beat, pitch, blockDuration);
+    const newNote = createNewNote(block.id, beat - block.startBeat, pitch, blockDuration);
     
     if (newNote) {
       return {
@@ -117,7 +119,7 @@ export const handleSelectionBoxComplete = (
   } else {
     // Process notes inside selection box with shift key state
     const addToExistingSelection = selectedNoteIds.length > 0;
-    const selection = processSelectionBoxNotes(block, selectionBox, selectedNoteIds, addToExistingSelection);
+    const selection = processSelectionBoxNotes(block, selectionBox, selectedNoteIds, addToExistingSelection, pixelsPerBeat, pixelsPerSemitone);
     
     return {
       action: 'selection',

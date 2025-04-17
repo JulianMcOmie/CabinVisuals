@@ -11,8 +11,11 @@ import {
  * Checks if a note is within the boundaries of a selection box
  */
 export const isNoteInSelectionBox = (
+  blockStartBeat: number,
   note: MIDINote,
-  selectionBox: { startX: number, startY: number, endX: number, endY: number }
+  selectionBox: { startX: number, startY: number, endX: number, endY: number },
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): boolean => {
   // Get normalized selection box coordinates
   const left = Math.min(selectionBox.startX, selectionBox.endX);
@@ -21,10 +24,10 @@ export const isNoteInSelectionBox = (
   const bottom = Math.max(selectionBox.startY, selectionBox.endY);
   
   // Calculate note positions in pixels
-  const noteLeft = note.startBeat * PIXELS_PER_BEAT;
-  const noteRight = (note.startBeat + note.duration) * PIXELS_PER_BEAT;
-  const noteTop = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
-  const noteBottom = noteTop + PIXELS_PER_SEMITONE;
+  const noteLeft = (blockStartBeat + note.startBeat) * pixelsPerBeat;
+  const noteRight = (blockStartBeat + note.startBeat + note.duration) * pixelsPerBeat;
+  const noteTop = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * pixelsPerSemitone;
+  const noteBottom = noteTop + pixelsPerSemitone;
   
   // Check if the note intersects with the selection box
   return !(
@@ -47,7 +50,9 @@ export const generateNoteId = (blockId?: string): string => {
  */
 export const getCoordsFromEvent = (
   e: MouseEvent | React.MouseEvent,
-  canvasRef: React.RefObject<HTMLCanvasElement | null>
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): { x: number, y: number, beat: number, pitch: number } | null => {
   const canvas = canvasRef.current;
   if (!canvas) return null;
@@ -57,8 +62,8 @@ export const getCoordsFromEvent = (
   const y = e.clientY - rect.top;
   
   // Calculate beat and pitch
-  const beat = (x / PIXELS_PER_BEAT);
-  const pitch = KEY_COUNT - Math.floor(y / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
+  const beat = (x / pixelsPerBeat);
+  const pitch = KEY_COUNT - Math.floor(y / pixelsPerSemitone) - 1 + LOWEST_NOTE;
   
   return { x, y, beat, pitch };
 };
@@ -70,7 +75,11 @@ export const findNoteAt = (
   x: number, 
   y: number, 
   notes: MIDINote[], 
-  selectedNoteIds: string[]
+  selectedNoteIds: string[],
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number,
+  blockStartBeat: number,
+  blockDuration: number
 ): { note: MIDINote, area: 'start' | 'end' | 'body' } | null => {
   // First check if any selected note was clicked (prioritize selected notes)
   if (selectedNoteIds.length > 0) {
@@ -78,10 +87,10 @@ export const findNoteAt = (
       const note = notes.find(n => n.id === noteId);
       if (!note) continue;
       
-      const noteX = note.startBeat * PIXELS_PER_BEAT;
-      const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
-      const noteWidth = note.duration * PIXELS_PER_BEAT;
-      const noteHeight = PIXELS_PER_SEMITONE;
+      const noteX = (blockStartBeat + note.startBeat - 1) * pixelsPerBeat;
+      const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * pixelsPerSemitone;
+      const noteWidth = note.duration * pixelsPerBeat;
+      const noteHeight = pixelsPerSemitone;
       
       if (
         x >= noteX && 
@@ -102,10 +111,10 @@ export const findNoteAt = (
   
   // If no selected note was clicked, check all notes
   for (const note of notes) {
-    const noteX = note.startBeat * PIXELS_PER_BEAT;
-    const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
-    const noteWidth = note.duration * PIXELS_PER_BEAT;
-    const noteHeight = PIXELS_PER_SEMITONE;
+    const noteX = (blockStartBeat + note.startBeat) * pixelsPerBeat;
+    const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * pixelsPerSemitone;
+    const noteWidth = note.duration * pixelsPerBeat;
+    const noteHeight = pixelsPerSemitone;
     
     if (
       x >= noteX && 

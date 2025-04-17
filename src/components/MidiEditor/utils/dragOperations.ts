@@ -1,10 +1,10 @@
 import { MIDIBlock, MIDINote } from '../../../lib/types';
 import { 
-  PIXELS_PER_BEAT,
-  PIXELS_PER_SEMITONE,
   GRID_SNAP,
   KEY_COUNT,
-  LOWEST_NOTE 
+  LOWEST_NOTE,
+  PIXELS_PER_BEAT,
+  PIXELS_PER_SEMITONE
 } from './constants';
 import { duplicateNotes, moveSelectedNotes, resizeNotesFromStart, resizeNotesFromEnd } from './noteOperations';
 
@@ -53,7 +53,9 @@ export const handleDragMove = (
   coords: { x: number, y: number },
   clickOffset: { x: number, y: number },
   dragStart: { x: number, y: number },
-  initialDragStates: Map<string, { startBeat: number, duration: number }>
+  initialDragStates: Map<string, { startBeat: number, duration: number }>,
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): MIDIBlock => {
   // Get the primary note being dragged
   const primaryNoteIndex = block.notes.findIndex(note => note.id === dragNoteId);
@@ -67,8 +69,8 @@ export const handleDragMove = (
     const targetY = y - clickOffset.y;
     
     // Convert to beat and pitch, with snapping
-    const targetBeat = Math.round(targetX / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
-    const targetPitch = KEY_COUNT - Math.floor(targetY / PIXELS_PER_SEMITONE) - 1 + LOWEST_NOTE;
+    const targetBeat = Math.round(targetX / pixelsPerBeat / GRID_SNAP) * GRID_SNAP;
+    const targetPitch = KEY_COUNT - Math.floor(targetY / pixelsPerSemitone) - 1 + LOWEST_NOTE;
     
     // Calculate the delta from primary note's original position
     const beatDelta = targetBeat - primaryNote.startBeat;
@@ -85,7 +87,7 @@ export const handleDragMove = (
 
     // Resize note from its start edge
     const dx = coords.x - dragStart.x;
-    const deltaBeats = Math.round(dx / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
+    const deltaBeats = Math.round(dx / pixelsPerBeat / GRID_SNAP) * GRID_SNAP;
     
     return resizeNotesFromStart(block, selectedNoteIds, deltaBeats, initialDragStates);
   } else if (dragOperation === 'end' && dragNoteId) {
@@ -94,7 +96,7 @@ export const handleDragMove = (
 
     // Resize note from its end edge
     const dx = coords.x - dragStart.x;
-    let deltaBeats = Math.round(dx / PIXELS_PER_BEAT / GRID_SNAP) * GRID_SNAP;
+    let deltaBeats = Math.round(dx / pixelsPerBeat / GRID_SNAP) * GRID_SNAP;
     
     return resizeNotesFromEnd(block, selectedNoteIds, deltaBeats, initialDragStates);
   }

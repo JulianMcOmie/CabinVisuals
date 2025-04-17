@@ -16,6 +16,7 @@ import {
   DragOperation,
   CursorType,
   SelectionBox,
+  BEATS_PER_MEASURE,
 } from './utils/constants';
 
 import {
@@ -45,9 +46,12 @@ interface MidiEditorProps {
 }
 
 function MidiEditor({ block, track }: MidiEditorProps) {
-  const { updateMidiBlock, selectNotes: storeSelectNotes } = useStore();
+  const { updateMidiBlock, selectNotes: storeSelectNotes, numMeasures } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const editorWidth = editorRef.current?.clientWidth || 800; // Default width if ref not available
+  const editorHeight = editorRef.current?.clientHeight || KEY_COUNT * PIXELS_PER_SEMITONE; // Default height if ref not available
   
   // State for drag operations
   const [dragOperation, setDragOperation] = useState<DragOperation>('none');
@@ -61,17 +65,22 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // Selection related state
   const [selectionBox, setSelectionBox] = useState<SelectionBox>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+
+  const [scrollX, setScrollX] = useState(0);
+  const [scrollY, setScrollY] = useState(0);
+  const [zoomX, setZoomX] = useState(1);
+  const [zoomY, setZoomY] = useState(1);
+  const [pixelsPerBeat, setPixelsPerBeat] = useState(editorWidth / (numMeasures * BEATS_PER_MEASURE));
+  const [pixelsPerSemitone, setPixelsPerSemitone] = useState(PIXELS_PER_SEMITONE);
   
   // Copy/paste related state
   const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
 
+
   const blockDuration = block.endBeat - block.startBeat;
-  const editorWidth = editorRef.current?.clientWidth || 800; // Default width if ref not available
-  const editorHeight = editorRef.current?.clientHeight || KEY_COUNT * PIXELS_PER_SEMITONE; // Default height if ref not available
-
-  const blockWidth = blockDuration * PIXELS_PER_BEAT;
-  const blockHeight = KEY_COUNT * PIXELS_PER_SEMITONE;
-
+  const blockWidth = blockDuration * pixelsPerBeat;
+  const blockHeight = KEY_COUNT * pixelsPerSemitone;
+  const blockStartBeat = block.startBeat;
   // Draw canvas using our extracted drawing function
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -95,26 +104,44 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       blockWidth,
       blockHeight,
       blockDuration,
+      blockStartBeat,
       selectionBox,
-      isDragging
+      isDragging,
+      pixelsPerBeat,
+      pixelsPerSemitone
     );
   }, [block.notes, blockDuration, editorWidth, editorHeight, selectionBox, isDragging, selectedNoteIds]);
 
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCoordsFromEvent(e, canvasRef);
+    const coords = getCoordsFromEvent(
+      e,
+      canvasRef,
+      pixelsPerBeat,
+      pixelsPerSemitone
+    );
+
     if (!coords) return;
     
     const { x, y, beat, pitch } = coords;
-    const clickResult = findNoteAt(x, y, block.notes, selectedNoteIds);
+    const noteClickResult = findNoteAt(
+      x,
+      y,
+      block.notes,
+      selectedNoteIds,
+      pixelsPerBeat,
+      pixelsPerSemitone,
+      blockStartBeat,
+      blockDuration
+    );
     
     setIsDragging(false);
-    setDragStart({ x: e.clientX, y: e.clientY });
+    setDragStart({ x: coords.x, y: coords.y });
     
-    if (clickResult) {
+    if (noteClickResult) {
       // Clicked on a note
       e.stopPropagation();
-      const { note, area } = clickResult;
+      const { note, area } = noteClickResult;
       
       // Use the utility function to handle note click
       const { 
@@ -130,7 +157,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         selectedNoteIds, 
         e.shiftKey, 
         x, 
-        y
+        y,
+        pixelsPerBeat,
+        pixelsPerSemitone
       );
       
       // Update state based on results from utility function
@@ -197,7 +226,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     if (dragOperation === 'select') {
       // Handle selection box completion
       if (selectionBox) {
-        const coords = getCoordsFromEvent(e, canvasRef);
+        const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
         if (!coords) {
           setDragOperation('none');
           setSelectionBox(null);
@@ -209,7 +238,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           selectionBox,
           e.shiftKey ? selectedNoteIds : [],
           isDragging,
-          coords
+          coords,
+          pixelsPerBeat,
+          pixelsPerSemitone
         );
         
         if (action === 'create-note' && newNote) {
@@ -241,10 +272,10 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     
-    const coords = getCoordsFromEvent(e, canvasRef);
+    const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
     if (!coords) return;
     
-    const result = findNoteAt(coords.x, coords.y, block.notes, selectedNoteIds);
+    const result = findNoteAt(coords.x, coords.y, block.notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat, blockDuration);
     if (result) {
       // Found a note, delete it using the utility function
       const updatedBlock = handleContextMenuOnNote(block, result.note.id);
@@ -254,13 +285,13 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   
   // Modified canvasMouseMove to handle selection box updates
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCoordsFromEvent(e, canvasRef);
+    const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
     if (!coords) {
       setHoverCursor('default');
       return;
     }
     
-    const { x, y } = coords;
+    const { x, y, beat, pitch } = coords;
     
     // Update selection box if in select mode
     if (dragOperation === 'select' && selectionBox) {
@@ -282,7 +313,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     if (dragOperation !== 'none') return;
     
     // Handle hover cursor
-    const cursorResult = findNoteAt(x, y, block.notes, selectedNoteIds);
+    const cursorResult = findNoteAt(x, y, block.notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat, blockDuration);
     
     if (cursorResult) {
       // Cursor is over a note, set the appropriate cursor style
@@ -304,7 +335,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     const handleMouseMove = (e: MouseEvent) => {
       // Handle selection box updates
       if (dragOperation === 'select' && selectionBox) {
-        const coords = getCoordsFromEvent(e, canvasRef);
+        const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
         if (!coords) return;
         
         // Update selection box
@@ -351,7 +382,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         }
       }
       
-      const coords = getCoordsFromEvent(e, canvasRef);
+      const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
       if (!coords) return;
       
       // Use utility function to handle drag movement
@@ -364,7 +395,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           coords,
           clickOffset,
           dragStart,
-          initialDragStates
+          initialDragStates,
+          pixelsPerBeat,
+          pixelsPerSemitone
         );
         
         // Only update if the block has changed
@@ -433,7 +466,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
             <PianoRollHeader 
               startBeat={block.startBeat} 
               endBeat={block.endBeat} 
-              pixelsPerBeat={PIXELS_PER_BEAT} 
+              pixelsPerBeat={pixelsPerBeat} 
             />
           </div>
         </div>
@@ -441,7 +474,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           <div className="piano-keys">
             <PianoKeys 
               keyCount={KEY_COUNT} 
-              keyHeight={PIXELS_PER_SEMITONE} 
+              keyHeight={pixelsPerSemitone} 
             />
           </div>
           <div 

@@ -29,7 +29,7 @@ function PianoRollHeader({
         
         // Only show labels for measure starts and visible area
         return (
-          <div 
+          <div
             key={`beat-${beat}`}
             style={{
               position: 'absolute',
@@ -41,7 +41,7 @@ function PianoRollHeader({
               pointerEvents: 'none'
             }}
           >
-            {isMeasureStart ? Math.floor(beat / 4) + 1 : beat % 4 + 1}
+            {/* {isMeasureStart ? Math.floor(beat / 4) + 1 : beat % 4 + 1} */}
           </div>
         );
       })}
@@ -53,7 +53,7 @@ function PianoRollHeader({
         const isMeasureStart = i % 16 === 0;
         
         return (
-          <div 
+          <div
             key={`tick-${i}`}
             style={{
               position: 'absolute',

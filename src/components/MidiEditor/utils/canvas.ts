@@ -1,7 +1,5 @@
 import { MIDINote } from '../../../lib/types';
 import {
-  PIXELS_PER_BEAT,
-  PIXELS_PER_SEMITONE,
   KEY_COUNT,
   LOWEST_NOTE,
   NOTE_COLOR,
@@ -24,19 +22,22 @@ export const drawMidiEditor = (
   blockWidth: number,
   blockHeight: number,
   blockDuration: number,
+  blockStartBeat: number,
   selectionBox: SelectionBox,
-  isDragging: boolean
+  isDragging: boolean,
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): void => {
   ctx.clearRect(0, 0, editorWidth, editorHeight);
   
   // Draw grid
-  drawGrid(ctx, editorWidth, editorHeight, blockDuration);
+  drawGrid(ctx, editorWidth, editorHeight, blockDuration, pixelsPerBeat, pixelsPerSemitone);
 
   // Draw block box
-  drawBlockBox(ctx, blockWidth, blockHeight);
+  drawBlockBox(ctx, blockDuration, blockHeight, blockStartBeat, pixelsPerBeat);
   
   // Draw notes
-  drawNotes(ctx, notes, selectedNoteIds);
+  drawNotes(ctx, notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat);
   
   // Draw selection box if active
   if (selectionBox && isDragging) {
@@ -51,11 +52,13 @@ const drawGrid = (
   ctx: CanvasRenderingContext2D,
   editorWidth: number,
   editorHeight: number,
-  blockDuration: number
+  blockDuration: number,
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): void => {
   // Draw horizontal lines (pitch)
   for (let i = 0; i <= KEY_COUNT; i++) {
-    const y = i * PIXELS_PER_SEMITONE;
+    const y = i * pixelsPerSemitone;
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(editorWidth, y);
@@ -73,8 +76,8 @@ const drawGrid = (
   }
   
   // Draw vertical lines (beats)
-  for (let i = 0; i <= Math.ceil(editorWidth / (GRID_SNAP * PIXELS_PER_BEAT)); i++) {
-    const x = i * GRID_SNAP * PIXELS_PER_BEAT;
+  for (let i = 0; i <= Math.ceil(editorWidth / (GRID_SNAP * pixelsPerBeat)); i++) {
+    const x = i * GRID_SNAP * pixelsPerBeat;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, editorHeight);
@@ -100,13 +103,15 @@ const drawGrid = (
  */
 const drawBlockBox = (
   ctx: CanvasRenderingContext2D,
-  editorWidth: number,
-  editorHeight: number
+  blockDuration: number,
+  blockHeight: number,
+  blockStartBeat: number,
+  pixelsPerBeat: number
 ): void => {
   // Draw block box
   ctx.strokeStyle = '#00FF00'; // Green color
   ctx.lineWidth = 3;
-  ctx.strokeRect(0, 0, editorWidth, editorHeight);
+  ctx.strokeRect(blockStartBeat * pixelsPerBeat, 0, blockDuration * pixelsPerBeat, blockHeight);
 };
 
 /**
@@ -115,13 +120,16 @@ const drawBlockBox = (
 const drawNotes = (
   ctx: CanvasRenderingContext2D,
   notes: MIDINote[],
-  selectedNoteIds: string[]
+  selectedNoteIds: string[],
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number,
+  blockStartBeat: number
 ): void => {
   notes.forEach(note => {
-    const noteX = note.startBeat * PIXELS_PER_BEAT;
-    const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * PIXELS_PER_SEMITONE;
-    const noteWidth = note.duration * PIXELS_PER_BEAT;
-    const noteHeight = PIXELS_PER_SEMITONE;
+    const noteX = (note.startBeat + blockStartBeat) * pixelsPerBeat;
+    const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * pixelsPerSemitone;
+    const noteWidth = note.duration * pixelsPerBeat;
+    const noteHeight = pixelsPerSemitone;
     
     // Set color based on selection state
     const isSelected = selectedNoteIds.includes(note.id);

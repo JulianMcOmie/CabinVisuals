@@ -1,6 +1,7 @@
 // Constants for MIDI Editor
 export const PIXELS_PER_BEAT = 50; // Greater detail than timeline view
 export const PIXELS_PER_SEMITONE = 16; // Height of each piano key
+export const BEATS_PER_MEASURE = 4;
 export const GRID_SNAP = 0.25; // Snap to 1/4 beat
 export const KEY_COUNT = 88; // 88 piano keys (A0 to C8)
 export const LOWEST_NOTE = 21; // A0 MIDI note number

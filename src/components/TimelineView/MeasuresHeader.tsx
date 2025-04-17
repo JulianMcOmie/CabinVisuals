@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import useStore from '../../store/store';
+import { BEATS_PER_MEASURE } from '../MidiEditor/utils/constants';
 
 function MeasuresHeader() {
   const { seekTo, numMeasures } = useStore();
@@ -10,13 +11,12 @@ function MeasuresHeader() {
   const [isDragging, setIsDragging] = useState(false);
 
   const pixelsPerMeasure = 400;
-  const beatsPerMeasure = 4;
 
   // Function to calculate beat from mouse X position relative to the overlay
   const calculateBeatFromX = (mouseX: number): number => {
-    const clickedBeat = (mouseX / pixelsPerMeasure) * beatsPerMeasure;
+    const clickedBeat = (mouseX / pixelsPerMeasure) * BEATS_PER_MEASURE;
     // Ensure beat is within valid range (0 to total beats)
-    const totalBeats = numMeasures * beatsPerMeasure;
+    const totalBeats = numMeasures * BEATS_PER_MEASURE;
     return Math.max(0, Math.min(clickedBeat, totalBeats));
   };
 

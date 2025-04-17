@@ -266,14 +266,16 @@ export const processSelectionBoxNotes = (
   block: MIDIBlock,
   selectionBox: { startX: number, startY: number, endX: number, endY: number },
   currentSelectedIds: string[],
-  addToSelection: boolean = false
+  addToSelection: boolean = false,
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): {
   selectedIds: string[],
   selectedNotes: MIDINote[]
 } => {
   // Find notes that intersect with the selection box
   const notesInSelection = block.notes.filter(note => 
-    isNoteInSelectionBox(note, selectionBox)
+    isNoteInSelectionBox(block.startBeat, note, selectionBox, pixelsPerBeat, pixelsPerSemitone)
   );
   
   let newSelectedIds: string[];
