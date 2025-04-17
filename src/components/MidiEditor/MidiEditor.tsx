@@ -48,7 +48,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const { 
     updateMidiBlock, 
     selectNotes: storeSelectNotes, 
-    setSelectedWindow
+    setSelectedWindow,
+    selectedWindow
   } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -389,6 +390,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     };
     
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle keyboard shortcuts if this window is selected
+      if (selectedWindow !== 'midiEditor') return;
+
       // Use the handler from keyboardHandlers.ts
       handleKeyboardShortcuts(
         e,
@@ -428,7 +432,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     isDragging,
     clickOffset,
     copiedNotes,
-    setCopiedNotes
+    setCopiedNotes,
+    selectedWindow
   ]);
 
   const handleEditorClick = () => {

@@ -26,7 +26,8 @@ function TimelineView() {
     addTrack, 
     selectTrack, 
     seekTo, 
-    setSelectedWindow
+    setSelectedWindow,
+    selectedWindow
   } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -190,7 +191,15 @@ function TimelineView() {
     <div 
       className="timeline-view" 
       onClick={handleTimelineClick}
-      style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+      style={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+        border: selectedWindow === 'timelineView' 
+          ? '2px solid rgba(255, 255, 255, 0.3)'
+          : '2px solid transparent'
+      }}
     >
       {/* Timeline container */}
       <div className="timeline-container" style={{ 
