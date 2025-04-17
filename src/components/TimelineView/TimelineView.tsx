@@ -112,27 +112,31 @@ function TimelineView() {
     if (event.altKey) {
       event.preventDefault(); // Prevent default scroll behavior when zooming
 
-      // Determine zoom direction and update state
-      const zoomFactor = 1.1;
+      // Vertical Zoom (unchanged - multiplicative)
+      const verticalZoomFactor = 1.1;
       if (event.deltaY < 0) {
         // Zoom in vertically
-        setVerticalZoom(prev => Math.min(prev * zoomFactor, 10)); // Max zoom 10x
+        setVerticalZoom(prev => Math.min(prev * verticalZoomFactor, 10)); // Max zoom 10x
       } else if (event.deltaY > 0) {
         // Zoom out vertically
-        setVerticalZoom(prev => Math.max(prev / zoomFactor, 0.1)); // Min zoom 0.1x
+        setVerticalZoom(prev => Math.max(prev / verticalZoomFactor, 0.1)); // Min zoom 0.1x
       }
 
-      // Note: Using deltaY for horizontal zoom might feel more natural on touchpads
-      if (event.deltaX < 0) {
-        // Zoom in horizontally (scrolling left)
-        setHorizontalZoom(prev => Math.min(prev * zoomFactor, 10));
-      } else if (event.deltaX > 0) {
-        // Zoom out horizontally (scrolling right)
-        setHorizontalZoom(prev => Math.max(prev / zoomFactor, 0.1));
+      // Horizontal Zoom (changed - linear step based on deltaX)
+      if (event.deltaX !== 0) {
+        // Define a sensitivity factor for horizontal zoom adjustment
+        const horizontalZoomSensitivity = 0.005; // Adjust this value for desired speed
+        // Calculate the change in zoom based on deltaX
+        // Negative deltaX (scroll left/up) zooms in (increases zoom value)
+        // Positive deltaX (scroll right/down) zooms out (decreases zoom value)
+        const deltaZoom = -event.deltaX * horizontalZoomSensitivity;
+
+        // Update horizontal zoom additively, clamping between min/max values
+        setHorizontalZoom(prev => Math.max(0.1, Math.min(prev + deltaZoom, 10)));
       }
     }
     // Allow normal scrolling if Alt key is not pressed
-  }, []);
+  }, []); // Dependencies remain empty as sensitivity is constant
 
   // Attach wheel listener to the timeline content area
   useEffect(() => {
@@ -217,14 +221,17 @@ function TimelineView() {
           }} />
           
           {/* Measures header - sticky at top */}
-          <div style={{ 
-            position: 'sticky', 
-            top: 0, 
+          <div style={{
+            position: 'sticky',
+            top: 0,
             paddingLeft: '200px', // Space for instrument column
             zIndex: 2,
             backgroundColor: HEADER_BG_COLOR
           }}>
-            <MeasuresHeader />
+            <MeasuresHeader
+              horizontalZoom={horizontalZoom}
+              pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
+            />
           </div>
           
           {/* Combined content area for instruments and timelines */}
