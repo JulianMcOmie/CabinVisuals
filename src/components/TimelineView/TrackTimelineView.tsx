@@ -117,7 +117,6 @@ function TrackTimelineView({
     trackTopY: number,
     isSelected: boolean,
     alpha: number, // Alpha transparency (0 to 1)
-    isGhost: boolean = false // Optional flag for ghost-specific styling (e.g., dashed line)
   ) => {
       // Use passed-in blockData instead of block from closure
       const leftPosition = blockData.startBeat * effectivePixelsPerBeat;
@@ -134,37 +133,29 @@ function TrackTimelineView({
       ctx.fillStyle = '#4a90e2';
       ctx.fill();
 
-      // Stroke border
-      if (isSelected && !isGhost) { // Only show solid selection border on non-ghost blocks
-          ctx.strokeStyle = 'white';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([]); // Ensure solid line
-          ctx.stroke();
-      } else if (isGhost) { // Dashed border for ghost block
-          ctx.strokeStyle = 'white';
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([4, 4]);
-          ctx.stroke();
+      if (isSelected) {
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]); // Ensure solid line
+        ctx.stroke();
       }
 
       // Draw block text
-      if (!isGhost) {
-          ctx.fillStyle = 'white';
-          // Adjust font size if needed based on DPR or zoom
-          const baseFontSize = 12;
-          ctx.font = `bold ${baseFontSize * (window.devicePixelRatio || 1)}px sans-serif`; 
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'middle';
-          const text = `${blockData.notes.length} notes`;
-          const textX = leftPosition + EDGE_RESIZE_WIDTH + 4;
-          const textY = trackTopY + effectiveTrackHeight / 2;
+      ctx.fillStyle = 'white';
+      // Adjust font size if needed based on DPR or zoom
+      const baseFontSize = 12;
+      ctx.font = `bold ${baseFontSize * (window.devicePixelRatio || 1)}px sans-serif`; 
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const text = `${blockData.notes.length} notes`;
+      const textX = leftPosition + EDGE_RESIZE_WIDTH + 4;
+      const textY = trackTopY + effectiveTrackHeight / 2;
 
-          // Simple rectangular clipping for text
-          ctx.beginPath(); // Start a new path for clipping
-          ctx.rect(textX - 4, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 1.5, effectiveTrackHeight); 
-          ctx.clip();
-          ctx.fillText(text, textX, textY);
-      }
+      // Simple rectangular clipping for text
+      ctx.beginPath(); // Start a new path for clipping
+      ctx.rect(textX - 4, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 1.5, effectiveTrackHeight); 
+      ctx.clip();
+      ctx.fillText(text, textX, textY);
 
       // Restore context state (removes clipping and resets globalAlpha/lineDash)
       ctx.restore();
@@ -175,7 +166,6 @@ function TrackTimelineView({
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
-    console.log('canvas', canvas);
     if (!canvas || !context) return;
 
     const dpr = window.devicePixelRatio || 1; // Get Device Pixel Ratio
@@ -198,7 +188,6 @@ function TrackTimelineView({
     // Clear canvas (using base dimensions)
     context.fillStyle = '#222';
     context.fillRect(0, 0, baseCanvasWidth, baseCanvasHeight);
-    console.log('canvas.width (scaled)', baseCanvasWidth);
 
     // Draw Grid Lines (up to renderMeasures)
     context.lineWidth = 1; // Note: lineWidth might appear thinner due to scaling
@@ -251,7 +240,6 @@ function TrackTimelineView({
             trackTopY,
             isSelected,
             isBeingDragged ? DRAGGED_BLOCK_OPACITY : 1, // Calculated alpha
-            false // Not a ghost block
         );
       });
     });
@@ -274,9 +262,8 @@ function TrackTimelineView({
                 context,
                 pendingUpdateBlock, // Pending block data
                 targetTrackTopY,    // Target track Y position
-                false,              // Ghost block is never selected visually
+                true,              // Ghost block is never selected visually
                 DRAGGED_BLOCK_OPACITY, // Alpha for ghost block
-                true                // Indicate it's a ghost block for styling
             );
         }
     }
@@ -308,6 +295,11 @@ function TrackTimelineView({
 
   // Canvas Event Handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Only proceed if the left mouse button was pressed
+    if (e.button !== 0) {
+        return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();

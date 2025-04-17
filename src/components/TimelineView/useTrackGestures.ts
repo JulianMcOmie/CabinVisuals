@@ -47,10 +47,21 @@ export function useTrackGestures({
   const [dragOperation, setDragOperation] = useState<'none' | 'start' | 'end' | 'move'>('none');
   const [dragStartX, setDragStartX] = useState(0);
   const [originalDragTrackId, setOriginalDragTrackId] = useState<string | null>(null);
-
   const [dragInitialBlockState, setDragInitialBlockState] = useState<MIDIBlock | null>(null);
+  
+  // State for visual feedback during drag
   const [pendingUpdateBlock, setPendingUpdateBlock] = useState<MIDIBlock | null>(null);
   const [pendingTargetTrackId, setPendingTargetTrackId] = useState<string | null>(null);
+
+  // Refs to hold the latest pending state for use in stable event handlers
+  const pendingUpdateBlockRef = useRef<MIDIBlock | null>(null);
+  const pendingTargetTrackIdRef = useRef<string | null>(null);
+
+  // Update refs whenever pending state changes (outside the main mouse handler effect)
+  useEffect(() => {
+      pendingUpdateBlockRef.current = pendingUpdateBlock;
+      pendingTargetTrackIdRef.current = pendingTargetTrackId;
+  }, [pendingUpdateBlock, pendingTargetTrackId]);
 
   // State for context menu
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -91,93 +102,108 @@ export function useTrackGestures({
           selectBlock(null);
         }
       }
-      // Escape key to close context menu
+      // Escape key: close context menu or cancel drag
       if (e.key === 'Escape') {
-        setShowContextMenu(false);
+        if (showContextMenu) {
+          setShowContextMenu(false);
+        }
+        // If a drag is in progress, Escape cancels it
+        if (dragOperation !== 'none') {
+          setDragOperation('none');
+          setOriginalDragTrackId(null);
+          setDragInitialBlockState(null);
+          // Reset pending state for visual feedback
+          setPendingUpdateBlock(null);
+          setPendingTargetTrackId(null);
+          // Refs will be updated by their own effect
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+      selectedBlockId, removeMidiBlock, tracks, findTrackAndBlock, selectBlock, // For delete
+      showContextMenu, setShowContextMenu, // For context menu close
+      dragOperation, setDragOperation, setOriginalDragTrackId, setDragInitialBlockState, // For drag cancel
+      setPendingUpdateBlock, setPendingTargetTrackId // Need setters for drag cancel reset
+  ]);
 
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [selectedBlockId, removeMidiBlock, tracks, findTrackAndBlock, selectBlock]);
 
   // Handle click outside context menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Basic check if click is outside menu - improve if menu contains complex elements
       const target = event.target as HTMLElement;
-      if (showContextMenu && !target.closest('.context-menu-class')) { // Add a class to your context menu div
+      if (showContextMenu && !target.closest('.context-menu-class')) {
          setShowContextMenu(false);
       }
     };
-
     window.addEventListener('click', handleClickOutside);
-    return () => {
-      window.removeEventListener('click', handleClickOutside);
-    };
-  }, [showContextMenu]); // Only depends on showContextMenu
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [showContextMenu]);
 
-  // Handle mouse up and move for drag operations
+  // --- Effect for handling mouse drag listeners --- 
   useEffect(() => {
+    // Define handlers within the effect closure
+
     const handleMouseUp = () => {
-      // Apply pending update only if a drag was active and there's a pending block
-      if (dragOperation !== 'none' && pendingUpdateBlock && originalDragTrackId) {
-         // Apply the pending update based on the operation type
-         if (dragOperation === 'move' && pendingTargetTrackId && pendingTargetTrackId !== originalDragTrackId) {
-             moveMidiBlock(originalDragTrackId, pendingTargetTrackId, pendingUpdateBlock);
+      // Read the latest pending state from REFS
+      const finalPendingBlock = pendingUpdateBlockRef.current;
+      const finalTargetTrackId = pendingTargetTrackIdRef.current;
+
+      // Apply update only if drag was active and we have final state
+      if (dragOperation !== 'none' && finalPendingBlock && originalDragTrackId) {
+         if (dragOperation === 'move' && finalTargetTrackId && finalTargetTrackId !== originalDragTrackId) {
+             moveMidiBlock(originalDragTrackId, finalTargetTrackId, finalPendingBlock);
          } else {
-             updateMidiBlock(originalDragTrackId, pendingUpdateBlock);
+             updateMidiBlock(originalDragTrackId, finalPendingBlock);
          }
       }
+
       // Reset drag states
       setDragOperation('none');
       setOriginalDragTrackId(null);
-      setDragInitialBlockState(null); // Reset initial block state
-      setPendingUpdateBlock(null);
+      setDragInitialBlockState(null);
+      setPendingUpdateBlock(null); // Reset visual state
       setPendingTargetTrackId(null);
-      setDragStartX(0); // Reset start X
+      setDragStartX(0);
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-       // Only proceed if a drag is active and we have the initial block state
-      if (dragOperation === 'none' || !dragInitialBlockState || !originalDragTrackId || !timelineAreaRef.current) return;
+      // Guard clauses using state read directly (these trigger the effect correctly)
+      if (dragOperation === 'none' || !dragInitialBlockState || !originalDragTrackId || !timelineAreaRef.current) {
+        return;
+      }
 
-      // Get the original block state directly
+      // Get the initial block state directly from state
       const originalBlock = dragInitialBlockState;
 
       const timelineAreaRect = timelineAreaRef.current.getBoundingClientRect();
       if (!timelineAreaRect) return;
 
+      // Calculations based on current event and initial state
       const currentX = e.clientX;
       const currentY = e.clientY - timelineAreaRect.top;
       const deltaX = currentX - dragStartX;
       const deltaBeat = Math.round(deltaX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP;
 
-      // Create a temporary block based on the *original* block's state
       let tempBlock = { ...originalBlock };
       let newStartBeat: number | undefined;
       let newEndBeat: number | undefined;
-      let tempTargetTrackId = originalDragTrackId; // Start with original track
+      let tempTargetTrackId = originalDragTrackId;
 
       if (dragOperation === 'start') {
-        // Use the original block's endBeat and startBeat
         newStartBeat = Math.max(0, Math.min(originalBlock.endBeat - GRID_SNAP, originalBlock.startBeat + deltaBeat));
         tempBlock.startBeat = newStartBeat;
       } else if (dragOperation === 'end') {
-        // Use the original block's startBeat and endBeat
         newEndBeat = Math.max(originalBlock.startBeat + GRID_SNAP, originalBlock.endBeat + deltaBeat);
         tempBlock.endBeat = newEndBeat;
       } else if (dragOperation === 'move') {
         const duration = originalBlock.endBeat - originalBlock.startBeat;
-        // Use the original block's startBeat
         newStartBeat = Math.max(0, originalBlock.startBeat + deltaBeat);
         tempBlock.startBeat = newStartBeat;
         tempBlock.endBeat = newStartBeat + duration;
 
-        // Determine target track based on vertical position
         const targetTrackIndex = Math.floor(Math.max(0, currentY) / effectiveTrackHeight);
         const potentialTargetTrack = tracks[targetTrackIndex];
         if (potentialTargetTrack) {
@@ -185,29 +211,42 @@ export function useTrackGestures({
         }
       }
 
-       // Update pending state
+       // Update STATE for visual feedback
        setPendingUpdateBlock(tempBlock);
        setPendingTargetTrackId(tempTargetTrackId);
+       // Refs will be updated by their separate effect
     };
 
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('mousemove', handleMouseMove);
+    // Add listeners only when a drag operation starts
+    if (dragOperation !== 'none') {
+        window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('mousemove', handleMouseMove);
+        // console.log("Adding mouse listeners");
+    }
 
+    // Cleanup function
     return () => {
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('mousemove', handleMouseMove);
+        // console.log("Removing mouse listeners");
     };
   }, [
-      dragOperation, dragStartX, originalDragTrackId, dragInitialBlockState, // Use initial block state here
-      updateMidiBlock, moveMidiBlock,
-      timelineAreaRef,
-      effectivePixelsPerBeat, effectiveTrackHeight,
-      tracks,
-      pendingUpdateBlock, pendingTargetTrackId,
-      setPendingUpdateBlock, setPendingTargetTrackId
+      // Effect runs when drag operation changes or initial state is set/cleared
+      dragOperation, dragStartX, originalDragTrackId, dragInitialBlockState,
+      // Stable dependencies needed by handlers
+      updateMidiBlock, moveMidiBlock, // Store actions
+      timelineAreaRef,               // Ref to timeline area
+      effectivePixelsPerBeat, effectiveTrackHeight, // Calculated geometry
+      tracks,                        // Tracks array (for finding target track)
+      // Setters are needed for resetting state in handleMouseUp
+      setPendingUpdateBlock, setPendingTargetTrackId 
+      // Note: We deliberately OMIT pendingUpdateBlock/pendingTargetTrackId states
+      // and their refs to prevent listener churn. The latest values are accessed
+      // via refs updated in a separate effect.
   ]);
 
-  // Start resizing from the left edge
+
+  // --- Drag Start Handlers (wrapped in useCallback for potential optimization) --- 
   const handleStartEdge = useCallback((trackId: string, blockId: string, clientX: number) => {
     const track = findTrackById(trackId);
     const block = track?.midiBlocks.find(b => b.id === blockId);
@@ -216,14 +255,14 @@ export function useTrackGestures({
     setDragOperation('start');
     setDragStartX(clientX);
     setOriginalDragTrackId(trackId);
-    setDragInitialBlockState({ ...block }); // Store copy of initial block state
-
+    setDragInitialBlockState({ ...block });
+    // Initialize pending state for immediate visual feedback
     setPendingUpdateBlock({ ...block });
     setPendingTargetTrackId(trackId);
     selectBlock(blockId);
-  }, [findTrackById, selectBlock]);
+    // Refs will be updated by their effect
+  }, [findTrackById, selectBlock]); // Dependencies: stable helpers + selectBlock prop
 
-  // Start resizing from the right edge
   const handleEndEdge = useCallback((trackId: string, blockId: string, clientX: number) => {
     const track = findTrackById(trackId);
     const block = track?.midiBlocks.find(b => b.id === blockId);
@@ -233,13 +272,11 @@ export function useTrackGestures({
     setDragStartX(clientX);
     setOriginalDragTrackId(trackId);
     setDragInitialBlockState({ ...block });
-
     setPendingUpdateBlock({ ...block });
     setPendingTargetTrackId(trackId);
     selectBlock(blockId);
   }, [findTrackById, selectBlock]);
 
-  // Start moving the block
   const handleMoveBlock = useCallback((trackId: string, blockId: string, clientX: number) => {
     const track = findTrackById(trackId);
     const block = track?.midiBlocks.find(b => b.id === blockId);
@@ -249,14 +286,14 @@ export function useTrackGestures({
     setDragStartX(clientX);
     setOriginalDragTrackId(trackId);
     setDragInitialBlockState({ ...block });
-
     setPendingUpdateBlock({ ...block });
     setPendingTargetTrackId(trackId);
     selectBlock(blockId);
   }, [findTrackById, selectBlock]);
 
+  // --- Other Handlers --- 
   const handleDoubleClick = useCallback((e: React.MouseEvent, trackId: string) => {
-    if (dragOperation !== 'none') return;
+    if (dragOperation !== 'none') return; // Prevent during drag
 
     const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
     if (!timelineAreaRect) return;
@@ -276,12 +313,13 @@ export function useTrackGestures({
 
     addMidiBlock(targetTrack.id, newBlock);
     selectBlock(newBlock.id);
-  }, [addMidiBlock, selectBlock, findTrackById, timelineAreaRef, effectivePixelsPerBeat, dragOperation]);
+  }, [addMidiBlock, selectBlock, findTrackById, timelineAreaRef, effectivePixelsPerBeat, GRID_SNAP, dragOperation]);
 
 
   const handleContextMenu = useCallback((e: React.MouseEvent, blockId: string | null = null, trackId: string | null = null) => {
     e.preventDefault();
     e.stopPropagation();
+    if (dragOperation !== 'none') return; // Prevent during drag
 
     let targetTrackIdForMenu: string | null = trackId;
 
@@ -325,7 +363,7 @@ export function useTrackGestures({
       setShowContextMenu(false);
       setContextMenuBlockId(null);
       setContextMenuTrackId(null);
-      selectBlock(null); // Deselect after deleting via context menu
+      selectBlock(null);
     }
   }, [contextMenuBlockId, contextMenuTrackId, removeMidiBlock, selectBlock]);
 
@@ -341,7 +379,7 @@ export function useTrackGestures({
 
   const handleFileSelected = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    const targetTrackId = contextMenuTrackId;
+    const targetTrackId = contextMenuTrackId; // Read from state
 
     if (event.target) event.target.value = '';
 
@@ -373,7 +411,7 @@ export function useTrackGestures({
         } catch (err) {
             console.error("Error parsing MIDI file:", err);
         } finally {
-            setContextMenuTrackId(null);
+            setContextMenuTrackId(null); // Clear the target ID after attempt
         }
     };
 
@@ -384,8 +422,9 @@ export function useTrackGestures({
 
     reader.readAsArrayBuffer(file);
 
-  }, [addMidiBlock, timeManager, contextMenuTrackId]);
+  }, [addMidiBlock, timeManager, contextMenuTrackId]); // Dependency on contextMenuTrackId state
 
+  // Return values from the hook
   return {
     handleStartEdge,
     handleEndEdge,
@@ -399,6 +438,7 @@ export function useTrackGestures({
     contextMenuPosition,
     contextMenuBlockId,
     fileInputRef,
+    // State needed for visual feedback
     pendingUpdateBlock,
     pendingTargetTrackId,
     dragOperation
