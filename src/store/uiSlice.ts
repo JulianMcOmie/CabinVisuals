@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
 import { AppState } from './store';
 
-export type SelectedWindowType = 'midiEditor' | 'trackTimelineView' | null;
+export type SelectedWindowType = 'midiEditor' | 'timelineView' | null;
 export interface UIState {
     isInstrumentSidebarVisible: boolean;
     selectedWindow: SelectedWindowType;
