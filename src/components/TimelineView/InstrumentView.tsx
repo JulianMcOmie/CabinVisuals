@@ -13,11 +13,20 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(track.name || 'Untitled Track');
   const inputRef = useRef<HTMLInputElement>(null);
+  const mouseDownRef = useRef(false);
+  const potentialDragRef = useRef<{
+    startX: number;
+    startY: number;
+    trackId: string;
+    offsetY: number;
+  } | null>(null);
+  const dragStartedRef = useRef(false);
+  const dragThreshold = 5; // pixels
 
   const isSelected = track.id === selectedTrackId;
 
   const handleClick = () => {
-    if (!isEditing) {
+    if (!isEditing && !dragStartedRef.current) {
       selectTrack(track.id);
     }
   };
@@ -52,18 +61,54 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isEditing && e.button === 0 && onDragStart) {
-      if (inputRef.current && inputRef.current.contains(e.target as Node)) {
+    if (isEditing || e.button !== 0 || !onDragStart) {
+      return;
+    }
+    if (inputRef.current && inputRef.current.contains(e.target as Node)) {
         return;
+    }
+
+    dragStartedRef.current = false;
+    mouseDownRef.current = true;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    potentialDragRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        trackId: track.id,
+        offsetY: offsetY
+    };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!mouseDownRef.current || !potentialDragRef.current || !onDragStart || dragStartedRef.current) {
+          return;
       }
 
-      const rect = e.currentTarget.getBoundingClientRect();
-      const elementTopY = rect.top;
-      const elementBottomY = rect.bottom;
-      const offsetY = e.clientY - elementTopY;
+      const dx = e.clientX - potentialDragRef.current.startX;
+      const dy = e.clientY - potentialDragRef.current.startY;
 
-      onDragStart(track.id, e.clientY, offsetY);
-    }
+      if (Math.sqrt(dx * dx + dy * dy) > dragThreshold) {
+          dragStartedRef.current = true;
+          onDragStart(
+              potentialDragRef.current.trackId,
+              potentialDragRef.current.startY,
+              potentialDragRef.current.offsetY
+          );
+          potentialDragRef.current = null;
+      }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+      mouseDownRef.current = false;
+      potentialDragRef.current = null;
+  };
+
+  const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (mouseDownRef.current && !dragStartedRef.current) {
+           mouseDownRef.current = false;
+           potentialDragRef.current = null;
+      }
   };
 
   useEffect(() => {
@@ -77,7 +122,11 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
     <div
       className="instrument-view"
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onMouseDown={onDragStart ? handleMouseDown : undefined}
+      onMouseMove={onDragStart ? handleMouseMove : undefined}
+      onMouseUp={onDragStart ? handleMouseUp : undefined}
+      onMouseLeave={onDragStart ? handleMouseLeave: undefined}
       style={{
         padding: '0 10px',
         height: '100%',
@@ -89,7 +138,7 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
         transition: 'background-color 0.1s ease, opacity 0.1s ease',
         minWidth: '150px',
         boxSizing: 'border-box',
-        cursor: isEditing ? 'text' : (onDragStart ? 'grab' : 'grabbing'),
+        cursor: isEditing ? 'text' : (onDragStart ? 'cursor' : 'grabbing'),
         opacity: isDragging ? 0.8 : 1,
         userSelect: 'none',
       }}
@@ -102,6 +151,7 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
           onChange={handleInputChange}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{
             width: '100%',
             padding: '0',
@@ -116,9 +166,9 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
           }}
         />
       ) : (
-        <span onDoubleClick={handleDoubleClick} style={{ width: '100%', pointerEvents: isDragging ? 'none' : 'auto' }}>
+        <div onDoubleClick={handleDoubleClick} style={{ width: '100%', pointerEvents: isDragging ? 'none' : 'auto' }}>
           {track.name || 'Untitled Track'}
-        </span>
+        </div>
       )}
     </div>
   );
