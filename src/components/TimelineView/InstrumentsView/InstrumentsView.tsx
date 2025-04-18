@@ -146,31 +146,41 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check if the target is an input field, textarea, etc.
       const target = event.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return; // Don't delete if user is typing
       }
 
-      // Check for Delete or Backspace key
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        // Check if this component's window is active and a track is selected
         if (selectedWindow === 'instrumentsView' && selectedTrackId) {
-          removeTrack(selectedTrackId);
-          event.preventDefault();
-          console.log('Deleted track', selectedTrackId);
+          const trackToDelete = tracks.find(t => t.id === selectedTrackId);
+
+          if (trackToDelete) {
+            if (trackToDelete.midiBlocks && trackToDelete.midiBlocks.length > 0) {
+              if (window.confirm(`Track "${trackToDelete.name}" contains MIDI blocks. Are you sure you want to delete it?`)) {
+                removeTrack(selectedTrackId);
+                console.log('Deleted track (with confirmation)', selectedTrackId);
+                event.preventDefault();
+              } else {
+                console.log('Track deletion cancelled by user', selectedTrackId);
+                event.preventDefault();
+              }
+            } else {
+              removeTrack(selectedTrackId);
+              console.log('Deleted track (no blocks)', selectedTrackId);
+              event.preventDefault();
+            }
+          }
         }
       }
     };
 
-    // Add listener when component mounts or dependencies change
     window.addEventListener('keydown', handleKeyDown);
 
-    // Cleanup listener on component unmount or before effect runs again
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedWindow, selectedTrackId, removeTrack]); // Dependencies for the effect
+  }, [selectedWindow, selectedTrackId, removeTrack, tracks]);
 
   // --- Rendering Logic ---
   const currentMouseYRelativeToContainer = containerRef.current && currentY !== null
