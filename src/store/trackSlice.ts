@@ -23,7 +23,7 @@ export interface TrackActions {
   moveMidiBlock: (oldTrackId: string, newTrackId: string, block: MIDIBlock) => void;
   updateTrack: (trackId: string, updatedProperties: Partial<Track>) => void;
   selectNotes: (notes: MIDINote[]) => void;
-  reorderTracks: (draggedTrackId: string, targetTrackId: string) => void;
+  reorderTracks: (draggedTrackId: string, targetTrackId: string | null) => void;
 }
 
 export type TrackSlice = TrackState & TrackActions;
@@ -309,23 +309,35 @@ export const createTrackSlice: StateCreator<
              };
        });
     },
-    reorderTracks: (draggedTrackId: string, targetTrackId: string) => {
+    reorderTracks: (draggedTrackId: string, targetTrackId: string | null) => {
       set((state: TrackState & { tracks: Track[] }) => {
         const currentTracks = state.tracks;
         const draggedIndex = currentTracks.findIndex(t => t.id === draggedTrackId);
-        const targetIndex = currentTracks.findIndex(t => t.id === targetTrackId);
 
-        if (draggedIndex === -1 || targetIndex === -1 || draggedIndex === targetIndex) {
-          return {}; // Do nothing if IDs are invalid or the same
+        if (draggedIndex === -1) {
+          console.warn(`reorderTracks: Dragged track ID ${draggedTrackId} not found.`);
+          return {}; // Do nothing if dragged track not found
         }
 
         const newTracks = [...currentTracks];
         const [draggedItem] = newTracks.splice(draggedIndex, 1);
-        // Adjust target index if the dragged item was removed from before the target
-        const adjustedTargetIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;
-        newTracks.splice(adjustedTargetIndex, 0, draggedItem);
 
-        // Update selections after reordering (selected track/block remain the same)
+        if (targetTrackId === null) {
+          // Dropped at the end
+          newTracks.push(draggedItem);
+        } else {
+          // Dropped before targetTrackId
+          const targetIndex = newTracks.findIndex(t => t.id === targetTrackId);
+
+          if (targetIndex === -1) {
+            console.warn(`reorderTracks: Target track ID ${targetTrackId} not found. Appending to end.`);
+            newTracks.push(draggedItem); // Fallback: append to end if target not found
+          } else {
+             newTracks.splice(targetIndex, 0, draggedItem);
+          }
+        }
+
+        // Update selections after reordering (selected track/block remain the same, references might change)
         const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
 
         return {

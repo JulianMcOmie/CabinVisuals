@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Track } from '../../../lib/types';
 import InstrumentView from './InstrumentView';
 import './InstrumentsView.css';
+import useStore from '../../../store/store';
 
 interface InstrumentsViewProps {
   tracks: Track[];
@@ -15,6 +16,8 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
   const [dragOffsetY, setDragOffsetY] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [orderedTrackIds, setOrderedTrackIds] = useState<string[] | null>(null);
+
+  const reorderTracks = useStore(state => state.reorderTracks);
 
   const draggedTrack = tracks.find(t => t.id === draggingTrackId);
 
@@ -49,13 +52,34 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
   }, [draggingTrackId, initialY, tracks, effectiveTrackHeight, dragOffsetY]);
 
   const handleMouseUp = useCallback(() => {
-    if (draggingTrackId === null) return;
+    if (draggingTrackId === null || !orderedTrackIds) {
+      setDraggingTrackId(null);
+      setInitialY(null);
+      setCurrentY(null);
+      setDragOffsetY(0);
+      setOrderedTrackIds(null);
+      return;
+    }
+
+    const finalOrderedIds = [...orderedTrackIds];
+    const droppedIndex = finalOrderedIds.findIndex(id => id === draggingTrackId);
+
+    if (droppedIndex !== -1) {
+      const targetTrackId = droppedIndex + 1 < finalOrderedIds.length 
+        ? finalOrderedIds[droppedIndex + 1] 
+        : null;
+
+      reorderTracks(draggingTrackId, targetTrackId);
+    } else {
+      console.warn("Dragged track ID not found in final ordered list. Cannot reorder.");
+    }
+
     setDraggingTrackId(null);
     setInitialY(null);
     setCurrentY(null);
     setDragOffsetY(0);
-    setOrderedTrackIds(null); // Reset order on drop
-  }, [draggingTrackId]);
+    setOrderedTrackIds(null);
+  }, [draggingTrackId, orderedTrackIds, reorderTracks]);
 
   useEffect(() => {
     if (draggingTrackId !== null) {
