@@ -4,9 +4,11 @@ import { Track } from '../../lib/types';
 
 interface InstrumentViewProps {
   track: Track;
+  onDragStart: (trackId: string, initialY: number) => void;
+  isDragging: boolean;
 }
 
-function InstrumentView({ track }: InstrumentViewProps) {
+function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps) {
   const { selectTrack, selectedTrackId, updateTrack } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(track.name || 'Untitled Track');
@@ -49,6 +51,15 @@ function InstrumentView({ track }: InstrumentViewProps) {
     handleSave();
   };
 
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isEditing || (inputRef.current && inputRef.current.contains(e.target as Node))) {
+      return;
+    }
+    if (e.button === 0) {
+      onDragStart(track.id, e.clientY);
+    }
+  };
+
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -60,6 +71,7 @@ function InstrumentView({ track }: InstrumentViewProps) {
     <div
       className="instrument-view"
       onClick={handleClick}
+      onMouseDown={handleMouseDown}
       style={{
         padding: '0 10px',
         height: '100%',
@@ -67,11 +79,12 @@ function InstrumentView({ track }: InstrumentViewProps) {
         display: 'flex',
         alignItems: 'center',
         color: '#ddd',
-        cursor: 'pointer',
         backgroundColor: isSelected ? '#333' : '#1a1a1a',
         transition: 'background-color 0.1s ease',
         minWidth: '150px',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        opacity: isDragging ? 0.5 : 1,
+        userSelect: 'none',
       }}
     >
       {isEditing ? (
