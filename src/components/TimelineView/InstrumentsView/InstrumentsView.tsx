@@ -14,6 +14,7 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
   const [currentY, setCurrentY] = useState<number | null>(null);
   const [dragOffsetY, setDragOffsetY] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [orderedTrackIds, setOrderedTrackIds] = useState<string[] | null>(null);
 
   const draggedTrack = tracks.find(t => t.id === draggingTrackId);
 
@@ -25,10 +26,27 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
   }, []);
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
-    if (draggingTrackId === null || initialY === null) return;
+    if (draggingTrackId === null || initialY === null || !containerRef.current) return;
     event.preventDefault();
-    setCurrentY(event.clientY);
-  }, [draggingTrackId, initialY]);
+    const newCurrentY = event.clientY;
+    setCurrentY(newCurrentY);
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const mouseYRelativeToContainer = newCurrentY - containerRect.top;
+    const targetIndex = Math.max(0, Math.min(tracks.length - 1, Math.floor((mouseYRelativeToContainer - dragOffsetY + effectiveTrackHeight / 2) / effectiveTrackHeight)));
+
+    const currentTrackIds = tracks.map(t => t.id);
+    const draggedItemIndex = currentTrackIds.findIndex(id => id === draggingTrackId);
+
+    if (draggedItemIndex === -1) return; // Should not happen
+
+    const newOrder = [...currentTrackIds];
+    const [removed] = newOrder.splice(draggedItemIndex, 1);
+    newOrder.splice(targetIndex, 0, removed);
+
+    setOrderedTrackIds(newOrder);
+
+  }, [draggingTrackId, initialY, tracks, effectiveTrackHeight, dragOffsetY]);
 
   const handleMouseUp = useCallback(() => {
     if (draggingTrackId === null) return;
@@ -36,6 +54,7 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
     setInitialY(null);
     setCurrentY(null);
     setDragOffsetY(0);
+    setOrderedTrackIds(null); // Reset order on drop
   }, [draggingTrackId]);
 
   useEffect(() => {
@@ -63,9 +82,14 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
 
   const ghostTopPosition = currentMouseYRelativeToContainer - dragOffsetY;
 
+  // Determine the tracks to display based on the current order state
+  const displayTracks = orderedTrackIds
+    ? orderedTrackIds.map(id => tracks.find(t => t.id === id)).filter((t): t is Track => t !== undefined)
+    : tracks;
+
   return (
     <div ref={containerRef} style={{ position: 'relative', height: '100%' }}>
-      {tracks.map(track => {
+      {displayTracks.map(track => {
         if (track.id === draggingTrackId) {
           return (
             <div
