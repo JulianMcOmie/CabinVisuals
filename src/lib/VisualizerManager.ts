@@ -44,7 +44,6 @@ class VisualizerManager {
     const bpm = this.timeManager.getBPM();
     const finalRenderObjects: VisualObject3D[] = [];
     
-    // 1. Reset active keys for this frame
     this.activeStateKeysThisFrame.clear();
 
     const isAnyTrackSoloed = this.tracks.some(track => track.isSoloed);
@@ -55,14 +54,12 @@ class VisualizerManager {
         : !track.isMuted;
       if (!shouldIncludeTrack || !track.synthesizer) return;
       
-      // 2. Get "raw" objects from synthesizer (must include sourceNoteId)
       const synthVisuals: VisualObject[] = track.synthesizer.getObjectsAtTime(
         time,
         track.midiBlocks,
         bpm
       );
 
-      // 3. Prepare stateful objects for effect processing
       const statefulVisualsForEffects: VisualObject[] = [];
       synthVisuals.forEach(synthVisObj => {
         if (synthVisObj.sourceNoteId) {
@@ -70,13 +67,18 @@ class VisualizerManager {
           this.activeStateKeysThisFrame.add(stateKey);
 
           const previousState = this.objectStates.get(stateKey);
-          const currentProperties = { ...synthVisObj.properties }; // Start with synth properties
+          // Start with synth properties (including its base position)
+          const currentProperties = { ...synthVisObj.properties }; 
 
-          // Restore position and velocity from previous state if it exists
+          // Restore stateful properties from previous frame if it exists
           if (previousState) {
-            currentProperties.position = previousState.position ?? currentProperties.position;
-            currentProperties.velocity = previousState.velocity ?? currentProperties.velocity;
-            // Potentially restore other stateful props if effects modify them
+            currentProperties.velocity = previousState.velocity ?? [0, 0, 0];
+            currentProperties.positionOffset = previousState.positionOffset ?? [0, 0, 0];
+            // Restore other stateful props here (e.g., maybe internal effect states?)
+          } else {
+            // Ensure defaults if no previous state
+            currentProperties.velocity = currentProperties.velocity ?? [0, 0, 0];
+            currentProperties.positionOffset = currentProperties.positionOffset ?? [0, 0, 0];
           }
           
           statefulVisualsForEffects.push({ 
@@ -84,36 +86,37 @@ class VisualizerManager {
             properties: currentProperties 
           });
         } else {
-          // Handle objects without sourceNoteId (e.g., background elements?)
-          // For now, pass them through non-statefully, won't be stored
-          // statefulVisualsForEffects.push(synthVisObj); 
            console.warn('VisualObject missing sourceNoteId, skipping state tracking.');
         }
       });
 
-      // 4. Apply effects chain to stateful objects
-      let finalVisualsAfterEffects = statefulVisualsForEffects; // Start with the state-restored objects
+      let finalVisualsAfterEffects = statefulVisualsForEffects;
       if (track.effects && track.effects.length > 0) {
         for (const effect of track.effects) {
           finalVisualsAfterEffects = effect.applyEffect(finalVisualsAfterEffects, time, bpm);
         }
       }
 
-      // 5. Update state map and prepare render objects
       finalVisualsAfterEffects.forEach((finalVisObj, index) => {
-         // Check if object is null or undefined after effects processing
         if (!finalVisObj || !finalVisObj.properties) return; 
 
         const stateKey = finalVisObj.sourceNoteId ? `${track.id}-${finalVisObj.sourceNoteId}` : null;
         
-        // Update state map for objects with IDs
+        // Update state map with the latest full properties
         if (stateKey) {
             this.objectStates.set(stateKey, finalVisObj.properties);
         }
 
         // Convert to VisualObject3D for rendering
         const props = finalVisObj.properties;
-        const position: [number, number, number] = props.position ?? [0, 0, 0];
+        const basePosition: [number, number, number] = props.position ?? [0, 0, 0];
+        const offset: [number, number, number] = props.positionOffset ?? [0, 0, 0];
+        const finalPosition: [number, number, number] = [
+          basePosition[0] + offset[0],
+          basePosition[1] + offset[1],
+          basePosition[2] + offset[2]
+        ];
+
         const rotation: [number, number, number] = props.rotation ?? [0, 0, 0];
         let scale: [number, number, number] = props.scale ?? [1, 1, 1];
         const color: string = props.color ?? '#ffffff';
@@ -125,12 +128,11 @@ class VisualizerManager {
         const clampedOpacity = Math.max(0, Math.min(1, opacity));
 
         if (clampedOpacity > 0) { 
-           // Use the persistent stateKey as the render ID
            const renderId = stateKey ?? `transient-${track.id}-${finalVisObj.type}-${index}`; 
           finalRenderObjects.push({
             id: renderId, 
             type: finalVisObj.type,
-            position,
+            position: finalPosition, // Use calculated final position
             rotation,
             scale,
             color,
@@ -140,7 +142,7 @@ class VisualizerManager {
       });
     }); // End track loop
 
-    // 6. Cleanup stale states
+    // Cleanup stale states
     const currentKeys = Array.from(this.objectStates.keys());
     currentKeys.forEach(key => {
       if (!this.activeStateKeysThisFrame.has(key)) {

@@ -22,7 +22,8 @@ export interface VisualObjectProperties {
   size?: number;
   
   // 3D properties
-  position?: [number, number, number];
+  position?: [number, number, number];      // Base position from synthesizer
+  positionOffset?: [number, number, number]; // Offset accumulated by effects
   rotation?: [number, number, number];
   scale?: [number, number, number];
   velocity?: [number, number, number];

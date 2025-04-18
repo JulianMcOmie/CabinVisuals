@@ -53,39 +53,38 @@ class GravityEffect extends Effect {
     const gz = this.getPropertyValue<number>('gravityZ') ?? 0;
     const strength = this.getPropertyValue<number>('gravityStrength') ?? 0.05;
 
-    // If strength is zero, no effect
     if (strength === 0) {
       return objects;
     }
 
-    // Calculate acceleration vector to apply this step
     const accelStepX = gx * strength;
     const accelStepY = gy * strength;
     const accelStepZ = gz * strength;
 
     return objects.map(originalObject => {
-      // Shallow clone
       const clone: VisualObject = {
         ...originalObject,
         properties: { ...originalObject.properties }
       };
 
-      const currentPos = clone.properties.position ?? [0, 0, 0];
-      const currentVel = clone.properties.velocity ?? [0, 0, 0]; // Default velocity to [0,0,0]
+      // Get current state, defaulting if necessary
+      const currentVel = clone.properties.velocity ?? [0, 0, 0]; 
+      const currentOffset = clone.properties.positionOffset ?? [0, 0, 0];
       
       // Calculate new velocity
       const newVelX = currentVel[0] + accelStepX;
       const newVelY = currentVel[1] + accelStepY;
       const newVelZ = currentVel[2] + accelStepZ;
 
-      // Calculate new position using new velocity (Euler integration)
-      const newPosX = currentPos[0] + newVelX;
-      const newPosY = currentPos[1] + newVelY;
-      const newPosZ = currentPos[2] + newVelZ;
+      // Calculate new position offset by adding the new velocity to the current offset
+      const newOffsetX = currentOffset[0] + newVelX;
+      const newOffsetY = currentOffset[1] + newVelY;
+      const newOffsetZ = currentOffset[2] + newVelZ;
 
-      // Update clone's properties
+      // Update clone's properties - ONLY velocity and positionOffset
       clone.properties.velocity = [newVelX, newVelY, newVelZ];
-      clone.properties.position = [newPosX, newPosY, newPosZ];
+      clone.properties.positionOffset = [newOffsetX, newOffsetY, newOffsetZ];
+      // DO NOT MODIFY clone.properties.position (the base position)
 
       return clone;
     });

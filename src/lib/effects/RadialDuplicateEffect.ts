@@ -45,7 +45,6 @@ class RadialDuplicateEffect extends Effect {
     const numCopies = Math.floor(this.getPropertyValue<number>('numCopies') ?? 3);
     const radius = this.getPropertyValue<number>('radius') ?? 1.0;
 
-    // If no copies or radius, return originals only
     if (numCopies <= 0 || radius <= 0) {
       return objects;
     }
@@ -53,25 +52,27 @@ class RadialDuplicateEffect extends Effect {
     const outputObjects: VisualObject[] = [...objects]; // Start with originals
 
     objects.forEach(originalObject => {
-      const originalPos = originalObject.properties.position ?? [0, 0, 0];
+      // Use original object's base position for calculations
+      const originalBasePos = originalObject.properties.position ?? [0, 0, 0];
 
       for (let i = 0; i < numCopies; i++) {
         const angle = (i / numCopies) * 2 * Math.PI;
         const offsetX = Math.cos(angle) * radius;
-        const offsetY = Math.sin(angle) * radius;
+        const offsetZ = Math.sin(angle) * radius; // Corrected: Offset should be in XZ plane for radial
         
         // Create a shallow clone for the duplicate
         const duplicate: VisualObject = {
           ...originalObject,
-          properties: { ...originalObject.properties }
+          properties: { 
+            ...originalObject.properties, // Copy all properties including offset and velocity
+            // Overwrite the base position
+            position: [
+              originalBasePos[0] + offsetX,
+              originalBasePos[1], // Keep original Y position by default
+              originalBasePos[2] + offsetZ
+            ] 
+          }
         };
-        
-        // Set the new position
-        duplicate.properties.position = [
-          originalPos[0] + offsetX,
-          originalPos[1] + offsetY,
-          originalPos[2]
-        ];
         
         outputObjects.push(duplicate);
       }
