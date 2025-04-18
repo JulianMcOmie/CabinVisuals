@@ -12,7 +12,7 @@ import { Track } from '../../lib/types';
 const TRACK_HEIGHT_BASE = 50; // Renamed base height
 const PIXELS_PER_BEAT_BASE = 100; // Renamed base pixels per beat
 const SIDEBAR_WIDTH = 200; // Define sidebar width as a constant
-const MIN_VIEWPORT_MEASURES = 64; // Minimum measures to allow zooming out to see
+const MIN_VIEWPORT_MEASURES = 8; // Minimum measures to allow zooming out to see
 const EXTRA_RENDER_MEASURES = 1; // Render this many extra measures beyond content or min viewport
 
 // Color constants
@@ -146,7 +146,7 @@ function TimelineView() {
           // Zoom out horizontally (scroll right)
           const visibleWidth = timelineContentRef.current?.clientWidth;
           const numMeasures = useStore.getState().numMeasures;
-          const targetMeasures = Math.max(64, numMeasures);
+          const targetMeasures = Math.max(MIN_VIEWPORT_MEASURES, numMeasures);
           
           let minHorizontalZoom = 0.1; // Default minimum zoom
 
