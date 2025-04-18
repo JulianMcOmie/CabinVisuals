@@ -38,6 +38,24 @@ class VisualizerManager {
     // this.objectStates.clear(); 
   }
   
+  // Method to reset the internal state (e.g., on playback start/loop)
+  resetState(): void {
+    this.objectStates.clear();
+    // Potentially reset effect states here too if they hold internal state
+    this.tracks.forEach(track => {
+      track.effects?.forEach(effect => {
+        if (typeof (effect as any).reset === 'function') {
+          (effect as any).reset();
+        }
+      });
+      // Reset synth state if needed
+      // if (typeof (track.synthesizer as any).reset === 'function') {
+      //   (track.synthesizer as any).reset();
+      // }
+    });
+    console.log("VisualizerManager state reset.");
+  }
+
   // Get all visual objects to render at current time
   getVisualObjects(): VisualObject3D[] {
     const time = this.timeManager.getCurrentBeat();
@@ -128,7 +146,10 @@ class VisualizerManager {
         const clampedOpacity = Math.max(0, Math.min(1, opacity));
 
         if (clampedOpacity > 0) { 
-           const renderId = stateKey ?? `transient-${track.id}-${finalVisObj.type}-${index}`; 
+           // Ensure unique ID even if multiple objects derive from the same note in one frame
+           const renderId = stateKey
+             ? `${stateKey}-${index}` // Append index for uniqueness
+             : `transient-${track.id}-${finalVisObj.type}-${index}`;
           finalRenderObjects.push({
             id: renderId, 
             type: finalVisObj.type,
