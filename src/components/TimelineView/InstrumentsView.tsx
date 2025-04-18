@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Track } from '../../lib/types';
 import InstrumentView from './InstrumentView';
-import useStore from '../../store/store'; // Import useStore to get track name for ghost
 
 interface InstrumentsViewProps {
   tracks: Track[];
@@ -12,14 +11,16 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
   const [draggingTrackId, setDraggingTrackId] = useState<string | null>(null);
   const [initialY, setInitialY] = useState<number | null>(null);
   const [currentY, setCurrentY] = useState<number | null>(null);
+  const [dragOffsetY, setDragOffsetY] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const draggedTrack = tracks.find(t => t.id === draggingTrackId);
 
-  const handleDragStart = useCallback((trackId: string, startY: number) => {
+  const handleDragStart = useCallback((trackId: string, startY: number, offsetY: number) => {
     setDraggingTrackId(trackId);
     setInitialY(startY);
     setCurrentY(startY);
+    setDragOffsetY(offsetY);
   }, []);
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
@@ -30,10 +31,10 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
 
   const handleMouseUp = useCallback(() => {
     if (draggingTrackId === null) return;
-    // Reset state - drop logic will go here later
     setDraggingTrackId(null);
     setInitialY(null);
     setCurrentY(null);
+    setDragOffsetY(0);
   }, [draggingTrackId]);
 
   useEffect(() => {
@@ -52,13 +53,14 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
     };
   }, [draggingTrackId, handleMouseMove, handleMouseUp]);
 
-  const ghostOffsetY = containerRef.current && currentY !== null && initialY !== null
+  const currentMouseYRelativeToContainer = containerRef.current && currentY !== null
     ? currentY - containerRef.current.getBoundingClientRect().top
     : 0;
 
+  const ghostTopPosition = currentMouseYRelativeToContainer - dragOffsetY;
+
   return (
     <div ref={containerRef} style={{ position: 'relative', height: '100%' }}>
-      {/* Draw all instrument views */}
       {tracks.map(track => {
         if (track.id === draggingTrackId) {
           return (
@@ -67,7 +69,7 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
               style={{
                 height: `${effectiveTrackHeight}px`,
                 borderBottom: '1px solid #333',
-                backgroundColor: 'rgba(0, 0, 0, 0.3)', // Dark placeholder background
+                backgroundColor: 'rgba(0, 0, 0, 0.3)',
                 boxSizing: 'border-box',
               }}
             />
@@ -90,12 +92,11 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
         }
       })}
 
-      {/* Ghost element for dragging - Renders InstrumentView */}
-      {draggingTrackId && draggedTrack && currentY !== null && initialY !== null && (
+      {draggingTrackId && draggedTrack && currentY !== null && (
         <div
           style={{
             position: 'absolute',
-            top: `${ghostOffsetY - (effectiveTrackHeight / 2)}px`,
+            top: `${ghostTopPosition}px`,
             left: 0,
             right: 0,
             height: `${effectiveTrackHeight}px`,

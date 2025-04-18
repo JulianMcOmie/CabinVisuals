@@ -4,7 +4,7 @@ import { Track } from '../../lib/types';
 
 interface InstrumentViewProps {
   track: Track;
-  onDragStart?: (trackId: string, initialY: number) => void;
+  onDragStart?: (trackId: string, initialY: number, offsetY: number) => void;
   isDragging: boolean;
 }
 
@@ -52,10 +52,17 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isEditing && inputRef.current && !inputRef.current.contains(e.target as Node) && e.button === 0 && onDragStart) {
-      onDragStart(track.id, e.clientY);
-    } else if (!isEditing && e.button === 0 && onDragStart) {
-      onDragStart(track.id, e.clientY);
+    if (!isEditing && e.button === 0 && onDragStart) {
+      if (inputRef.current && inputRef.current.contains(e.target as Node)) {
+        return;
+      }
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const elementTopY = rect.top;
+      const elementBottomY = rect.bottom;
+      const offsetY = e.clientY - elementTopY;
+
+      onDragStart(track.id, e.clientY, offsetY);
     }
   };
 
