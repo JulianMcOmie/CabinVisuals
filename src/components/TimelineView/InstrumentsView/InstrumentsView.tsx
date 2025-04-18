@@ -10,6 +10,7 @@ interface InstrumentsViewProps {
 }
 
 function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps) {
+  // --- State for Track Reordering ---
   const [draggingTrackId, setDraggingTrackId] = useState<string | null>(null);
   const [initialY, setInitialY] = useState<number | null>(null);
   const [currentY, setCurrentY] = useState<number | null>(null);
@@ -17,21 +18,31 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
   const containerRef = useRef<HTMLDivElement>(null);
   const [orderedTrackIds, setOrderedTrackIds] = useState<string[] | null>(null);
 
+  // --- State for Mute/Solo Dragging ---
+  const [muteSoloDragInfo, setMuteSoloDragInfo] = useState<{
+    action: 'mute' | 'solo';
+    targetState: boolean;
+  } | null>(null);
+
   const reorderTracks = useStore(state => state.reorderTracks);
   const selectTrack = useStore(state => state.selectTrack);
+  const updateTrack = useStore(state => state.updateTrack); // Correctly get updateTrack from store
 
   const draggedTrack = tracks.find(t => t.id === draggingTrackId);
 
+  // --- Handlers for Track Reordering ---
   const handleDragStart = useCallback((trackId: string, startY: number, offsetY: number) => {
+    if (muteSoloDragInfo) return;
     selectTrack(trackId);
     setDraggingTrackId(trackId);
     setInitialY(startY);
     setCurrentY(startY);
     setDragOffsetY(offsetY);
-  }, [selectTrack]);
+  }, [selectTrack, muteSoloDragInfo]);
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (draggingTrackId === null || initialY === null || !containerRef.current) return;
+    if (muteSoloDragInfo) return;
     event.preventDefault();
     const newCurrentY = event.clientY;
     setCurrentY(newCurrentY);
@@ -40,7 +51,8 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
     const mouseYRelativeToContainer = newCurrentY - containerRect.top;
     const targetIndex = Math.max(0, Math.min(tracks.length - 1, Math.floor((mouseYRelativeToContainer - dragOffsetY + effectiveTrackHeight / 2) / effectiveTrackHeight)));
 
-    const currentTrackIds = tracks.map(t => t.id);
+    // Use current track order if no drag-reordering has happened yet, otherwise use the temporary order
+    const currentTrackIds = orderedTrackIds ?? tracks.map(t => t.id);
     const draggedItemIndex = currentTrackIds.findIndex(id => id === draggingTrackId);
 
     if (draggedItemIndex === -1) return; // Should not happen
@@ -51,31 +63,25 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
 
     setOrderedTrackIds(newOrder);
 
-  }, [draggingTrackId, initialY, tracks, effectiveTrackHeight, dragOffsetY]);
+  }, [draggingTrackId, initialY, tracks, effectiveTrackHeight, dragOffsetY, muteSoloDragInfo, orderedTrackIds]);
 
   const handleMouseUp = useCallback(() => {
-    if (draggingTrackId === null || !orderedTrackIds) {
-      setDraggingTrackId(null);
-      setInitialY(null);
-      setCurrentY(null);
-      setDragOffsetY(0);
-      setOrderedTrackIds(null);
-      return;
+    // This handles the mouseup for track reordering
+    if (draggingTrackId === null) return;
+
+    if (orderedTrackIds) { // Check if reordering actually happened
+      const droppedIndex = orderedTrackIds.findIndex(id => id === draggingTrackId);
+
+      if (droppedIndex !== -1) {
+        const targetTrackId = droppedIndex + 1 < orderedTrackIds.length
+          ? orderedTrackIds[droppedIndex + 1]
+          : null;
+        reorderTracks(draggingTrackId, targetTrackId);
+      } else {
+        console.warn("Dragged track ID not found in final ordered list. Cannot reorder.");
+      }
     }
-
-    const finalOrderedIds = [...orderedTrackIds];
-    const droppedIndex = finalOrderedIds.findIndex(id => id === draggingTrackId);
-
-    if (droppedIndex !== -1) {
-      const targetTrackId = droppedIndex + 1 < finalOrderedIds.length 
-        ? finalOrderedIds[droppedIndex + 1] 
-        : null;
-
-      reorderTracks(draggingTrackId, targetTrackId);
-    } else {
-      console.warn("Dragged track ID not found in final ordered list. Cannot reorder.");
-    }
-
+    // Reset track reorder state regardless
     setDraggingTrackId(null);
     setInitialY(null);
     setCurrentY(null);
@@ -83,6 +89,29 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
     setOrderedTrackIds(null);
   }, [draggingTrackId, orderedTrackIds, reorderTracks]);
 
+  // --- Handlers for Mute/Solo Dragging ---
+  const handleMuteSoloDragStart = useCallback((_trackId: string, action: 'mute' | 'solo', targetState: boolean) => {
+    if (draggingTrackId) return;
+    setMuteSoloDragInfo({ action, targetState });
+    const handleMouseUpGlobal = () => {
+      setMuteSoloDragInfo(null);
+      window.removeEventListener('mouseup', handleMouseUpGlobal);
+    };
+    window.addEventListener('mouseup', handleMouseUpGlobal);
+  }, [draggingTrackId]);
+
+  const handleTrackHoverDuringMuteSoloDrag = useCallback((hoveredTrackId: string) => {
+    if (!muteSoloDragInfo) return;
+    const track = tracks.find(t => t.id === hoveredTrackId);
+    if (!track) return;
+    const { action, targetState } = muteSoloDragInfo;
+    const propertyToUpdate = action === 'mute' ? 'isMuted' : 'isSoloed';
+    if (track[propertyToUpdate] !== targetState) {
+      updateTrack(hoveredTrackId, { [propertyToUpdate]: targetState });
+    }
+  }, [muteSoloDragInfo, tracks, updateTrack]);
+
+  // --- Effects ---
   useEffect(() => {
     if (draggingTrackId !== null) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -91,8 +120,9 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
       document.body.classList.add('dragging-no-select');
     } else {
       document.removeEventListener('mousemove', handleMouseMove);
-       document.body.style.cursor = '';
-       document.body.classList.remove('dragging-no-select');
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.classList.remove('dragging-no-select');
     }
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
@@ -102,6 +132,8 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
     };
   }, [draggingTrackId, handleMouseMove, handleMouseUp]);
 
+
+  // --- Rendering Logic ---
   const currentMouseYRelativeToContainer = containerRef.current && currentY !== null
     ? currentY - containerRef.current.getBoundingClientRect().top
     : 0;
@@ -116,7 +148,10 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
   return (
     <div ref={containerRef} style={{ position: 'relative', height: '100%' }}>
       {displayTracks.map(track => {
-        if (track.id === draggingTrackId) {
+        // Check if this track is the placeholder for track reordering
+        const isReorderPlaceholder = track.id === draggingTrackId;
+
+        if (isReorderPlaceholder) {
           return (
             <div
               key={`${track.id}-placeholder`}
@@ -129,6 +164,7 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
             />
           );
         } else {
+          // Render the actual InstrumentView for non-placeholder tracks
           return (
             <div
               key={`${track.id}-instrument-container`}
@@ -139,13 +175,18 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
               <InstrumentView
                 track={track}
                 onDragStart={handleDragStart}
-                isDragging={false}
+                isDragging={false} // Regular view is never the ghost
+                // Pass mute/solo drag props
+                onMuteSoloDragStart={handleMuteSoloDragStart}
+                isMuteSoloDragging={muteSoloDragInfo !== null}
+                onTrackHoverDuringMuteSoloDrag={handleTrackHoverDuringMuteSoloDrag}
               />
             </div>
           );
         }
       })}
 
+      {/* Ghost element for track reordering - Rendered separately */}
       {draggingTrackId && draggedTrack && currentY !== null && (
         <div
           style={{
@@ -161,7 +202,11 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
         >
           <InstrumentView
              track={draggedTrack}
-             isDragging={true}
+             isDragging={true} // This is the ghost
+             // Mute/Solo props for the ghost - disable interaction
+             onMuteSoloDragStart={() => {}} // No-op
+             isMuteSoloDragging={false}    // Never dragging mute/solo itself
+             onTrackHoverDuringMuteSoloDrag={() => {}} // No-op
           />
         </div>
       )}

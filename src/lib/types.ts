@@ -40,6 +40,8 @@ import Synthesizer from './Synthesizer';
 export interface Track {
   id: string;
   name: string;
+  isSoloed: boolean;
+  isMuted: boolean;
   midiBlocks: MIDIBlock[];
   synthesizer: Synthesizer; // Now uses the imported class type
 }

@@ -6,9 +6,19 @@ interface InstrumentViewProps {
   track: Track;
   onDragStart?: (trackId: string, initialY: number, offsetY: number) => void;
   isDragging: boolean;
+  onMuteSoloDragStart: (trackId: string, action: 'mute' | 'solo', targetState: boolean) => void;
+  isMuteSoloDragging: boolean;
+  onTrackHoverDuringMuteSoloDrag: (hoveredTrackId: string) => void;
 }
 
-function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps) {
+function InstrumentView({
+  track,
+  onDragStart,
+  isDragging,
+  onMuteSoloDragStart,
+  isMuteSoloDragging,
+  onTrackHoverDuringMuteSoloDrag
+}: InstrumentViewProps) {
   const { selectTrack, selectedTrackId, updateTrack } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(track.name || 'Untitled Track');
@@ -119,6 +129,26 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
     }
   }, [isEditing]);
 
+  const handleMuteMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    const newMutedState = !track.isMuted;
+    updateTrack(track.id, { isMuted: newMutedState });
+    onMuteSoloDragStart(track.id, 'mute', newMutedState);
+  };
+
+  const handleSoloMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    const newSoloState = !track.isSoloed;
+    updateTrack(track.id, { isSoloed: newSoloState });
+    onMuteSoloDragStart(track.id, 'solo', newSoloState);
+  };
+
+  const handleMouseEnter = () => {
+    if (isMuteSoloDragging) {
+      onTrackHoverDuringMuteSoloDrag(track.id);
+    }
+  };
+
   return (
     <div
       className="instrument-view"
@@ -128,6 +158,7 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
       onMouseMove={onDragStart ? handleMouseMove : undefined}
       onMouseUp={onDragStart ? handleMouseUp : undefined}
       onMouseLeave={onDragStart ? handleMouseLeave: undefined}
+      onMouseEnter={handleMouseEnter}
       style={{
         padding: '0 10px',
         height: '100%',
@@ -143,32 +174,70 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
         userSelect: 'none',
       }}
     >
-      {isEditing ? (
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputValue}
-          onChange={handleInputChange}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          onMouseDown={(e) => e.stopPropagation()}
+      <div style={{ flexGrow: 1, marginRight: '8px' }}>
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              padding: '0',
+              margin: '0',
+              border: 'none',
+              background: 'transparent',
+              color: 'inherit',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              boxSizing: 'border-box'
+            }}
+          />
+        ) : (
+          <div onDoubleClick={handleDoubleClick} style={{ width: '100%', pointerEvents: isDragging ? 'none' : 'auto' }}>
+            {track.name || 'Untitled Track'}
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+        <button
+          onMouseDown={handleMuteMouseDown}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
           style={{
-            width: '100%',
-            padding: '0',
-            margin: '0',
-            border: 'none',
-            background: 'transparent',
-            color: 'inherit',
-            fontFamily: 'inherit',
-            fontSize: 'inherit',
-            boxSizing: 'border-box'
+            padding: '2px 5px',
+            border: `1px solid ${track.isMuted ? '#4A90E2' : '#555'}`,
+            borderRadius: '3px',
+            backgroundColor: track.isMuted ? '#4A90E2' : '#444',
+            color: track.isMuted ? '#fff' : '#ddd',
+            minWidth: '25px',
+            textAlign: 'center'
           }}
-        />
-      ) : (
-        <div onDoubleClick={handleDoubleClick} style={{ width: '100%', pointerEvents: isDragging ? 'none' : 'auto' }}>
-          {track.name || 'Untitled Track'}
-        </div>
-      )}
+          title="Mute Track (M)"
+        >
+          M
+        </button>
+        <button
+          onMouseDown={handleSoloMouseDown}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          style={{
+            padding: '2px 5px',
+            border: `1px solid ${track.isSoloed ? '#FFD700' : '#555'}`,
+            borderRadius: '3px',
+            backgroundColor: track.isSoloed ? '#FFD700' : '#444',
+            color: track.isSoloed ? '#000' : '#ddd',
+            minWidth: '25px',
+            textAlign: 'center'
+          }}
+          title="Solo Track (S)"
+        >
+          S
+        </button>
+      </div>
     </div>
   );
 }
