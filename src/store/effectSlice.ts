@@ -2,6 +2,10 @@ import { StateCreator } from 'zustand';
 import Effect from '../lib/Effect'; // Import the base Effect class
 import { AppState } from './store'; // Import the combined AppState
 
+// Import Effect implementations
+import ScaleEffect from '../lib/effects/ScaleEffect';
+import DelayEffect from '../lib/effects/DelayEffect';
+
 // Define Effect structures
 export interface EffectDefinition {
   id: string;
@@ -25,16 +29,14 @@ export interface EffectActions {}
 // Combined Effect Slice Type
 export type EffectSlice = EffectState & EffectActions;
 
-// Define the actual effect data (initially empty)
-// We will populate this later when we create concrete Effect classes
+// Define the actual effect data
 const availableEffectsData: EffectCategories = {
-  // Example structure:
-  // Color: [
-  //   { id: 'ColorOverrideEffect', name: 'Color Override', constructor: ColorOverrideEffect },
-  // ],
-  // Spatial: [
-  //   { id: 'DelayEffect', name: 'Visual Delay', constructor: DelayEffect },
-  // ]
+  Transform: [
+    { id: 'ScaleEffect', name: 'Scale', constructor: ScaleEffect },
+  ],
+  Time: [
+    { id: 'DelayEffect', name: 'Delay', constructor: DelayEffect },
+  ]
 };
 
 // Creator function for the Effect Slice

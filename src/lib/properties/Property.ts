@@ -32,7 +32,6 @@ export interface ColorMetadata extends BaseMetadata {}
 export type PropertyMetadata<T> =
   | (NumericMetadata & { uiType: 'slider' | 'numberInput' })
   | (DropdownMetadata<T> & { uiType: 'dropdown' })
-  // Add the ColorMetadata for the 'color' uiType
   | (ColorMetadata & { uiType: 'color' });
 
 // --- Property Class ---
