@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import useStore from '../../store/store';
-import InstrumentsView from './InstrumentsView';
+import InstrumentsView from './InstrumentsView/InstrumentsView';
 import TrackTimelineView from './TrackTimelineView';
 import MeasuresHeader from './MeasuresHeader';
 import BasicSynthesizer from '../../lib/synthesizers/BasicSynthesizer';

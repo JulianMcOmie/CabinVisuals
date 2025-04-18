@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import useStore from '../../store/store';
-import { Track } from '../../lib/types';
+import useStore from '../../../store/store';
+import { Track } from '../../../lib/types';
 
 interface InstrumentViewProps {
   track: Track;
@@ -139,7 +139,7 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
         transition: 'background-color 0.1s ease, opacity 0.1s ease',
         minWidth: '150px',
         boxSizing: 'border-box',
-        cursor: isEditing ? 'text' : (onDragStart ? 'cursor' : 'grabbing'),
+        cursor: isEditing ? 'text' : 'default',
         opacity: isDragging ? 0.8 : 1,
         userSelect: 'none',
       }}
@@ -162,7 +162,6 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
             color: 'inherit',
             fontFamily: 'inherit',
             fontSize: 'inherit',
-            outline: 'none',
             boxSizing: 'border-box'
           }}
         />

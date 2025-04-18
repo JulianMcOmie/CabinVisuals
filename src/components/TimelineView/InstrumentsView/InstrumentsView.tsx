@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Track } from '../../lib/types';
+import { Track } from '../../../lib/types';
 import InstrumentView from './InstrumentView';
 import './InstrumentsView.css';
 
