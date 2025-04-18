@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Track } from '../../lib/types';
 import InstrumentView from './InstrumentView';
+import './InstrumentsView.css';
 
 interface InstrumentsViewProps {
   tracks: Track[];
@@ -42,14 +43,17 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp, { once: true });
       document.body.style.cursor = 'grabbing';
+      document.body.classList.add('dragging-no-select');
     } else {
       document.removeEventListener('mousemove', handleMouseMove);
        document.body.style.cursor = '';
+       document.body.classList.remove('dragging-no-select');
     }
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = '';
+      document.body.classList.remove('dragging-no-select');
     };
   }, [draggingTrackId, handleMouseMove, handleMouseUp]);
 

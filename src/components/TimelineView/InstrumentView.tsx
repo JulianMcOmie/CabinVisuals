@@ -96,6 +96,7 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
               potentialDragRef.current.offsetY
           );
           potentialDragRef.current = null;
+          setIsEditing(false);
       }
   };
 
