@@ -5,6 +5,7 @@ import { AppState } from './store'; // Import the combined AppState
 // Import Effect implementations
 import ScaleEffect from '../lib/effects/ScaleEffect';
 import DelayEffect from '../lib/effects/DelayEffect';
+import RadialDuplicateEffect from '../lib/effects/RadialDuplicateEffect'; // Import the new effect
 
 // Define Effect structures
 export interface EffectDefinition {
@@ -36,6 +37,9 @@ const availableEffectsData: EffectCategories = {
   ],
   Time: [
     { id: 'DelayEffect', name: 'Delay', constructor: DelayEffect },
+  ],
+  Spatial: [ // Add new Spatial category
+    { id: 'RadialDuplicateEffect', name: 'Radial Duplicate', constructor: RadialDuplicateEffect },
   ]
 };
 

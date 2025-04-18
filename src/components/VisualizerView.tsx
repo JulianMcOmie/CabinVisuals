@@ -30,6 +30,9 @@ function Scene({ visualizerManager }: { visualizerManager: VisualizerManager }) 
 function VisualObject({ object }: { object: VisualObject3D }) {
   const meshRef = useRef<THREE.Mesh>(null);
   
+  // Determine if the object should be transparent
+  const isTransparent = object.opacity < 1.0;
+
   return (
     <mesh
       ref={meshRef}
@@ -45,6 +48,9 @@ function VisualObject({ object }: { object: VisualObject3D }) {
       )}
       <meshStandardMaterial 
         color={object.color} 
+        opacity={object.opacity}
+        transparent={isTransparent}
+        depthWrite={!isTransparent}
       />
     </mesh>
   );
