@@ -18,15 +18,17 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
   const [orderedTrackIds, setOrderedTrackIds] = useState<string[] | null>(null);
 
   const reorderTracks = useStore(state => state.reorderTracks);
+  const selectTrack = useStore(state => state.selectTrack);
 
   const draggedTrack = tracks.find(t => t.id === draggingTrackId);
 
   const handleDragStart = useCallback((trackId: string, startY: number, offsetY: number) => {
+    selectTrack(trackId);
     setDraggingTrackId(trackId);
     setInitialY(startY);
     setCurrentY(startY);
     setDragOffsetY(offsetY);
-  }, []);
+  }, [selectTrack]);
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (draggingTrackId === null || initialY === null || !containerRef.current) return;
