@@ -340,7 +340,8 @@ class VisualObjectEngine {
                                              // _adsrPhase: adsrPhase,
                                              // _instanceData: instanceData, // For debugging
                                              // _level: levelConfig.level, // For debugging
-                                         }
+                                         },
+                                         sourceNoteId: note.id // ** Automatically add sourceNoteId **
                                      };
                                      allVisualObjects.push(visualObject);
                                 }

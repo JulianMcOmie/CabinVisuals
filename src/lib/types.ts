@@ -25,6 +25,7 @@ export interface VisualObjectProperties {
   position?: [number, number, number];
   rotation?: [number, number, number];
   scale?: [number, number, number];
+  velocity?: [number, number, number];
   
   // Expandable with more properties later
 }
@@ -32,6 +33,7 @@ export interface VisualObjectProperties {
 export interface VisualObject {
   type: string;
   properties: VisualObjectProperties;
+  sourceNoteId?: string;
 }
 
 // Import the actual Synthesizer class

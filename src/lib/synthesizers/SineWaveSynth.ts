@@ -1,6 +1,6 @@
 import Synthesizer from '../Synthesizer';
-import { MIDIBlock, VisualObject } from '../types';
-import { Property } from '../properties/Property';
+import { MIDIBlock, VisualObject, MIDINote } from '../types';
+import { Property, NumericMetadata } from '../properties/Property';
 import VisualObjectEngine, { MappingContext, MappingUtils, NoteContext } from '../VisualObjectEngine';
 
 class SineWaveSynth extends Synthesizer {
@@ -27,6 +27,14 @@ class SineWaveSynth extends Synthesizer {
             ['decay', new Property<number>('decay', 0.2, { uiType: 'slider', label: 'Decay (s)', min: 0.01, max: 2, step: 0.01 })],
             ['sustain', new Property<number>('sustain', 0.7, { uiType: 'slider', label: 'Sustain Level', min: 0, max: 1, step: 0.01 })],
             ['release', new Property<number>('release', 1.0, { uiType: 'slider', label: 'Release (s)', min: 0.1, max: 4, step: 0.05 })],
+            ['amplitude', new Property<number>(
+                'amplitude', 1.0,
+                { label: 'Amplitude', min: 0, max: 2, step: 0.1, uiType: 'slider' } as NumericMetadata & { uiType: 'slider'}
+            )],
+            ['frequency', new Property<number>(
+                'frequency', 0.5, 
+                { label: 'Frequency', min: 0.1, max: 5, step: 0.1, uiType: 'slider' } as NumericMetadata & { uiType: 'slider'}
+            )],
         ]);
     }
 
@@ -88,18 +96,57 @@ class SineWaveSynth extends Synthesizer {
     }
 
     getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
-        return this.engine.getObjectsAtTime(time, midiBlocks, bpm);
+        const objects: VisualObject[] = [];
+        const amplitude = this.getPropertyValue<number>('amplitude') ?? 1.0;
+        const frequency = this.getPropertyValue<number>('frequency') ?? 0.5;
+
+        midiBlocks.forEach(block => {
+            block.notes.forEach(note => {
+                const noteStart = note.startBeat + block.startBeat;
+                const noteEnd = noteStart + note.duration;
+
+                // Check if the note is active at the current time
+                if (time >= noteStart && time < noteEnd) {
+                    // Base position or calculation based on pitch (example: simple mapping)
+                    const baseX = (note.pitch % 12) - 6; // Example position based on pitch class
+                    const baseZ = Math.floor(note.pitch / 12) - 5; // Example position based on octave
+
+                    // Calculate vertical position based on sine wave
+                    const yPos = Math.sin((time - noteStart) * Math.PI * 2 * frequency) * amplitude;
+                    
+                    // Calculate opacity fade out towards the end of the note
+                    const timeRemaining = noteEnd - time;
+                    const fadeDuration = Math.min(note.duration * 0.2, 0.5); // Fade out over last 20% or 0.5 beats
+                    let opacity = 1.0;
+                    if (timeRemaining < fadeDuration) {
+                        opacity = Math.max(0, timeRemaining / fadeDuration);
+                    }
+
+                    objects.push({
+                        type: 'sphere', // Example type
+                        properties: {
+                            position: [baseX, yPos, baseZ],
+                            scale: [0.5, 0.5, 0.5], // Example scale
+                            color: '#00ffaa', // Example color
+                            opacity: opacity * (note.velocity / 127), // Opacity based on velocity and fade
+                            // Initial velocity could be set here if desired, e.g.:
+                            // velocity: [0, initialYVelocity, 0]
+                        }
+                    });
+                }
+            });
+        });
+
+        return objects;
     }
 
     clone(): this {
-        const cloned = new SineWaveSynth() as this;
-        this.properties.forEach((property, name) => {
-            const clonedProperty = cloned.properties.get(name);
-            if (clonedProperty) {
-                clonedProperty.value = property.value;
-            }
+        const newInstance = new SineWaveSynth() as this;
+        // Clone properties
+        this.properties.forEach((prop, key) => {
+            newInstance.properties.set(key, prop.clone());
         });
-        return cloned;
+        return newInstance;
     }
 }
 

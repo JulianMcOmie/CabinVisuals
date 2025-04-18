@@ -6,6 +6,7 @@ import { AppState } from './store'; // Import the combined AppState
 import ScaleEffect from '../lib/effects/ScaleEffect';
 import DelayEffect from '../lib/effects/DelayEffect';
 import RadialDuplicateEffect from '../lib/effects/RadialDuplicateEffect'; // Import the new effect
+import GravityEffect from '../lib/effects/GravityEffect'; // Import the new effect
 
 // Define Effect structures
 export interface EffectDefinition {
@@ -40,6 +41,7 @@ const availableEffectsData: EffectCategories = {
   ],
   Spatial: [ // Add new Spatial category
     { id: 'RadialDuplicateEffect', name: 'Radial Duplicate', constructor: RadialDuplicateEffect },
+    { id: 'GravityEffect', name: 'Gravity', constructor: GravityEffect }, // Add Gravity
   ]
 };
 
