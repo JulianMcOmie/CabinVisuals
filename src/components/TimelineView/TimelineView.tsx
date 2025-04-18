@@ -55,7 +55,6 @@ function TimelineView() {
     
     addTrack(newTrack);
     selectTrack(newTrack.id);
-    setSelectedWindow('timelineView'); // Set window on add track
   };
   
   // Calculate playhead position based on beat, zoom AND scroll
@@ -83,10 +82,8 @@ function TimelineView() {
     }
   }, [isDragging]);
 
-  // Mouse down handler to start dragging
-  const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    setSelectedWindow('timelineView'); // Set window on interaction
-
+  // Mouse down handler to start dragging the playhead
+  const handlePlayheadMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     // Only drag on left click
     if (event.button !== 0) return;
     event.preventDefault(); 
@@ -118,7 +115,6 @@ function TimelineView() {
   // Handler for wheel events (zoom)
   const handleWheel = useCallback((event: WheelEvent) => {
     if (event.altKey) {
-      setSelectedWindow('timelineView'); // Set window on zoom interaction
       event.preventDefault(); // Prevent default scroll behavior when zooming
 
       // Vertical Zoom (multiplicative but with linear response to wheel)
@@ -163,7 +159,7 @@ function TimelineView() {
         }
       }
     }
-  }, [setHorizontalZoom, setVerticalZoom, setSelectedWindow]); // Added setSelectedWindow
+  }, [setHorizontalZoom, setVerticalZoom]);
 
   // Attach wheel listener to the timeline content area
   useEffect(() => {
@@ -182,11 +178,10 @@ function TimelineView() {
   const totalTracksHeight = tracks.length * effectiveTrackHeight;
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent setting if the click originated from the playhead
+    // Prevent setting if the click originated from the playhead or track area handled below
     if (playheadRef.current && playheadRef.current.contains(e.target as Node)) {
         return;
     }
-    setSelectedWindow('timelineView');
   };
 
   return (
@@ -352,7 +347,7 @@ function TimelineView() {
         <div 
           ref={playheadRef}
           className="playhead"
-          onMouseDown={handleMouseDown}
+          onMouseDown={handlePlayheadMouseDown}
           style={{
             position: 'absolute',
             top: '40px',

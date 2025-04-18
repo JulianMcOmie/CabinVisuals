@@ -40,7 +40,8 @@ function TrackTimelineView({
     removeMidiBlock,
     moveMidiBlock,
     timeManager,
-    selectedWindow
+    selectedWindow,
+    setSelectedWindow
   } = useStore();
   const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for hook, points to the container
   const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for the canvas element
@@ -291,16 +292,15 @@ function TrackTimelineView({
       pendingUpdateBlock,
       pendingTargetTrackId,
       dragOperation,
-      drawMidiBlock // Add drawMidiBlock as dependency (or wrap in useCallback)
+      drawMidiBlock, 
+      selectedWindow
   ]); // Add zoom dependencies
 
 
   // Canvas Event Handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Only proceed if the left mouse button was pressed
-    if (e.button !== 0) {
-        return;
-    }
+    setSelectedWindow('timelineView'); // Set window on mouse down
+    if (e.button !== 0) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -355,6 +355,7 @@ function TrackTimelineView({
   };
 
   const handleCanvasDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+     setSelectedWindow('timelineView');
      const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -370,6 +371,7 @@ function TrackTimelineView({
   };
 
  const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    setSelectedWindow('timelineView');
     e.preventDefault(); // Prevent default browser context menu
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -467,7 +469,10 @@ function TrackTimelineView({
       style={{
         width: '100%', // Container takes full width
         backgroundColor: '#222',
-        position: 'absolute' // Needed for positioning context menu correctly relative to scroll
+        position: 'absolute', // Needed for positioning context menu correctly relative to scroll
+        border: selectedWindow === 'timelineView' 
+          ? '1px dotted rgba(255, 255, 255, 0.4)' // Visual feedback when selected
+          : '1px solid transparent' // Match parent's border style if needed
       }}
     >
       <canvas
