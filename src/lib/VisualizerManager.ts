@@ -31,14 +31,20 @@ class VisualizerManager {
   
   // Get all visual objects to render at current time
   getVisualObjects(): VisualObject3D[] {
-    const time = this.timeManager.getCurrentBeat(); // Use seconds time
+    const time = this.timeManager.getCurrentBeat();
     const bpm = this.timeManager.getBPM();
     const objects: VisualObject3D[] = [];
-    const secondsPerBeat = 60 / bpm;
 
-    // Implement logic from trackSlice.getVisualObjectsAtTime
+    // Determine if any track is soloed
+    const isAnyTrackSoloed = this.tracks.some(track => track.isSoloed);
+
     this.tracks.forEach(track => {
-      // Call synthesizer's getObjectsAtTime once per track
+      const shouldIncludeTrack = isAnyTrackSoloed
+        ? track.isSoloed // If any track is soloed, only include soloed tracks
+        : !track.isMuted; // Otherwise, include tracks that are not muted
+      if (!shouldIncludeTrack) return;
+      
+      // Call synthesizer's getObjectsAtTime only for included tracks
       if (track.synthesizer) {
         const trackVisuals: VisualObject[] = track.synthesizer.getObjectsAtTime(
           time, // Current time in seconds
