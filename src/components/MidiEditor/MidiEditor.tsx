@@ -50,12 +50,13 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     updateMidiBlock, 
     selectNotes: storeSelectNotes, 
     setSelectedWindow,
-    selectedWindow
+    selectedWindow,
+    numMeasures
   } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const editorWidth = 650; // Default width if ref not available
+  const editorWidth = editorRef.current?.clientWidth || numMeasures * BEATS_PER_MEASURE * PIXELS_PER_BEAT; // Default width if ref not available
   const editorHeight = editorRef.current?.clientHeight || KEY_COUNT * PIXELS_PER_SEMITONE; // Default height if ref not available
   
   // State for drag operations
