@@ -23,6 +23,7 @@ export interface TrackActions {
   moveMidiBlock: (oldTrackId: string, newTrackId: string, block: MIDIBlock) => void;
   updateTrack: (trackId: string, updatedProperties: Partial<Track>) => void;
   selectNotes: (notes: MIDINote[]) => void;
+  reorderTracks: (draggedTrackId: string, targetTrackId: string) => void;
 }
 
 export type TrackSlice = TrackState & TrackActions;
@@ -307,6 +308,32 @@ export const createTrackSlice: StateCreator<
                  selectedBlock: selections.selectedBlock 
              };
        });
+    },
+    reorderTracks: (draggedTrackId: string, targetTrackId: string) => {
+      set((state: TrackState & { tracks: Track[] }) => {
+        const currentTracks = state.tracks;
+        const draggedIndex = currentTracks.findIndex(t => t.id === draggedTrackId);
+        const targetIndex = currentTracks.findIndex(t => t.id === targetTrackId);
+
+        if (draggedIndex === -1 || targetIndex === -1 || draggedIndex === targetIndex) {
+          return {}; // Do nothing if IDs are invalid or the same
+        }
+
+        const newTracks = [...currentTracks];
+        const [draggedItem] = newTracks.splice(draggedIndex, 1);
+        // Adjust target index if the dragged item was removed from before the target
+        const adjustedTargetIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;
+        newTracks.splice(adjustedTargetIndex, 0, draggedItem);
+
+        // Update selections after reordering (selected track/block remain the same)
+        const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
+
+        return {
+          tracks: newTracks,
+          selectedTrack: selections.selectedTrack,
+          selectedBlock: selections.selectedBlock
+        };
+      });
     },
   };
 } 

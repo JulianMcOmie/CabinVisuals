@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import useStore from '../../store/store';
 import InstrumentView from './InstrumentView';
+import InstrumentsView from './InstrumentsView';
 import TrackTimelineView from './TrackTimelineView';
 import MeasuresHeader from './MeasuresHeader';
 import BasicSynthesizer from '../../lib/synthesizers/BasicSynthesizer';
@@ -305,21 +306,10 @@ function TimelineView() {
               }}
             >
               {/* Map over tracks to render InstrumentView */}
-              {tracks.map(track => (
-                <div 
-                  key={`${track.id}-instrument`} // Unique key
-                  style={{ 
-                    height: `${effectiveTrackHeight}px`, // Use effective track height
-                    borderBottom: '1px solid #333', // Add border between instruments
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <InstrumentView 
-                    track={track} 
-                    // Pass verticalZoom if needed, or let it use effectiveTrackHeight for layout
-                  />
-                </div>
-              ))}
+              <InstrumentsView 
+                tracks={tracks}
+                effectiveTrackHeight={effectiveTrackHeight}
+              />
             </div>
 
             {/* Single TrackTimelineView for all tracks */}
