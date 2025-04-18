@@ -36,6 +36,7 @@ export interface VisualObject {
 
 // Import the actual Synthesizer class
 import Synthesizer from './Synthesizer';
+import Effect from './Effect';
 
 export interface Track {
   id: string;
@@ -44,4 +45,5 @@ export interface Track {
   isMuted: boolean;
   midiBlocks: MIDIBlock[];
   synthesizer: Synthesizer; // Now uses the imported class type
+  effects: Effect[];
 }

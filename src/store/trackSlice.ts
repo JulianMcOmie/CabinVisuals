@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { Track, MIDIBlock, MIDINote } from '../lib/types';
 import { AppState } from './store'; // Import the combined AppState
+import Effect from '../lib/Effect'; // Import Effect class
 
 // Track Slice
 export interface TrackState {
@@ -24,6 +25,11 @@ export interface TrackActions {
   updateTrack: (trackId: string, updatedProperties: Partial<Track>) => void;
   selectNotes: (notes: MIDINote[]) => void;
   reorderTracks: (draggedTrackId: string, targetTrackId: string | null) => void;
+  // Effect Actions
+  addEffectToTrack: (trackId: string, effectToAdd: Effect) => void;
+  removeEffectFromTrack: (trackId: string, effectIndex: number) => void;
+  updateEffectPropertyOnTrack: (trackId: string, effectIndex: number, propertyName: string, value: any) => void;
+  // reorderEffectsOnTrack: (trackId: string, draggedIndex: number, targetIndex: number) => void; // Reordering skipped
 }
 
 export type TrackSlice = TrackState & TrackActions;
@@ -343,6 +349,76 @@ export const createTrackSlice: StateCreator<
         return {
           tracks: newTracks,
           selectedTrack: selections.selectedTrack,
+          selectedBlock: selections.selectedBlock
+        };
+      });
+    },
+    // --- Effect Actions Implementations ---
+    addEffectToTrack: (trackId: string, effectToAdd: Effect) => {
+      set((state) => {
+        const newTracks = state.tracks.map(track => {
+          if (track.id === trackId) {
+            const clonedEffect = effectToAdd.clone(); // Clone the effect before adding
+            const updatedEffects = [...(track.effects || []), clonedEffect];
+            return { ...track, effects: updatedEffects };
+          }
+          return track;
+        });
+        const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
+        return { 
+          tracks: newTracks,
+          selectedTrack: selections.selectedTrack, // Update selected track reference
+          selectedBlock: selections.selectedBlock
+        };
+      });
+    },
+    removeEffectFromTrack: (trackId: string, effectIndex: number) => {
+      set((state) => {
+        const newTracks = state.tracks.map(track => {
+          if (track.id === trackId) {
+            const currentEffects = track.effects || [];
+            if (effectIndex >= 0 && effectIndex < currentEffects.length) {
+              const updatedEffects = [
+                ...currentEffects.slice(0, effectIndex),
+                ...currentEffects.slice(effectIndex + 1)
+              ];
+              return { ...track, effects: updatedEffects };
+            }
+          }
+          return track;
+        });
+        const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
+        return { 
+          tracks: newTracks,
+          selectedTrack: selections.selectedTrack, // Update selected track reference
+          selectedBlock: selections.selectedBlock
+        };
+      });
+    },
+    updateEffectPropertyOnTrack: (trackId: string, effectIndex: number, propertyName: string, value: any) => {
+      set((state) => {
+        const newTracks = state.tracks.map(track => {
+          if (track.id === trackId) {
+            const currentEffects = track.effects || [];
+            if (effectIndex >= 0 && effectIndex < currentEffects.length) {
+              const effectToUpdate = currentEffects[effectIndex];
+              const clonedEffect = effectToUpdate.clone(); // Clone the specific effect
+              clonedEffect.setPropertyValue(propertyName, value); // Update the property on the clone
+              
+              const updatedEffects = [
+                ...currentEffects.slice(0, effectIndex),
+                clonedEffect, // Replace with the updated clone
+                ...currentEffects.slice(effectIndex + 1)
+              ];
+              return { ...track, effects: updatedEffects };
+            }
+          }
+          return track;
+        });
+        const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
+        return { 
+          tracks: newTracks,
+          selectedTrack: selections.selectedTrack, // Update selected track reference
           selectedBlock: selections.selectedBlock
         };
       });
