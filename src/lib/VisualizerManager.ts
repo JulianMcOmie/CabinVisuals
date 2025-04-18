@@ -33,59 +33,74 @@ class VisualizerManager {
   getVisualObjects(): VisualObject3D[] {
     const time = this.timeManager.getCurrentBeat();
     const bpm = this.timeManager.getBPM();
-    const objects: VisualObject3D[] = [];
+    const finalObjects: VisualObject3D[] = []; // Renamed to avoid conflict
 
-    // Determine if any track is soloed
     const isAnyTrackSoloed = this.tracks.some(track => track.isSoloed);
 
     this.tracks.forEach(track => {
       const shouldIncludeTrack = isAnyTrackSoloed
-        ? track.isSoloed // If any track is soloed, only include soloed tracks
-        : !track.isMuted; // Otherwise, include tracks that are not muted
+        ? track.isSoloed
+        : !track.isMuted;
       if (!shouldIncludeTrack) return;
       
-      // Call synthesizer's getObjectsAtTime only for included tracks
       if (track.synthesizer) {
-        const trackVisuals: VisualObject[] = track.synthesizer.getObjectsAtTime(
-          time, // Current time in seconds
-          track.midiBlocks, // All blocks for this track
-          bpm // Current BPM
+        // 1. Get initial objects from synthesizer
+        let currentVisuals: VisualObject[] = track.synthesizer.getObjectsAtTime(
+          time,
+          track.midiBlocks,
+          bpm
         );
 
-        // Convert returned VisualObjects to VisualObject3D
-        if (trackVisuals && Array.isArray(trackVisuals)) {
-          trackVisuals.forEach((obj, index) => {
+        // 2. Apply effects chain if effects exist
+        if (track.effects && track.effects.length > 0) {
+          for (const effect of track.effects) {
+            // Pass the current visuals through the effect
+            currentVisuals = effect.applyEffect(currentVisuals, time, bpm);
+          }
+        }
+
+        // 3. Convert the final processed VisualObjects to VisualObject3D
+        if (currentVisuals && Array.isArray(currentVisuals)) {
+          currentVisuals.forEach((obj, index) => {
+            // Check if object is null or undefined after effects processing
+            if (!obj) return; 
+            
             const props = obj.properties;
+            if (!props) return; // Check if properties exist
 
             // Extract properties, providing defaults
             const position: [number, number, number] = props.position ?? [0, 0, 0];
             const rotation: [number, number, number] = props.rotation ?? [0, 0, 0];
-            let scale: [number, number, number] = props.scale ?? [1, 1, 1]; // Use let for potential modification
-            const color: string = props.color ?? '#ffffff'; // Default color white
-            const opacity: number = props.opacity ?? 1.0; // Default opacity 1
+            let scale: [number, number, number] = props.scale ?? [1, 1, 1];
+            const color: string = props.color ?? '#ffffff';
+            const opacity: number = props.opacity ?? 1.0;
 
-            // Handle legacy objects that only have size - keep this logic if needed
             if (props.size !== undefined && !props.scale) {
               const size = props.size;
-              scale = [size, size, size]; // Assign new array
+              scale = [size, size, size];
             }
 
-            objects.push({
-              // Generate ID based on track and visual object index
-              id: `obj-${track.id}-${obj.type}-${index}`,
-              type: obj.type,
-              position,
-              rotation,
-              scale,
-              color,
-              opacity
-            });
+            // Ensure opacity is within valid range [0, 1] after effects
+            const clampedOpacity = Math.max(0, Math.min(1, opacity));
+
+            // Only add objects with positive opacity
+            if (clampedOpacity > 0) { 
+              finalObjects.push({
+                id: `obj-${track.id}-${obj.type}-${index}`,
+                type: obj.type,
+                position,
+                rotation,
+                scale,
+                color,
+                opacity: clampedOpacity // Use clamped opacity
+              });
+            }
           });
         }
       }
     });
 
-    return objects;
+    return finalObjects;
   }
   
 }
