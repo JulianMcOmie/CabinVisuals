@@ -4,7 +4,7 @@ import { Track } from '../../lib/types';
 
 interface InstrumentViewProps {
   track: Track;
-  onDragStart: (trackId: string, initialY: number) => void;
+  onDragStart?: (trackId: string, initialY: number) => void;
   isDragging: boolean;
 }
 
@@ -52,10 +52,9 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isEditing || (inputRef.current && inputRef.current.contains(e.target as Node))) {
-      return;
-    }
-    if (e.button === 0) {
+    if (!isEditing && inputRef.current && !inputRef.current.contains(e.target as Node) && e.button === 0 && onDragStart) {
+      onDragStart(track.id, e.clientY);
+    } else if (!isEditing && e.button === 0 && onDragStart) {
       onDragStart(track.id, e.clientY);
     }
   };
@@ -71,7 +70,7 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
     <div
       className="instrument-view"
       onClick={handleClick}
-      onMouseDown={handleMouseDown}
+      onMouseDown={onDragStart ? handleMouseDown : undefined}
       style={{
         padding: '0 10px',
         height: '100%',
@@ -79,11 +78,12 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
         display: 'flex',
         alignItems: 'center',
         color: '#ddd',
-        backgroundColor: isSelected ? '#333' : '#1a1a1a',
-        transition: 'background-color 0.1s ease',
+        backgroundColor: isSelected && !isDragging ? '#333' : '#1a1a1a',
+        transition: 'background-color 0.1s ease, opacity 0.1s ease',
         minWidth: '150px',
         boxSizing: 'border-box',
-        opacity: isDragging ? 0.5 : 1,
+        cursor: isEditing ? 'text' : (onDragStart ? 'grab' : 'grabbing'),
+        opacity: isDragging ? 0.8 : 1,
         userSelect: 'none',
       }}
     >
@@ -109,7 +109,7 @@ function InstrumentView({ track, onDragStart, isDragging }: InstrumentViewProps)
           }}
         />
       ) : (
-        <span onDoubleClick={handleDoubleClick} style={{ width: '100%' }}>
+        <span onDoubleClick={handleDoubleClick} style={{ width: '100%', pointerEvents: isDragging ? 'none' : 'auto' }}>
           {track.name || 'Untitled Track'}
         </span>
       )}
