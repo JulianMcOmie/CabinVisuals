@@ -34,7 +34,7 @@ export const drawMidiEditor = (
   drawGrid(ctx, editorWidth, editorHeight, blockDuration, pixelsPerBeat, pixelsPerSemitone);
 
   // Draw block box
-  drawBlockBox(ctx, blockDuration, blockHeight, blockStartBeat, pixelsPerBeat);
+  drawMidiBlockBox(ctx, blockDuration, blockHeight, blockStartBeat, pixelsPerBeat);
   
   // Draw notes
   drawNotes(ctx, notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat);
@@ -101,7 +101,7 @@ const drawGrid = (
 /**
  * Draws the block box
  */
-const drawBlockBox = (
+const drawMidiBlockBox = (
   ctx: CanvasRenderingContext2D,
   blockDuration: number,
   blockHeight: number,
