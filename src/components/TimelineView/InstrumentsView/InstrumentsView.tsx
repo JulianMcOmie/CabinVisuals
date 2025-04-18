@@ -3,6 +3,7 @@ import { Track } from '../../../lib/types';
 import InstrumentView from './InstrumentView';
 import './InstrumentsView.css';
 import useStore from '../../../store/store';
+import { SelectedWindowType } from '../../../store/uiSlice'; // Import type if needed
 
 interface InstrumentsViewProps {
   tracks: Track[];
@@ -27,6 +28,11 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
   const reorderTracks = useStore(state => state.reorderTracks);
   const selectTrack = useStore(state => state.selectTrack);
   const updateTrack = useStore(state => state.updateTrack); // Correctly get updateTrack from store
+  const setSelectedWindow = useStore(state => state.setSelectedWindow); // Get action from uiSlice
+  // Get state and actions for delete functionality
+  const selectedWindow = useStore((state) => state.selectedWindow);
+  const selectedTrackId = useStore((state) => state.selectedTrackId);
+  const removeTrack = useStore((state) => state.removeTrack);
 
   const draggedTrack = tracks.find(t => t.id === draggingTrackId);
 
@@ -111,6 +117,12 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
     }
   }, [muteSoloDragInfo, tracks, updateTrack]);
 
+  // --- Handlers ---
+
+  const handleContainerMouseDown = useCallback(() => {
+    setSelectedWindow('instrumentsView');
+  }, [setSelectedWindow]);
+
   // --- Effects ---
   useEffect(() => {
     if (draggingTrackId !== null) {
@@ -132,6 +144,33 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
     };
   }, [draggingTrackId, handleMouseMove, handleMouseUp]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if the target is an input field, textarea, etc.
+      const target = event.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return; // Don't delete if user is typing
+      }
+
+      // Check for Delete or Backspace key
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Check if this component's window is active and a track is selected
+        if (selectedWindow === 'instrumentsView' && selectedTrackId) {
+          removeTrack(selectedTrackId);
+          event.preventDefault();
+          console.log('Deleted track', selectedTrackId);
+        }
+      }
+    };
+
+    // Add listener when component mounts or dependencies change
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup listener on component unmount or before effect runs again
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedWindow, selectedTrackId, removeTrack]); // Dependencies for the effect
 
   // --- Rendering Logic ---
   const currentMouseYRelativeToContainer = containerRef.current && currentY !== null
@@ -146,7 +185,11 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
     : tracks;
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', height: '100%' }}>
+    <div
+      ref={containerRef}
+      style={{ position: 'relative', height: '100%' }}
+      onMouseDown={handleContainerMouseDown}
+    >
       {displayTracks.map(track => {
         // Check if this track is the placeholder for track reordering
         const isReorderPlaceholder = track.id === draggingTrackId;

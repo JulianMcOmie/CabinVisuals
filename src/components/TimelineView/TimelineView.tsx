@@ -48,7 +48,9 @@ function TimelineView() {
       id: `track-${Date.now()}`,
       name: `Track ${trackNumber}`,
       midiBlocks: [],
-      synthesizer: new BasicSynthesizer()
+      synthesizer: new BasicSynthesizer(),
+      isSoloed: false,
+      isMuted: false
     };
     
     addTrack(newTrack);
