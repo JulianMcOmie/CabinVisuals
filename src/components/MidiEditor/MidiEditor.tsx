@@ -250,58 +250,11 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   };
   
   const handleCanvasMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (dragNoteId) {
-      // We were dragging a note - just end the drag
-      setDragNoteId(null);
-      setDragOperation('none');
-      setSelectionBox(null);
-      return;
-    }
-    
-    if (dragOperation === 'select') {
-      // Handle selection box completion
-      if (selectionBox) {
-        const coords = getCoordsAndDerived(e);
-        if (!coords) {
-          setDragOperation('none');
-          setSelectionBox(null);
-          return;
-        }
-        
-        const { action, newNote, selectedIds, selectedNotes } = handleSelectionBoxComplete(
-          block,
-          selectionBox,
-          e.shiftKey ? selectedNoteIds : [],
-          isDragging,
-          coords,
-          pixelsPerBeat,
-          pixelsPerSemitone
-        );
-        
-        if (action === 'create-note' && newNote) {
-          // Add new note to block
-          const updatedBlock = { ...block };
-          updatedBlock.notes = [...block.notes, newNote];
-          updateMidiBlock(track.id, updatedBlock);
-          
-          // Select the new note
-          setSelectedNoteIds([newNote.id]);
-          storeSelectNotes([newNote]);
-        } else {
-          // Update selection based on the selection box
-          setSelectedNoteIds(selectedIds);
-          storeSelectNotes(selectedNotes);
-        }
-      }
-      
-      setDragOperation('none');
-      setSelectionBox(null);
-      return;
-    }
-    
-    // Other operations handled elsewhere
-    setDragOperation('none');
-    setSelectionBox(null);
+    // If we were dragging a note, the global mouseup already handles resetting state.
+    // If we were creating a selection box, the global mouseup will handle completion.
+    // This handler might not be strictly necessary anymore unless needed for other canvas-specific mouseup actions.
+    // Keep it simple for now, global handler takes precedence.
+    // console.log("handleCanvasMouseUp - Now likely handled by global listener");
   };
   
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -458,11 +411,52 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       }
     };
     
-    const handleMouseUp = () => {
-      // End all drag operations
+    const handleMouseUp = (e: MouseEvent) => {
+      if (dragOperation === 'select') {
+        if (selectionBox) {
+          const derivedCoords = getCoordsAndDerived(e);
+
+          // --- FIX: Only process selection if coords are valid --- 
+          if (derivedCoords) { 
+            const { action, newNote, selectedIds, selectedNotes } = handleSelectionBoxComplete(
+              block,
+              selectionBox,
+              selectedNoteIds, 
+              isDragging, 
+              derivedCoords, // Pass valid coords
+              pixelsPerBeat, 
+              pixelsPerSemitone
+            );
+            
+            if (action === 'create-note' && newNote) {
+              // ... add new note ...
+              const updatedBlock = { ...block };
+              updatedBlock.notes = [...block.notes, newNote];
+              updateMidiBlock(track.id, updatedBlock);
+              setSelectedNoteIds([newNote.id]);
+              storeSelectNotes([newNote]);
+            } else {
+              // Update selection based on the box
+              setSelectedNoteIds(selectedIds);
+              storeSelectNotes(selectedNotes);
+            }
+          } else {
+              // Coords were null (mouseup far away?), just clear selection box visually
+              // but maybe don't alter the note selection state?
+              // Or perhaps clear the selection?
+              // Current behaviour: selection state is updated only if coords are valid.
+              console.warn("MouseUp for selection box occurred too far away to get coordinates.");
+          }
+          // ----------------------------------------------------
+        } 
+        // Reset selection box state regardless of coords
+        setSelectionBox(null);
+      }
+
+      // Reset ALL drag operations
       setDragNoteId(null);
-      setDragOperation('none');
-      setSelectionBox(null);
+      setDragOperation('none'); 
+      setSelectionBox(null); 
       setIsDragging(false);
     };
     
@@ -486,7 +480,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     // Add event listeners
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mouseup', handleMouseUp); // This listener now handles selection end
     window.addEventListener('keydown', handleKeyDown);
     
     return () => {
