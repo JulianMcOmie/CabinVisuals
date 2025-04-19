@@ -13,7 +13,7 @@ export interface UseTrackGesturesProps {
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
   addMidiBlock: (trackId: string, block: MIDIBlock) => void;
   removeMidiBlock: (trackId: string, blockId: string) => void;
-  moveMidiBlock: (oldTrackId: string, newTrackId: string, block: MIDIBlock) => void;
+  moveMidiBlock: (blockId: string, oldTrackId: string, newTrackId: string, newStartBeat: number, newEndBeat: number) => void;
   selectBlock: (blockId: string | null) => void;
   selectedBlockId: string | null;
   timelineAreaRef: RefObject<HTMLDivElement | null>;
