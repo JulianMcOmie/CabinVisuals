@@ -36,6 +36,7 @@ interface MappingContext {
   note: MIDINote;
   time: number; // Current global time (beats)
   bpm: number;
+  noteAbsoluteStartBeat: number; // Absolute start beat of the triggering note
   timeSinceNoteStart: number; // Seconds
   noteProgressPercent: number; // 0-1
   noteDurationSeconds: number;
@@ -384,6 +385,7 @@ class VisualObjectEngine {
                                     note: note, 
                                     time: time,
                                     bpm: bpm,
+                                    noteAbsoluteStartBeat: noteAbsoluteStartBeat,
                                     timeSinceNoteStart: timeSinceNoteStart, 
                                     noteProgressPercent: noteProgressPercent,
                                     noteDurationSeconds: noteDurationSeconds,
