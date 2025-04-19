@@ -21,6 +21,7 @@ import SymmetricResonanceSynth from '../lib/synthesizers/SymmetricResonanceSynth
 import GlowSynth from '../lib/synthesizers/GlowSynth';
 import OscillatingGlowRowSynth from '../lib/synthesizers/OscillatingGlowRowSynth';
 import OscillatingCubeRowSynth from '../lib/synthesizers/OscillatingCubeRowSynth';
+import FireworkSynth from '../lib/synthesizers/FireworkSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -66,6 +67,7 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'ReverseKickEngineSynth', name: 'Reverse Kick (Engine)', constructor: ReverseKickEngineSynth },
     { id: 'RadialPulseSynth', name: 'Radial Pulse', constructor: RadialPulseSynth },
     { id: 'RadialDrumSynth', name: 'Radial Drum', constructor: RadialDrumSynth },
+    { id: 'FireworkSynth', name: 'Firework Burst', constructor: FireworkSynth },
   ],
 };
 
