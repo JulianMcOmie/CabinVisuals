@@ -13,11 +13,12 @@ import {
   PIXELS_PER_BEAT,
   PIXELS_PER_SEMITONE,
   KEY_COUNT,
-  DragOperation,
-  CursorType,
   SelectionBox,
   BEATS_PER_MEASURE,
-  LOWEST_NOTE
+  LOWEST_NOTE,
+  RESIZE_HANDLE_WIDTH, // For note resize
+  BLOCK_RESIZE_HANDLE_WIDTH,
+  GRID_SNAP
 } from './utils/constants';
 
 import {
@@ -41,6 +42,12 @@ import {
 } from './utils/dragOperations';
 
 import { handleKeyboardShortcuts } from './utils/keyboardHandlers';
+
+// Define CursorType including ew-resize
+type CursorType = 'default' | 'move' | 'w-resize' | 'e-resize' | 'ew-resize';
+
+// Define DragOperation type
+type DragOperation = 'none' | 'move' | 'start' | 'end' | 'select' | 'resize-start' | 'resize-end';
 
 interface MidiEditorProps {
   block: MIDIBlock;
@@ -122,6 +129,10 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // --- ADDED: State to track mouse button on down --- 
   const [mouseDownButton, setMouseDownButton] = useState<number | null>(null);
   // -------------------------------------------------
+
+  // --- ADDED: State to store block state on resize start ---
+  const [initialBlockState, setInitialBlockState] = useState<MIDIBlock | null>(null);
+  // ---------------------------------------------------------
 
   const [scrollX, setScrollX] = useState(0);
   const [scrollY, setScrollY] = useState(0);
@@ -237,14 +248,39 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setSelectedWindow('midiEditor');
-    // --- Record mouse button --- 
     setMouseDownButton(e.button);
-    // -------------------------
 
     const coords = getCoordsAndDerived(e);
     if (!coords) return;
     
-    const { x, y, beat, pitch } = coords;
+    const { x, y, scrolledX, scrolledY, beat, pitch } = coords; 
+
+    // --- Check for Block Resize Click FIRST --- 
+    if (e.button === 0) { // Only allow left-click resize
+      const blockStartX_px = blockStartBeat * pixelsPerBeat;
+      const blockEndX_px = blockStartX_px + blockWidth;
+
+      if (scrolledX >= blockStartX_px - BLOCK_RESIZE_HANDLE_WIDTH / 2 && 
+          scrolledX <= blockStartX_px + BLOCK_RESIZE_HANDLE_WIDTH / 2) {
+        // Start edge resize
+        setDragOperation('resize-start');
+        setDragStart({ x, y }); // Use element-relative coords for delta calculation
+        setInitialBlockState({ ...block }); // Store initial block state
+        e.stopPropagation();
+        return;
+      } else if (scrolledX >= blockEndX_px - BLOCK_RESIZE_HANDLE_WIDTH / 2 && 
+                 scrolledX <= blockEndX_px + BLOCK_RESIZE_HANDLE_WIDTH / 2) {
+        // End edge resize
+        setDragOperation('resize-end');
+        setDragStart({ x, y });
+        setInitialBlockState({ ...block });
+        e.stopPropagation();
+        return;
+      }
+    }
+    // -----------------------------------------
+    
+    // If not resizing, proceed with note/selection logic
     const noteClickResult = findNoteAt(
       x,
       y,
@@ -257,7 +293,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     );
     
     setIsDragging(false);
-    setDragStart({ x: coords.x, y: coords.y });
+    setDragStart({ x: x, y: y }); 
     
     if (noteClickResult) {
       // Clicked on a note
@@ -342,18 +378,19 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           });
       }
     } else {
-      // Clicked on empty space - will start selection box
-      setDragOperation('select');
-      setSelectionBox({ startX: x, startY: y, endX: x, endY: y });
-      
-      // Clear selection if not holding shift
-      if (!e.shiftKey) {
-        setSelectedNoteIds([]);
-        storeSelectNotes([]);
+      // Clicked on empty space
+      if (e.button === 0) { // Only start selection on left click
+        setDragOperation('select');
+        setSelectionBox({ startX: x, startY: y, endX: x, endY: y }); 
+        
+        if (!e.shiftKey) {
+          setSelectedNoteIds([]);
+          storeSelectNotes([]);
+        }
+        
+        setDragNoteId(null);
+        setHoverCursor('default');
       }
-      
-      setDragNoteId(null);
-      setHoverCursor('default');
     }
   };
   
@@ -401,29 +438,38 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       return;
     }
     
-    const { x, y, beat, pitch } = coords;
+    const { x, y, scrolledX, scrolledY, beat, pitch } = coords; 
     
-    // Update selection box if in select mode
-    if (dragOperation === 'select' && selectionBox) {
-      setSelectionBox({
-        ...selectionBox,
-        endX: x,
-        endY: y
-      });
-      
-      // Check if drag threshold is met using utility function
-      if (!isDragging && isDragThresholdMet(selectionBox.startX, selectionBox.startY, coords.x, coords.y)) {
-        setIsDragging(true);
-      }
-      
-      return;
+    if (dragOperation !== 'none') return; // Skip hover checks if any drag is active
+
+    // Check for Block Resize Hover 
+    const blockStartX_px = blockStartBeat * pixelsPerBeat;
+    const blockEndX_px = blockStartX_px + blockWidth; 
+
+    let isOverEdge = false;
+    if (scrolledX >= blockStartX_px - BLOCK_RESIZE_HANDLE_WIDTH / 2 && 
+        scrolledX <= blockStartX_px + BLOCK_RESIZE_HANDLE_WIDTH / 2) {
+      setHoverCursor('ew-resize');
+      isOverEdge = true;
+    } else if (scrolledX >= blockEndX_px - BLOCK_RESIZE_HANDLE_WIDTH / 2 && 
+               scrolledX <= blockEndX_px + BLOCK_RESIZE_HANDLE_WIDTH / 2) {
+      setHoverCursor('ew-resize');
+      isOverEdge = true;
     }
     
-    // Skip hover effects if we're already in a drag operation
-    if (dragOperation !== 'none') return;
-    
-    // Handle hover cursor
-    const cursorResult = findNoteAt(x, y, block.notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat, blockDuration);
+    if (isOverEdge) return; // Don't check notes if hovering edge
+
+    // Handle Note Hover Cursor (if not over edge)
+    const cursorResult = findNoteAt(
+      scrolledX, 
+      scrolledY, 
+      block.notes, 
+      selectedNoteIds, 
+      pixelsPerBeat, 
+      pixelsPerSemitone, 
+      blockStartBeat, 
+      blockDuration
+    );
     
     if (cursorResult) {
       // Cursor is over a note, set the appropriate cursor style
@@ -435,7 +481,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         setHoverCursor('move');
       }
     } else {
-      // Not over a note
+      // Not over a note or edge
       setHoverCursor('default');
     }
   };
@@ -443,7 +489,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // Global mouse handlers and keyboard shortcuts
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      // Handle selection box updates
+      // Handle selection box updates first
       if (dragOperation === 'select' && selectionBox) {
         const coords = getCoordsAndDerived(e);
         if (!coords) return;
@@ -462,6 +508,55 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         
         return;
       }
+      
+      // --- ADDED: Handle Block Resize Drag --- 
+      if ((dragOperation === 'resize-start' || dragOperation === 'resize-end') && initialBlockState) {
+        const derivedCoords = getCoordsAndDerived(e);
+        if (!derivedCoords) return; 
+
+        const deltaX = derivedCoords.x - dragStart.x; 
+        const deltaBeat = Math.round(deltaX / pixelsPerBeat / GRID_SNAP) * GRID_SNAP;
+
+        let tempBlock = { ...block }; 
+
+        if (dragOperation === 'resize-start') {
+          const originalEndBeat = initialBlockState.endBeat; 
+          let newStartBeat = Math.max(0, initialBlockState.startBeat + deltaBeat);
+
+          // Prevent start from crossing the end beat 
+          if (newStartBeat >= originalEndBeat - GRID_SNAP) { 
+            newStartBeat = originalEndBeat - GRID_SNAP; 
+          }
+          
+          tempBlock.startBeat = newStartBeat;
+
+          // --- Calculate note adjustments DURING drag --- 
+          const deltaBlockStartBeat = tempBlock.startBeat - initialBlockState.startBeat;
+          if (deltaBlockStartBeat !== 0) {
+            // Use notes from initial state to avoid cumulative errors
+            tempBlock.notes = initialBlockState.notes.map(note => ({
+              ...note,
+              startBeat: note.startBeat - deltaBlockStartBeat
+            }));
+          } else {
+            // If no change in start beat, keep original notes
+            tempBlock.notes = initialBlockState.notes;
+          }
+          // ---------------------------------------------
+
+        } else { // resize-end
+          const newEndBeat = Math.max(initialBlockState.startBeat + GRID_SNAP, initialBlockState.endBeat + deltaBeat);
+          tempBlock.endBeat = newEndBeat;
+          // Notes don't need adjusting for end resize
+          tempBlock.notes = initialBlockState.notes; // Ensure we use initial notes state
+        }
+        
+        // Update the block in the store (now includes adjusted notes if needed)
+        updateMidiBlock(track.id, tempBlock);
+
+        return; 
+      }
+      // -----------------------------------------
       
       // Handle note modifications
       if (dragOperation === 'none' || !dragNoteId) return;
@@ -565,12 +660,22 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         } 
       } // End of check for left-click selection
 
+      // --- ADDED: Finalize Block Resize --- 
+      else if ((dragOperation === 'resize-start' || dragOperation === 'resize-end') && initialBlockState) {
+        // Just clear the initial state
+        setInitialBlockState(null);
+      }
+      // ------------------------------------
+
       // Reset ALL drag operations and mouse button state regardless of button clicked
       setDragNoteId(null);
       setDragOperation('none'); 
       setSelectionBox(null); 
       setIsDragging(false);
-      setMouseDownButton(null); // <-- Reset mouse button state
+      setMouseDownButton(null); 
+      // --- ADDED: Also clear initial block state here just in case ---
+      setInitialBlockState(null); 
+      // ------------------------------------------------------------
     };
     
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -622,7 +727,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     pixelsPerSemitone,
     scrollX,
     scrollY,
-    mouseDownButton
+    mouseDownButton,
+    initialBlockState
   ]);
 
   const handleEditorClick = () => {
