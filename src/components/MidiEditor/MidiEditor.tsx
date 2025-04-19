@@ -154,6 +154,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     isAdjusting: false,
     mouseY: 0,
     proportionY: 0,
+    mouseX: 0, // Added for horizontal
+    proportionX: 0, // Added for horizontal
+    zoomDimension: 'none' as 'x' | 'y' | 'none', // Added to track dimension
   });
   // ------------------------------------------------------
   
@@ -174,6 +177,29 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
         // Horizontal Zoom
         setPixelsPerBeat((prevPixelsPerBeat: number) => {
+          // --- Capture scroll state BEFORE zoom ---
+          const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
+          if (gridElement) {
+              const rect = gridElement.getBoundingClientRect();
+              const mouseX = e.clientX - rect.left; // Mouse X relative to grid element
+              const currentScrollX = gridElement.scrollLeft;
+              const currentContentWidth = numMeasures * BEATS_PER_MEASURE * prevPixelsPerBeat;
+              
+              if (currentContentWidth > 0) { // Avoid division by zero
+                zoomScrollAdjustmentRef.current = {
+                  ...zoomScrollAdjustmentRef.current, // Preserve Y values
+                  isAdjusting: true,
+                  mouseX: mouseX,
+                  proportionX: (mouseX + currentScrollX) / currentContentWidth,
+                  zoomDimension: 'x',
+                };
+              } else {
+                // If content width is 0, reset adjustment flags
+                zoomScrollAdjustmentRef.current = { ...zoomScrollAdjustmentRef.current, isAdjusting: false, zoomDimension: 'none' };
+              }
+          }
+          // ----------------------------------------
+
           let newPixelsPerBeat;
           if (e.deltaX < 0) {
             // Zoom In (Increase pixelsPerBeat)
@@ -198,13 +224,15 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                 
                 if (currentContentHeight > 0) { // Avoid division by zero
                   zoomScrollAdjustmentRef.current = {
+                    ...zoomScrollAdjustmentRef.current, // Preserve X values
                     isAdjusting: true,
                     mouseY: mouseY,
                     proportionY: (mouseY + currentScrollY) / currentContentHeight,
+                    zoomDimension: 'y',
                   };
                 } else {
                   // If content height is 0, reset adjustment
-                  zoomScrollAdjustmentRef.current = { isAdjusting: false, mouseY: 0, proportionY: 0 };
+                  zoomScrollAdjustmentRef.current = { ...zoomScrollAdjustmentRef.current, isAdjusting: false, zoomDimension: 'none' };
                 }
             }
             // ----------------------------------------
@@ -322,28 +350,42 @@ function MidiEditor({ block, track }: MidiEditorProps) {
 
       const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
       if (gridElement) {
-        const newContentHeight = KEY_COUNT * pixelsPerSemitone;
-        const { mouseY, proportionY } = zoomScrollAdjustmentRef.current;
-
-        // Calculate new scroll position to keep mouse point stable
-        let targetScrollY = (proportionY * newContentHeight) - mouseY;
-
-        // Clamp scroll position within valid bounds
+        const { mouseX, proportionX, mouseY, proportionY, zoomDimension } = zoomScrollAdjustmentRef.current;
         const viewportHeight = gridElement.clientHeight;
-        targetScrollY = Math.max(0, Math.min(targetScrollY, newContentHeight - viewportHeight));
+        const viewportWidth = gridElement.clientWidth;
 
-        if (!isNaN(targetScrollY) && isFinite(targetScrollY)) {
-            gridElement.scrollTop = targetScrollY;
-            // Update state directly, bypassing onScroll handler for this adjustment
-            setScrollY(targetScrollY); 
-        } else {
-            console.warn("Calculated invalid targetScrollY during zoom adjustment", { proportionY, newContentHeight, mouseY, targetScrollY });
+        if (zoomDimension === 'x') {
+          // --- Horizontal Adjustment ---
+          const newContentWidth = numMeasures * BEATS_PER_MEASURE * pixelsPerBeat;
+          let targetScrollX = (proportionX * newContentWidth) - mouseX;
+          targetScrollX = Math.max(0, Math.min(targetScrollX, newContentWidth - viewportWidth));
+
+          if (!isNaN(targetScrollX) && isFinite(targetScrollX)) {
+              gridElement.scrollLeft = targetScrollX;
+              // setScrollX(targetScrollX); // REMOVED: Update state via onScroll after adjustment
+          } else {
+              console.warn("Calculated invalid targetScrollX during zoom adjustment", { proportionX, newContentWidth, mouseX, targetScrollX });
+          }
+          // ---------------------------
+        } else if (zoomDimension === 'y') {
+          // --- Vertical Adjustment ---
+          const newContentHeight = KEY_COUNT * pixelsPerSemitone;
+          let targetScrollY = (proportionY * newContentHeight) - mouseY;
+          targetScrollY = Math.max(0, Math.min(targetScrollY, newContentHeight - viewportHeight));
+
+          if (!isNaN(targetScrollY) && isFinite(targetScrollY)) {
+              gridElement.scrollTop = targetScrollY;
+              // setScrollY(targetScrollY); // REMOVED: Update state via onScroll after adjustment
+          } else {
+              console.warn("Calculated invalid targetScrollY during zoom adjustment", { proportionY, newContentHeight, mouseY, targetScrollY });
+          }
+          // -------------------------
         }
       }
       // Reset the flag at the end of the adjustment logic
-      zoomScrollAdjustmentRef.current.isAdjusting = false;
+      zoomScrollAdjustmentRef.current = { ...zoomScrollAdjustmentRef.current, isAdjusting: false, zoomDimension: 'none' };
     }
-  }, [pixelsPerSemitone]); // Run ONLY when pixelsPerSemitone changes
+  }, [pixelsPerBeat, pixelsPerSemitone]); // Run when EITHER zoom level changes
   // -----------------------------------------------------------------
 
   // Helper to get coords and derived values, adjusted for scroll
