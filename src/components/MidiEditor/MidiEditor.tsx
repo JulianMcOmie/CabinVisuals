@@ -134,6 +134,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const blockDuration = block.endBeat - block.startBeat;
   const blockWidth = blockDuration * pixelsPerBeat;
   const blockHeight = KEY_COUNT * pixelsPerSemitone;
+  // --- ADDED: Calculate total grid width based on song measures ---
+  const totalGridWidth = numMeasures * BEATS_PER_MEASURE * pixelsPerBeat;
+  // ----------------------------------------------------------------
   
   // Draw canvas using our extracted drawing function
   useEffect(() => {
@@ -148,23 +151,34 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Context translation for scrolling
+    ctx.save();
     ctx.scale(dpr, dpr);
+    ctx.translate(-scrollX, -scrollY);
+    
+    // --- Pass calculated totalGridWidth to drawMidiEditor --- 
+    const totalGridWidth = numMeasures * BEATS_PER_MEASURE * pixelsPerBeat;
     
     drawMidiEditor(
       ctx,
       block.notes,
       selectedNoteIds,
-      editorDimensions.width,
+      editorDimensions.width, 
       editorDimensions.height,
-      blockWidth,
+      blockWidth,             
       blockHeight,
       blockDuration,
       blockStartBeat,
+      totalGridWidth, // <-- Pass the new total width here
       selectionBox,
       isDragging,
       pixelsPerBeat,
       pixelsPerSemitone
     );
+
+    // Restore context state
+    ctx.restore(); 
+
   }, [
       block.notes, 
       blockDuration, 
@@ -173,19 +187,48 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       selectionBox, 
       isDragging, 
       selectedNoteIds,
-      blockWidth,
+      blockWidth, // Keep blockWidth as dependency
       blockHeight,
       pixelsPerBeat,
-      pixelsPerSemitone
+      pixelsPerSemitone,
+      scrollX, 
+      scrollY,
+      numMeasures // Add numMeasures as it's used to calculate totalGridWidth
   ]);
 
-  // Helper to get coords and derived values
+  // Helper to get coords and derived values, adjusted for scroll
   const getCoordsAndDerived = (e: MouseEvent | React.MouseEvent) => {
-    const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
-    if (!coords) return null;
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
     
-    const { x, y, beat, pitch } = coords;
-    return { x, y, beat, pitch };
+    // Calculate mouse position relative to the canvas ELEMENT's top-left corner
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Adjust mouse coordinates by the current scroll position
+    const scrolledX = mouseX + scrollX;
+    const scrolledY = mouseY + scrollY;
+
+    // Calculate beat and pitch based on ADJUSTED coordinates
+    const beat = scrolledX / pixelsPerBeat;
+    const pitch = KEY_COUNT - Math.floor(scrolledY / pixelsPerSemitone) - 1; // Assuming 0,0 is top-left
+
+    if (isNaN(beat) || isNaN(pitch)) {
+      console.warn("NaN coordinate calculation", { scrolledX, scrolledY, pixelsPerBeat, pixelsPerSemitone });
+      return null;
+    }
+
+    // Return both raw (relative to element) and scrolled coordinates, plus derived values
+    return {
+      x: mouseX,       // Raw X relative to canvas element
+      y: mouseY,       // Raw Y relative to canvas element
+      scrolledX,   // X adjusted for scroll
+      scrolledY,   // Y adjusted for scroll
+      beat,        // Beat calculated from scrolledX
+      pitch        // Pitch calculated from scrolledY
+    };
   };
 
   // Mouse event handlers
@@ -324,9 +367,22 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     const result = findNoteAt(coords.x, coords.y, block.notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat, blockDuration);
     if (result) {
-      // Found a note, delete it using the utility function
-      const updatedBlock = handleContextMenuOnNote(block, result.note.id);
+      // Get the note ID that was clicked
+      const clickedNoteId = result.note.id;
+      // Check if this note was selected
+      const wasSelected = selectedNoteIds.includes(clickedNoteId);
+
+      // Call the utility function, passing the selected IDs
+      const updatedBlock = handleContextMenuOnNote(block, clickedNoteId, selectedNoteIds);
+      
+      // Update the block in the store
       updateMidiBlock(track.id, updatedBlock);
+
+      // If the clicked note was selected (meaning all selected notes were deleted), clear the selection
+      if (wasSelected) {
+        setSelectedNoteIds([]);
+        storeSelectNotes([]);
+      }
     }
   };
   
@@ -564,7 +620,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     setCopiedNotes,
     selectedWindow,
     pixelsPerBeat,
-    pixelsPerSemitone
+    pixelsPerSemitone,
+    scrollX,
+    scrollY
   ]);
 
   const handleEditorClick = () => {
@@ -596,14 +654,24 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           </div>
           <div 
             className="piano-roll-grid relative" 
-            style={{ width: `${editorWidth}px`, height: `${editorHeight}px` }}
+            style={{
+              width: `${editorWidth}px`,      // Visible width
+              overflowX: 'auto',           // Horizontal scroll only
+              overflowY: 'hidden'            // Hide vertical scroll
+            }}
+            onScroll={(e) => {
+              setScrollX(e.currentTarget.scrollLeft);
+            }}
           >
             <canvas 
               ref={canvasRef}
-              className="absolute top-0 left-0 w-full h-full"
-              width={editorWidth}
-              height={editorHeight}
-              style={{ cursor: hoverCursor }}
+              style={{
+                display: 'block',
+                width: `${totalGridWidth}px`,   // Full scrollable content width
+                height: `${blockHeight}px`, // Full content height
+                cursor: hoverCursor
+              }}
+              // Width/Height attributes still set by editorDimensions in useEffect
               onMouseDown={handleCanvasMouseDown}
               onMouseUp={handleCanvasMouseUp}
               onMouseMove={handleCanvasMouseMove}

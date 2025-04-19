@@ -7,7 +7,8 @@ import {
   SELECTION_BOX_COLOR,
   SELECTION_BOX_BORDER_COLOR,
   GRID_SNAP,
-  SelectionBox
+  SelectionBox,
+  BEATS_PER_MEASURE
 } from './constants';
 
 /**
@@ -17,29 +18,35 @@ export const drawMidiEditor = (
   ctx: CanvasRenderingContext2D,
   notes: MIDINote[],
   selectedNoteIds: string[],
-  editorWidth: number,
-  editorHeight: number,
-  blockWidth: number,
-  blockHeight: number,
+  editorWidth: number,   // Visible width
+  editorHeight: number,  // Visible height
+  blockWidth: number,    // Block width (for block outline, note placement)
+  blockHeight: number,   // Total piano roll height
   blockDuration: number,
   blockStartBeat: number,
+  totalGridWidth: number, // Renamed parameter for clarity, represents full grid width
   selectionBox: SelectionBox,
   isDragging: boolean,
   pixelsPerBeat: number,
   pixelsPerSemitone: number
 ): void => {
+  // Clear the visible area. Assumes 0,0 is top-left of VISIBLE area AFTER translate
   ctx.clearRect(0, 0, editorWidth, editorHeight);
   
-  // Draw grid
-  drawGrid(ctx, editorWidth, editorHeight, blockDuration, pixelsPerBeat, pixelsPerSemitone);
-
-  // Draw block box
-  drawMidiBlockBox(ctx, blockDuration, blockHeight, blockStartBeat, pixelsPerBeat);
+  // Calculate total beats based on totalGridWidth (or could be passed in if available)
+  // Note: Ensure numMeasures/BEATS_PER_MEASURE are available or passed if needed
+  const totalBeats = totalGridWidth / pixelsPerBeat; 
   
-  // Draw notes
+  // Draw grid using totalGridWidth and totalBeats
+  drawGrid(ctx, totalGridWidth, editorHeight, totalBeats, pixelsPerBeat, pixelsPerSemitone);
+
+  // Draw block box (uses block specific dimensions)
+  drawMidiBlockBox(ctx, blockDuration, blockHeight, blockStartBeat, pixelsPerBeat, pixelsPerSemitone);
+  
+  // Draw notes (uses note specific dimensions relative to block start)
   drawNotes(ctx, notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat);
   
-  // Draw selection box if active
+  // Draw selection box if active (uses mouse coords relative to visible area)
   if (selectionBox && isDragging) {
     drawSelectionBox(ctx, selectionBox);
   }
@@ -50,9 +57,9 @@ export const drawMidiEditor = (
  */
 const drawGrid = (
   ctx: CanvasRenderingContext2D,
-  editorWidth: number,
-  editorHeight: number,
-  blockDuration: number,
+  totalGridWidth: number, // Renamed: Use total width for grid extent
+  contentHeight: number, // Still represents the height to draw lines within
+  totalBeats: number,    // Renamed: Total beats for vertical line calculation
   pixelsPerBeat: number,
   pixelsPerSemitone: number
 ): void => {
@@ -61,39 +68,35 @@ const drawGrid = (
     const y = i * pixelsPerSemitone;
     ctx.beginPath();
     ctx.moveTo(0, y);
-    ctx.lineTo(editorWidth, y);
+    // --- Use totalGridWidth --- 
+    ctx.lineTo(totalGridWidth, y);
     
-    // Check if this is an octave line (every 12th line)
+    // Octave line styling
     if (i % 12 === 0) {
-      ctx.strokeStyle = '#666';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
     } else {
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
     }
-    
     ctx.stroke();
   }
   
   // Draw vertical lines (beats)
-  for (let i = 0; i <= Math.ceil(editorWidth / (GRID_SNAP * pixelsPerBeat)); i++) {
+  // --- Loop based on totalBeats --- 
+  const totalGridLines = Math.ceil(totalBeats / GRID_SNAP);
+  for (let i = 0; i <= totalGridLines; i++) {
     const x = i * GRID_SNAP * pixelsPerBeat;
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, editorHeight);
+    ctx.lineTo(x, contentHeight); // Use the height passed (likely visible height)
     
-    // Different styles for different beat divisions
+    // Beat division styling
     if (i % (4/GRID_SNAP) === 0) {
-      ctx.strokeStyle = '#666'; // Measure lines
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
     } else if (i % (1/GRID_SNAP) === 0) {
-      ctx.strokeStyle = '#444'; // Beat lines
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#444'; ctx.lineWidth = 0.5;
     } else {
-      ctx.strokeStyle = '#333'; // Grid lines
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
     }
-    
     ctx.stroke();
   }
 };
@@ -106,12 +109,13 @@ const drawMidiBlockBox = (
   blockDuration: number,
   blockHeight: number,
   blockStartBeat: number,
-  pixelsPerBeat: number
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): void => {
   // Draw block box
   ctx.strokeStyle = '#00FF00'; // Green color
   ctx.lineWidth = 3;
-  ctx.strokeRect(blockStartBeat * pixelsPerBeat, 0, blockDuration * pixelsPerBeat, blockHeight);
+  ctx.strokeRect(blockStartBeat * pixelsPerBeat, 0, blockDuration * pixelsPerBeat, pixelsPerSemitone * KEY_COUNT);
 };
 
 /**
