@@ -29,7 +29,10 @@ function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
 
   return (
     <div 
-      style={{ padding: '20px', color: '#ddd'}} 
+      style={{
+        padding: '20px', 
+        color: '#ddd',
+      }} 
       onClick={handleViewClick} // Attach click handler to the main div
     >
       <h3>Track Settings: {track.name}</h3>

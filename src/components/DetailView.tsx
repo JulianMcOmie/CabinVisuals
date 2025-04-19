@@ -28,9 +28,9 @@ function DetailView() {
         className="detail-container" 
         style={{ 
           flex: 1, 
-          overflow: 'hidden',
           padding: 0, 
-          backgroundColor: '#222' 
+          backgroundColor: '#222',
+          overflow: 'auto'
         }}
       >
         {isMidiEditorVisible ? (
