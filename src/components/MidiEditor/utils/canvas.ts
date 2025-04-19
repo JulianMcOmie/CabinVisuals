@@ -81,7 +81,7 @@ const drawGrid = (
     const x = i * GRID_SNAP * pixelsPerBeat;
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, contentHeight); // Use the height passed (likely visible height)
+    ctx.lineTo(x, editorHeight); // Use the height passed (likely visible height)
     
     // Style beat/measure lines
     if (i % (4/GRID_SNAP) === 0) {
@@ -105,8 +105,6 @@ const drawMidiBlockBox = (
   ctx: CanvasRenderingContext2D,
   blockDuration: number,
   blockStartBeat: number,
-  pixelsPerBeat: number,
-  pixelsPerSemitone: number
   pixelsPerBeat: number,
   pixelsPerSemitone: number
 ): void => {
