@@ -82,11 +82,13 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // Copy/paste related state
   const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
 
+  const blockStartBeat = block.startBeat;
+
 
   const blockDuration = block.endBeat - block.startBeat;
   const blockWidth = blockDuration * pixelsPerBeat;
   const blockHeight = KEY_COUNT * pixelsPerSemitone;
-  const blockStartBeat = block.startBeat;
+  
   // Draw canvas using our extracted drawing function
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -116,7 +118,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       pixelsPerBeat,
       pixelsPerSemitone
     );
-  }, [block.notes, blockDuration, editorWidth, editorHeight, selectionBox, isDragging, selectedNoteIds]);
+  }, [block.notes, blockDuration, blockStartBeat, editorWidth, editorHeight, selectionBox, isDragging, selectedNoteIds]);
 
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
