@@ -350,8 +350,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     // If not resizing, proceed with note/selection logic
     const noteClickResult = findNoteAt(
-      x,
-      y,
+      scrolledX,
+      scrolledY,
       block.notes,
       selectedNoteIds,
       pixelsPerBeat,
@@ -477,7 +477,16 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     const coords = getCoordsAndDerived(e);
     if (!coords) return;
     
-    const result = findNoteAt(coords.x, coords.y, block.notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat, blockDuration);
+    const result = findNoteAt(
+        coords.scrolledX,
+        coords.scrolledY,
+        block.notes, 
+        selectedNoteIds, 
+        pixelsPerBeat, 
+        pixelsPerSemitone, 
+        blockStartBeat, 
+        blockDuration
+    );
     if (result) {
       // Get the note ID that was clicked
       const clickedNoteId = result.note.id;
