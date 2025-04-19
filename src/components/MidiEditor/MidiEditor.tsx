@@ -149,6 +149,14 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [pixelsPerBeat, setPixelsPerBeat] = useState(PIXELS_PER_BEAT); //useState(editorWidth / (numMeasures * BEATS_PER_MEASURE));
   const [pixelsPerSemitone, setPixelsPerSemitone] = useState(PIXELS_PER_SEMITONE); // Make this stateful for zoom
   
+  // --- Refs for smooth vertical zoom scroll adjustment ---
+  const zoomScrollAdjustmentRef = useRef({
+    isAdjusting: false,
+    mouseY: 0,
+    proportionY: 0,
+  });
+  // ------------------------------------------------------
+  
   // Copy/paste related state
   const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
 
@@ -180,6 +188,27 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       } else if (e.deltaY !== 0) { // Only zoom vertically if there's vertical scroll
         // Vertical Zoom
         setPixelsPerSemitone((prevPixelsPerSemitone: number) => {
+            // --- Capture scroll state BEFORE zoom ---
+            const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
+            if (gridElement) {
+                const rect = gridElement.getBoundingClientRect();
+                const mouseY = e.clientY - rect.top; // Mouse Y relative to grid element
+                const currentScrollY = gridElement.scrollTop;
+                const currentContentHeight = KEY_COUNT * prevPixelsPerSemitone;
+                
+                if (currentContentHeight > 0) { // Avoid division by zero
+                  zoomScrollAdjustmentRef.current = {
+                    isAdjusting: true,
+                    mouseY: mouseY,
+                    proportionY: (mouseY + currentScrollY) / currentContentHeight,
+                  };
+                } else {
+                  // If content height is 0, reset adjustment
+                  zoomScrollAdjustmentRef.current = { isAdjusting: false, mouseY: 0, proportionY: 0 };
+                }
+            }
+            // ----------------------------------------
+
             let newPixelsPerSemitone;
             if (e.deltaY < 0) {
                 // Zoom In (Increase pixelsPerSemitone)
@@ -189,7 +218,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                 newPixelsPerSemitone = prevPixelsPerSemitone / Math.pow(ZOOM_SENSITIVITY, zoomIntensityY);
             }
             // Clamp the value within limits
-            return Math.max(MIN_PIXELS_PER_SEMITONE, Math.min(MAX_PIXELS_PER_SEMITONE, newPixelsPerSemitone));
+            const finalPixelsPerSemitone = Math.max(MIN_PIXELS_PER_SEMITONE, Math.min(MAX_PIXELS_PER_SEMITONE, newPixelsPerSemitone));
+            // setScrollY(scrollY + finalPixelsPerSemitone - pixelsPerSemitone); // REMOVED: Automatic scroll adjustment during vertical zoom
+            return finalPixelsPerSemitone;
         });
       }
     }
@@ -277,7 +308,44 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       numMeasures
   ]);
 
-  // Helper to get coords and derived values, adjusted for scroll
+  // --- ADDED: useEffect to log scrollY and pixelsPerSemitone together ---
+  useEffect(() => {
+    console.log({ scrollY, pixelsPerSemitone });
+  }, [scrollY, pixelsPerSemitone]);
+  // ----------------------------------------------------------------------
+
+  // --- ADDED: useEffect for smooth vertical zoom scroll adjustment ---
+  useEffect(() => {
+    if (zoomScrollAdjustmentRef.current.isAdjusting) {
+      // Reset the flag *before* potentially triggering onScroll via scrollTop assignment - REVERTED
+      // zoomScrollAdjustmentRef.current.isAdjusting = false; 
+
+      const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
+      if (gridElement) {
+        const newContentHeight = KEY_COUNT * pixelsPerSemitone;
+        const { mouseY, proportionY } = zoomScrollAdjustmentRef.current;
+
+        // Calculate new scroll position to keep mouse point stable
+        let targetScrollY = (proportionY * newContentHeight) - mouseY;
+
+        // Clamp scroll position within valid bounds
+        const viewportHeight = gridElement.clientHeight;
+        targetScrollY = Math.max(0, Math.min(targetScrollY, newContentHeight - viewportHeight));
+
+        if (!isNaN(targetScrollY) && isFinite(targetScrollY)) {
+            gridElement.scrollTop = targetScrollY;
+            // Update state directly, bypassing onScroll handler for this adjustment
+            setScrollY(targetScrollY); 
+        } else {
+            console.warn("Calculated invalid targetScrollY during zoom adjustment", { proportionY, newContentHeight, mouseY, targetScrollY });
+        }
+      }
+      // Reset the flag at the end of the adjustment logic
+      zoomScrollAdjustmentRef.current.isAdjusting = false;
+    }
+  }, [pixelsPerSemitone]); // Run ONLY when pixelsPerSemitone changes
+  // -----------------------------------------------------------------
+
   // Helper to get coords and derived values, adjusted for scroll
   const getCoordsAndDerived = (e: MouseEvent | React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -299,7 +367,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     // -----------------------------------------
 
     if (isNaN(beat) || isNaN(pitch)) {
-      console.warn("NaN coordinate calculation", { mouseX, mouseY, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone });
+      // console.warn("NaN coordinate calculation", { mouseX, mouseY, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone });
       return null;
     }
 
@@ -644,7 +712,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         if (isDragThresholdMet(dragStart.x, dragStart.y, e.clientX, e.clientY)) {
           setIsDragging(true);
           
-          // Handle Option/Alt key duplication HERE too
+          // Handle Option/Alt key duplication HERE too - REMOVED as it's handled in MouseDown
+          /*
           if (dragOperation === 'move' && (e.altKey || e.metaKey) && initialDragStates.size > 0) { // Ensure initial states exist
             // Use initialDragStates.keys() as the IDs to duplicate
             const idsToDuplicate = Array.from(initialDragStates.keys());
@@ -674,6 +743,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
             });
             // Proceed with the drag using the new notes
           }
+          */
         } else {
           return; // Don't start dragging yet
         }
@@ -733,7 +803,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
               storeSelectNotes(selectedNotes);
             }
           } else {
-              console.warn("MouseUp for selection box occurred too far away to get coordinates.");
+              // console.warn("MouseUp for selection box occurred too far away to get coordinates.");
           }
         } 
       } // End of check for left-click selection
@@ -847,6 +917,10 @@ function MidiEditor({ block, track }: MidiEditorProps) {
               height: '100%'
             }}
             onScroll={(e) => {
+              // Prevent scroll state update if we are programmatically adjusting scroll during zoom
+              if (zoomScrollAdjustmentRef.current.isAdjusting) {
+                return; 
+              }
               // Update both scroll states
               setScrollX(e.currentTarget.scrollLeft);
               setScrollY(e.currentTarget.scrollTop);
