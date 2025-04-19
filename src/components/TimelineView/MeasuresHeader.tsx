@@ -15,6 +15,13 @@ const HANDLE_PIXEL_THRESHOLD = 10; // Pixel sensitivity for grabbing handles
 const MIN_LABEL_SPACING_PIXELS = 40; // Minimum pixels between measure/beat labels
 const MIN_SUBDIVISION_SPACING_PIXELS = 10; // Minimum pixels between beat subdivision lines
 const DISABLED_AREA_COLOR = 'rgba(0, 0, 0, 0.3)'; // Color for dimming extra measures
+// --- Project Resize Constants ---
+const PROJECT_RESIZE_HANDLE_WIDTH = 8; // Width of the triangle base
+const PROJECT_RESIZE_HANDLE_HEIGHT_RATIO = 1.2; // Triangle height relative to width
+const PROJECT_RESIZE_HANDLE_COLOR = 'rgba(200, 200, 200, 0.9)';
+const PROJECT_RESIZE_AREA_PIXELS = 10; // Clickable pixel threshold around the handle
+const PROJECT_RESIZE_HANDLE_GAP = 3; // Gap between last measure line and handle
+const MIN_PROJECT_BEATS = BEATS_PER_MEASURE; // Minimum project length in beats (e.g., 1 measure)
 
 interface MeasuresHeaderProps {
   horizontalZoom: number;
@@ -36,6 +43,7 @@ function MeasuresHeader({
     loopEndBeat,
     setLoopRange,
     toggleLoop,
+    setNumMeasures,
   } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,11 +58,14 @@ function MeasuresHeader({
     initialEndBeat: number | null;
   }>({ type: null, initialBeat: 0, initialMouseX: 0, initialStartBeat: null, initialEndBeat: null });
   const [cursorStyle, setCursorStyle] = useState('pointer'); // State for dynamic cursor
+  const [isResizingProject, setIsResizingProject] = useState(false); // State for project resize drag
 
   // Calculate effective pixels per beat based on zoom
   const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;
   const actualSongBeats = numMeasures * BEATS_PER_MEASURE; // Use prop
-  const totalRenderBeats = renderMeasures * BEATS_PER_MEASURE; // Use prop
+
+  // Calculate total render beats based on the renderMeasures prop
+  const totalRenderBeats = renderMeasures * BEATS_PER_MEASURE;
 
   // --- Utility Functions (using effectivePixelsPerBeat) ---
   const calculateBeatFromX = useCallback((mouseX: number): number => {
@@ -65,6 +76,15 @@ function MeasuresHeader({
     // Clamp click/seek actions to actual song beats
     return Math.max(0, Math.min(clickedBeat, actualSongBeats));
   }, [totalRenderBeats, effectivePixelsPerBeat, actualSongBeats]);
+
+  // Calculate beat from X without clamping to actual song length (used for resizing)
+  const calculateUnclampedBeatFromX = useCallback((mouseX: number): number => {
+    const totalWidth = effectivePixelsPerBeat * totalRenderBeats; // Use render width
+    const clampedMouseX = Math.max(0, Math.min(mouseX, totalWidth));
+    // Avoid division by zero if totalWidth is 0
+    const clickedBeat = totalWidth > 0 ? (clampedMouseX / totalWidth) * totalRenderBeats : 0; // Use render beats
+    return Math.max(0, clickedBeat); // Only clamp at 0, not actualSongBeats
+  }, [totalRenderBeats, effectivePixelsPerBeat]);
 
   // Convert beat number to pixel X coordinate
   const beatToX = useCallback((beat: number): number => {
@@ -190,8 +210,23 @@ function MeasuresHeader({
     const clickedBeat = quantizeBeat(clickedBeatRaw);
 
     if (mouseY < TOP_SECTION_HEIGHT) {
-      // --- Top Half: Initiate Loop Drag ---
+      // --- Top Half: Initiate Loop Drag OR Project Resize ---
       event.preventDefault();
+
+      // Check for Project Resize Handle interaction first
+      const endOfProjectBeat = numMeasures * BEATS_PER_MEASURE;
+      const handleBaseX = beatToX(endOfProjectBeat) + PROJECT_RESIZE_HANDLE_GAP;
+      const handleTipX = handleBaseX + PROJECT_RESIZE_HANDLE_WIDTH;
+      const handleMinX = handleBaseX - PROJECT_RESIZE_AREA_PIXELS / 2;
+      const handleMaxX = handleTipX + PROJECT_RESIZE_AREA_PIXELS / 2;
+
+      if (mouseX >= handleMinX && mouseX <= handleMaxX) {
+        // Start Project Resizing
+        setIsResizingProject(true);
+        return; // Prevent loop drag logic
+      }
+
+      // --- If not resizing project, check for Loop interactions ---
       const handleBeatThreshold = HANDLE_PIXEL_THRESHOLD / effectivePixelsPerBeat; // Use effective value
       let dragType: typeof loopDragState.type = 'creating';
 
@@ -230,7 +265,11 @@ function MeasuresHeader({
 
   // --- Overlay Mouse Move (for Cursor) ---
   const handleOverlayMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-      // Only update cursor if not currently dragging
+      // Only update cursor if not currently dragging anything
+      if (isResizingProject) {
+        setCursorStyle('ew-resize');
+        return;
+      }
       if (loopDragState.type !== null || isSeeking) return;
 
       const mouseY = event.nativeEvent.offsetY;
@@ -240,31 +279,82 @@ function MeasuresHeader({
       if (mouseY < TOP_SECTION_HEIGHT) {
           const currentBeatRaw = calculateBeatFromX(mouseX);
           const handleBeatThreshold = HANDLE_PIXEL_THRESHOLD / effectivePixelsPerBeat; // Use effective value
-          newCursor = 'cell'; // Default for top section (creating)
 
-          if (loopStartBeat !== null && loopEndBeat !== null) {
-              const startDist = Math.abs(currentBeatRaw - loopStartBeat);
-              const endDist = Math.abs(currentBeatRaw - loopEndBeat);
-              const minHandleDist = handleBeatThreshold * 1.5;
+          // Check for Project Resize Handle Hover first
+          const endOfProjectBeat = numMeasures * BEATS_PER_MEASURE;
+          const handleBaseX = beatToX(endOfProjectBeat) + PROJECT_RESIZE_HANDLE_GAP;
+          const handleTipX = handleBaseX + PROJECT_RESIZE_HANDLE_WIDTH;
+          const handleMinX = handleBaseX - PROJECT_RESIZE_AREA_PIXELS / 2;
+          const handleMaxX = handleTipX + PROJECT_RESIZE_AREA_PIXELS / 2;
 
-              if (startDist <= minHandleDist || endDist <= minHandleDist) {
-                  newCursor = 'ew-resize'; // Resizing L/R
-              } else if (loopEnabled && currentBeatRaw >= loopStartBeat && currentBeatRaw < loopEndBeat) {
-                  newCursor = 'grab'; // Moving active loop
-              } else if (!loopEnabled && currentBeatRaw >= loopStartBeat && currentBeatRaw < loopEndBeat) {
-                  // Hovering inactive loop body shows default create cursor
-                  newCursor = 'cell';
+          if (mouseX >= handleMinX && mouseX <= handleMaxX) {
+              newCursor = 'ew-resize';
+          } else {
+              // --- Check Loop Handle Hover ---
+              newCursor = 'cell'; // Default for top section (creating/outside loop)
+              if (loopStartBeat !== null && loopEndBeat !== null) {
+                  const startDist = Math.abs(currentBeatRaw - loopStartBeat);
+                  const endDist = Math.abs(currentBeatRaw - loopEndBeat);
+                  const minHandleDist = handleBeatThreshold * 1.5;
+
+                  if (startDist <= minHandleDist || endDist <= minHandleDist) {
+                      newCursor = 'ew-resize'; // Resizing L/R
+                  } else if (loopEnabled && currentBeatRaw >= loopStartBeat && currentBeatRaw < loopEndBeat) {
+                      newCursor = 'grab'; // Moving active loop
+                  } else if (!loopEnabled && currentBeatRaw >= loopStartBeat && currentBeatRaw < loopEndBeat) {
+                      // Hovering inactive loop body shows default create cursor
+                      newCursor = 'cell';
+                  }
               }
           }
       }
       setCursorStyle(newCursor);
-  }, [loopDragState.type, isSeeking, loopStartBeat, loopEndBeat, loopEnabled, calculateBeatFromX, effectivePixelsPerBeat]);
+  }, [loopDragState.type, isSeeking, loopStartBeat, loopEndBeat, loopEnabled, calculateBeatFromX, effectivePixelsPerBeat, beatToX, numMeasures]); // Added resize dependencies
+
+  // --- Project Resize Drag Handlers ---
+  const handleProjectResizeMove = useCallback((event: MouseEvent) => {
+    if (!isResizingProject || !overlayRef.current) return; // Check flag
+
+    const overlayRect = overlayRef.current.getBoundingClientRect();
+    const mouseX = event.clientX - overlayRect.left;
+    const targetBeatRaw = calculateUnclampedBeatFromX(mouseX);
+
+    // Quantize to the nearest beat, enforce minimum project beats
+    const quantizedBeat = Math.max(MIN_PROJECT_BEATS, Math.round(targetBeatRaw));
+
+    // Calculate the required number of measures to contain this beat
+    const newNumMeasures = Math.max(1, Math.ceil(quantizedBeat / BEATS_PER_MEASURE)); // Ensure at least 1 measure
+
+    // Only call setNumMeasures if it actually changes
+    if (newNumMeasures !== numMeasures) {
+         // Call the function from the store to update the actual project length
+         setNumMeasures(newNumMeasures);
+         // The parent component is responsible for reacting to this change,
+         // potentially adjusting renderMeasures and scroll position if needed.
+    }
+  }, [isResizingProject, calculateUnclampedBeatFromX, numMeasures, setNumMeasures, actualSongBeats /* Recalculate if actualSongBeats changes */]);
+
+  const handleProjectResizeEnd = useCallback(() => {
+    if (isResizingProject) {
+        setIsResizingProject(false);
+    }
+  }, [isResizingProject]);
 
   // Effect to manage global mouse listeners
   useEffect(() => {
-    const isLoopDragging = loopDragState.type !== null;
-    const currentMoveHandler = isLoopDragging ? handleLoopMove : (isSeeking ? handleSeekMove : null);
-    const currentEndHandler = isLoopDragging ? handleLoopEnd : (isSeeking ? handleSeekEnd : null);
+    let currentMoveHandler: ((event: MouseEvent) => void) | null = null;
+    let currentEndHandler: ((event: MouseEvent) => void) | null = null;
+
+    if (isResizingProject) {
+        currentMoveHandler = handleProjectResizeMove;
+        currentEndHandler = handleProjectResizeEnd;
+    } else if (loopDragState.type) {
+        currentMoveHandler = handleLoopMove;
+        currentEndHandler = handleLoopEnd;
+    } else if (isSeeking) {
+        currentMoveHandler = handleSeekMove;
+        currentEndHandler = handleSeekEnd;
+    }
 
     if (currentMoveHandler) {
       window.addEventListener('mousemove', currentMoveHandler);
@@ -281,7 +371,11 @@ function MeasuresHeader({
         window.removeEventListener('mouseup', currentEndHandler);
       }
     };
-  }, [isSeeking, loopDragState.type, handleSeekMove, handleSeekEnd, handleLoopMove, handleLoopEnd]);
+  }, [
+      isResizingProject, handleProjectResizeMove, handleProjectResizeEnd, // Resize state/handlers
+      loopDragState.type, handleLoopMove, handleLoopEnd,                 // Loop state/handlers
+      isSeeking, handleSeekMove, handleSeekEnd                            // Seek state/handlers
+  ]);
 
   // Draw canvas (with DPR and dynamic rendering)
   useEffect(() => {
@@ -335,6 +429,27 @@ function MeasuresHeader({
       ctx.fillStyle = loopEnabled ? 'rgba(50, 80, 200, 0.8)' : 'rgba(100, 100, 100, 0.8)';
       ctx.fillRect(loopStartX - handleIndicatorWidth / 2, 0, handleIndicatorWidth, TOP_SECTION_HEIGHT);
       ctx.fillRect(loopEndX - handleIndicatorWidth / 2, 0, handleIndicatorWidth, TOP_SECTION_HEIGHT);
+    }
+
+    // --- Draw Project Resize Handle (Top Half) ---
+    const endOfProjectBeat = numMeasures * BEATS_PER_MEASURE;
+    const handleBaseX = beatToX(endOfProjectBeat) + PROJECT_RESIZE_HANDLE_GAP;
+    // Use logicalWidth declared earlier in the effect
+
+    if (handleBaseX < logicalWidth) { // Only draw if visible
+        const handleTipX = handleBaseX + PROJECT_RESIZE_HANDLE_WIDTH;
+        const handleCenterY = TOP_SECTION_HEIGHT / 2;
+        const handleHeight = PROJECT_RESIZE_HANDLE_WIDTH * PROJECT_RESIZE_HANDLE_HEIGHT_RATIO;
+        const topY = handleCenterY - handleHeight / 2;
+        const bottomY = handleCenterY + handleHeight / 2;
+
+        ctx.fillStyle = PROJECT_RESIZE_HANDLE_COLOR;
+        ctx.beginPath();
+        ctx.moveTo(handleBaseX, topY);      // Top left corner of base
+        ctx.lineTo(handleBaseX, bottomY);   // Bottom left corner of base
+        ctx.lineTo(handleTipX, handleCenterY); // Pointy tip to the right
+        ctx.closePath();
+        ctx.fill();
     }
 
     // --- Draw Dividing Line ---
@@ -502,7 +617,7 @@ function MeasuresHeader({
         ref={overlayRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleOverlayMouseMove} // Add mouse move for cursor updates
-        onMouseLeave={() => setCursorStyle('pointer')} // Reset cursor on leave
+        onMouseLeave={() => {if (!isResizingProject && !loopDragState.type && !isSeeking) setCursorStyle('pointer')}} // Reset cursor only if not dragging
         style={{
           position: 'absolute', // Overlay covers canvas
           width: '100%',

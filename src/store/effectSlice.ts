@@ -12,6 +12,7 @@ import RescalePositionEffect from '../lib/effects/RescalePositionEffect';
 import Rotate3DEffect from '../lib/effects/Rotate3DEffect';
 import PanEffect from '../lib/effects/PanEffect';
 import ColorEffect from '../lib/effects/ColorEffect';
+import GlobalRotateEffect from '../lib/effects/GlobalRotateEffect'; // Import the new effect
 
 // Define Effect structures
 export interface EffectDefinition {
@@ -42,7 +43,8 @@ export const availableEffectsData: EffectCategories = {
     { id: 'ScaleEffect', name: 'Scale', constructor: ScaleEffect },
     { id: 'PositionOffsetEffect', name: 'Position Offset', constructor: PositionOffsetEffect },
     { id: 'RescalePositionEffect', name: 'Rescale Position', constructor: RescalePositionEffect },
-    { id: 'Rotate3DEffect', name: '3D Rotate', constructor: Rotate3DEffect },
+    { id: 'Rotate3DEffect', name: '3D Rotate (Local)', constructor: Rotate3DEffect }, // Renamed slightly for clarity
+    { id: 'GlobalRotateEffect', name: 'Global Rotate', constructor: GlobalRotateEffect }, // Add the new effect
   ],
   Time: [
     { id: 'DelayEffect', name: 'Delay', constructor: DelayEffect },

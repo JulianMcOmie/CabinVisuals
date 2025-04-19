@@ -13,7 +13,7 @@ const TRACK_HEIGHT_BASE = 50; // Renamed base height
 const PIXELS_PER_BEAT_BASE = 100; // Renamed base pixels per beat
 const SIDEBAR_WIDTH = 200; // Define sidebar width as a constant
 const MIN_VIEWPORT_MEASURES = 8; // Minimum measures to allow zooming out to see
-const EXTRA_RENDER_MEASURES = 1; // Render this many extra measures beyond content or min viewport
+const EXTRA_RENDER_MEASURES = 8; // Render this many extra measures beyond content or min viewport
 
 // Color constants
 const SIDEBAR_BG_COLOR = '#1a1a1a';
@@ -49,6 +49,7 @@ function TimelineView() {
       name: `Track ${trackNumber}`,
       midiBlocks: [],
       synthesizer: new BasicSynthesizer(),
+      effects: [],
       isSoloed: false,
       isMuted: false
     };
@@ -116,6 +117,7 @@ function TimelineView() {
   const handleWheel = useCallback((event: WheelEvent) => {
     if (event.altKey) {
       event.preventDefault(); // Prevent default scroll behavior when zooming
+      event.stopPropagation(); // Stop the event from bubbling up
 
       // Vertical Zoom (multiplicative but with linear response to wheel)
       const verticalZoomFactor = 1.15;
@@ -136,16 +138,16 @@ function TimelineView() {
         const horizontalZoomFactor = 1.15;
         const zoomSteps = Math.min(Math.abs(event.deltaX) / 100, 1); // Normalize wheel delta
         const effectiveFactor = Math.pow(horizontalZoomFactor, zoomSteps);
-        
+
         if (event.deltaX < 0) {
           // Zoom in horizontally (scroll left)
           setHorizontalZoom(prev => Math.min(prev * effectiveFactor, 10)); // Max zoom 10x
         } else {
           // Zoom out horizontally (scroll right)
           const visibleWidth = timelineContentRef.current?.clientWidth;
-          const numMeasures = useStore.getState().numMeasures;
-          const targetMeasures = Math.max(MIN_VIEWPORT_MEASURES, numMeasures);
-          
+          const currentNumMeasures = useStore.getState().numMeasures; // OK to use getState here for zoom calc
+          const targetMeasures = Math.max(MIN_VIEWPORT_MEASURES, currentNumMeasures);
+
           let minHorizontalZoom = 0.1; // Default minimum zoom
 
           if (visibleWidth && visibleWidth > 0) {
@@ -159,7 +161,7 @@ function TimelineView() {
         }
       }
     }
-  }, [setHorizontalZoom, setVerticalZoom]);
+  }, [setHorizontalZoom, setVerticalZoom]); // Dependencies: setHorizontalZoom, setVerticalZoom
 
   // Attach wheel listener to the timeline content area
   useEffect(() => {
@@ -173,7 +175,38 @@ function TimelineView() {
   }, [handleWheel]);
 
   const numMeasures = useStore(state => state.numMeasures);
-  const renderMeasures = Math.max(MIN_VIEWPORT_MEASURES, numMeasures) + EXTRA_RENDER_MEASURES;
+
+  // State to hold the basis for rendering width (high-water mark)
+  const [renderWidthBasisMeasures, setRenderWidthBasisMeasures] = useState(() =>
+    // Initialize based on initial project length or minimum viewport
+    Math.max(MIN_VIEWPORT_MEASURES, useStore.getState().numMeasures)
+  );
+
+  // Effect to update the render width basis when needed
+  useEffect(() => {
+    const viewportWidth = timelineContentRef.current?.clientWidth ?? 0;
+    // Ensure pixelsPerMeasure is not zero to avoid division issues
+    const pixelsPerMeasure = (PIXELS_PER_BEAT_BASE * horizontalZoom * 4);
+    const measuresNeededForViewport = pixelsPerMeasure > 0
+        ? Math.ceil(viewportWidth / pixelsPerMeasure)
+        : MIN_VIEWPORT_MEASURES; // Fallback if calculation is not possible
+
+    // Determine the minimum measures required based on content, viewport, and absolute minimum
+    const currentRequiredMeasures = Math.max(
+        numMeasures, // Use the reactive numMeasures from the hook here
+        measuresNeededForViewport,
+        MIN_VIEWPORT_MEASURES
+    );
+
+    // Update the basis only if the new requirement is higher than the current high-water mark
+    setRenderWidthBasisMeasures(prevBasis => Math.max(prevBasis, currentRequiredMeasures));
+
+    // Note: This intentionally doesn't shrink the basis when numMeasures decreases.
+    // A ResizeObserver on timelineContentRef could provide more accurate viewport updates.
+  }, [numMeasures, horizontalZoom]); // Re-evaluate when content length or zoom changes
+
+  // Calculate the actual measures to render based on the stable basis + extra buffer
+  const renderMeasures = renderWidthBasisMeasures + EXTRA_RENDER_MEASURES;
 
   const totalTracksHeight = tracks.length * effectiveTrackHeight;
 
