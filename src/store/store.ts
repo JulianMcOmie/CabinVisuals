@@ -171,17 +171,17 @@ const useStore = create<AppState>()(
 
       // Merge function to reconstruct instances during hydration
       merge: (persistedStateUnknown: unknown, currentState: AppState): AppState => {
-        // Type assertion: Assume the persisted state matches our PersistentState interface
         const persistedState = persistedStateUnknown as PersistentState;
         console.log("Merging persisted state...", persistedState);
         
         const newState = { ...currentState } as any; 
 
-        // Check if persistedState is actually an object after assertion
         if (typeof persistedState !== 'object' || persistedState === null) {
              console.warn("Persisted state is not an object, returning current state.");
              return currentState;
         }
+
+        let bpmNeedsUpdate: number | undefined = undefined;
 
         // Iterate over the keys in the persisted state
         for (const key in persistedState) {
@@ -217,15 +217,14 @@ const useStore = create<AppState>()(
                                 return newEffect;
                              } catch (e) {
                                  console.error(`Failed to reconstruct effect "${effectData.type}":`, e);
-                                 return null; // Skip failed effect
+                                 return null; 
                              }
                         } else {
                             console.warn(`Effect constructor not found for type "${effectData.type}".`);
-                            return null; // Skip unknown effect
+                            return null; 
                         }
-                    }).filter((effect): effect is EffectInstance => effect !== null); // Filter out nulls
+                    }).filter((effect): effect is EffectInstance => effect !== null); 
 
-                    // Reconstruct the track object
                     return {
                         id: trackData.id,
                         name: trackData.name,
@@ -239,12 +238,34 @@ const useStore = create<AppState>()(
                 }).filter((track): track is TrackType => track !== null); 
 
             } else if (typedKey in newState) {
+                // Assign simple persisted value
                 newState[typedKey] = persistedValue as any; 
+                // Check if BPM is being updated
+                if (typedKey === 'bpm' && typeof persistedValue === 'number') {
+                     bpmNeedsUpdate = persistedValue;
+                }
             } else {
                  console.warn(`Persisted key "${typedKey}" not found in current state, skipping merge.`);
             }
         }
-        console.log("Merged state:", newState);
+
+        // --- Post-Merge Adjustments --- 
+        // Update TimeManager BPM if it was loaded from persisted state
+        if (bpmNeedsUpdate !== undefined && newState.timeManager && typeof newState.timeManager.setBPM === 'function') {
+             console.log(`Applying persisted BPM (${bpmNeedsUpdate}) to TimeManager.`);
+             // Directly call setBPM on the TimeManager instance within the merged state
+             // Note: This bypasses the store's setBPM action, directly modifying the instance.
+             // This is generally okay during initial hydration.
+             try {
+                newState.timeManager.setBPM(bpmNeedsUpdate);
+             } catch (e) {
+                console.error("Failed to apply persisted BPM to TimeManager:", e);
+             }
+        } else if (bpmNeedsUpdate !== undefined) {
+             console.warn("Persisted BPM found, but TimeManager or setBPM method is missing in the merged state.");
+        }
+
+        console.log("Final merged state:", newState);
         return newState as AppState; 
       },
     }
