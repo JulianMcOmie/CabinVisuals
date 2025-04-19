@@ -11,6 +11,7 @@ import PositionOffsetEffect from '../lib/effects/PositionOffsetEffect';
 import RescalePositionEffect from '../lib/effects/RescalePositionEffect';
 import Rotate3DEffect from '../lib/effects/Rotate3DEffect';
 import PanEffect from '../lib/effects/PanEffect';
+import ColorEffect from '../lib/effects/ColorEffect';
 
 // Define Effect structures
 export interface EffectDefinition {
@@ -50,6 +51,9 @@ const availableEffectsData: EffectCategories = {
     { id: 'RadialDuplicateEffect', name: 'Radial Duplicate', constructor: RadialDuplicateEffect },
     { id: 'GravityEffect', name: 'Gravity', constructor: GravityEffect },
     { id: 'PanEffect', name: 'Pan', constructor: PanEffect },
+  ],
+  Color: [
+    { id: 'ColorEffect', name: 'Override Color', constructor: ColorEffect },
   ]
 };
 
