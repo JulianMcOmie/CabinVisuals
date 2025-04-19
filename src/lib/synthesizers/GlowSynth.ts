@@ -79,10 +79,10 @@ class GlowSynth extends Synthesizer {
             1.5,
             { label: 'Base Size', uiType: 'slider', min: 0.1, max: 5, step: 0.05 }
         ));
-        this.properties.set('expansionRate', new Property<number>(
-            'expansionRate',
-            2.0,
-            { label: 'Expansion Rate', uiType: 'slider', min: 0.0, max: 10.0, step: 0.1 }
+        this.properties.set('zMoveRate', new Property<number>(
+            'zMoveRate',
+            10.0,
+            { label: 'Backward Move Rate', uiType: 'slider', min: 0.0, max: 20.0, step: 0.1 }
         ));
         this.properties.set('hueRange', new Property<ColorRange>(
             'hueRange',
@@ -115,6 +115,7 @@ class GlowSynth extends Synthesizer {
         this.engine.defineObject('sphere')
             .withPosition((ctx: MappingContext) => {
                 const ySpread = this.getPropertyValue<number>('ySpread') ?? 3.0;
+                const zMoveRate = this.getPropertyValue<number>('zMoveRate') ?? 5.0;
                 let yPos = 0;
                 
                 if (this._minPitch !== null && this._maxPitch !== null && this._minPitch !== this._maxPitch) {
@@ -128,14 +129,13 @@ class GlowSynth extends Synthesizer {
                 }
                 yPos = Math.max(-ySpread, Math.min(ySpread, yPos));
                 
-                return [0, yPos, 0];
+                const zPos = -zMoveRate * ctx.timeSinceNoteStart;
+
+                return [0, yPos, zPos];
             })
             .withScale((ctx: MappingContext) => {
                 const baseSize = this.getPropertyValue<number>('baseSize') ?? 1.5;
-                const expansionRate = this.getPropertyValue<number>('expansionRate') ?? 2.0;
-                const currentSize = baseSize + expansionRate * ctx.timeSinceNoteStart;
-                const finalSize = Math.max(0.01, currentSize);
-                return [finalSize, finalSize, finalSize];
+                return [baseSize, baseSize, baseSize];
             })
             .withColor((ctx: MappingContext) => {
                 const range = this.getPropertyValue<ColorRange>('hueRange') ?? { startHue: 180, endHue: 300 };

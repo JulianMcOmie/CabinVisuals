@@ -13,6 +13,7 @@ import Rotate3DEffect from '../lib/effects/Rotate3DEffect';
 import PanEffect from '../lib/effects/PanEffect';
 import ColorEffect from '../lib/effects/ColorEffect';
 import GlobalRotateEffect from '../lib/effects/GlobalRotateEffect'; // Import the new effect
+import HorizontalDuplicateEffect from '../lib/effects/HorizontalDuplicateEffect'; // Import the new effect
 
 // Define Effect structures
 export interface EffectDefinition {
@@ -53,6 +54,7 @@ export const availableEffectsData: EffectCategories = {
     { id: 'RadialDuplicateEffect', name: 'Radial Duplicate', constructor: RadialDuplicateEffect },
     { id: 'GravityEffect', name: 'Gravity', constructor: GravityEffect },
     { id: 'PanEffect', name: 'Pan', constructor: PanEffect },
+    { id: 'HorizontalDuplicateEffect', name: 'Horizontal Duplicate', constructor: HorizontalDuplicateEffect }, // Add the new effect
   ],
   Color: [
     { id: 'ColorEffect', name: 'Override Color', constructor: ColorEffect },
