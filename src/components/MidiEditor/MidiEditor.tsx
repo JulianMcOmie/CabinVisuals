@@ -17,6 +17,7 @@ import {
   CursorType,
   SelectionBox,
   BEATS_PER_MEASURE,
+  LOWEST_NOTE
 } from './utils/constants';
 
 import {
@@ -129,11 +130,13 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
 
   const blockStartBeat = block.startBeat;
-
-
   const blockDuration = block.endBeat - block.startBeat;
   const blockWidth = blockDuration * pixelsPerBeat;
   const blockHeight = KEY_COUNT * pixelsPerSemitone;
+  // --- ADDED: Calculate total grid width based on song measures --- 
+  const totalGridWidth = numMeasures * BEATS_PER_MEASURE * pixelsPerBeat;
+  const totalGridHeight = KEY_COUNT * pixelsPerSemitone;
+  // ----------------------------------------------------------------
   
   // Draw canvas using our extracted drawing function
   useEffect(() => {
@@ -142,29 +145,38 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     if (!editorDimensions.width || !editorDimensions.height) return;
     
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = editorDimensions.width * dpr;
-    canvas.height = editorDimensions.height * dpr;
+    // Set bitmap resolution based on visible dimensions
+    canvas.width = totalGridWidth * dpr; //editorDimensions.width * dpr;
+    canvas.height = totalGridHeight * dpr; //editorDimensions.height * dpr;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Context translation for scrolling
+    ctx.save();
     ctx.scale(dpr, dpr);
+    // --- Apply both X and Y translation ---
+    ctx.translate(-scrollX, -scrollY);
+    // -------------------------------------
     
+    // Call the main drawing function
     drawMidiEditor(
       ctx,
       block.notes,
       selectedNoteIds,
-      editorDimensions.width,
+      editorDimensions.width, // Pass visible dimensions
       editorDimensions.height,
-      blockWidth,
-      blockHeight,
       blockDuration,
       blockStartBeat,
+      totalGridWidth,
       selectionBox,
       isDragging,
       pixelsPerBeat,
       pixelsPerSemitone
     );
+
+    ctx.restore(); 
+
   }, [
       block.notes, 
       blockDuration, 
@@ -173,19 +185,46 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       selectionBox, 
       isDragging, 
       selectedNoteIds,
-      blockWidth,
-      blockHeight,
       pixelsPerBeat,
-      pixelsPerSemitone
+      pixelsPerSemitone,
+      scrollX, 
+      scrollY,
+      numMeasures
   ]);
 
-  // Helper to get coords and derived values
+  // Helper to get coords and derived values, adjusted for scroll
   const getCoordsAndDerived = (e: MouseEvent | React.MouseEvent) => {
-    const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
-    if (!coords) return null;
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
     
-    const { x, y, beat, pitch } = coords;
-    return { x, y, beat, pitch };
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Adjust for scroll
+    const scrolledX = mouseX + scrollX;
+    const scrolledY = mouseY + scrollY;
+
+    // Calculate beat and pitch based on SCROLLED coordinates
+    const beat = scrolledX / pixelsPerBeat;
+    // --- Use scrolledY for pitch calculation --- 
+    const pitch = KEY_COUNT - Math.floor(scrolledY / pixelsPerSemitone) - 1 + LOWEST_NOTE;
+    // -----------------------------------------
+
+    if (isNaN(beat) || isNaN(pitch)) {
+      console.warn("NaN coordinate calculation", { mouseX, mouseY, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone });
+      return null;
+    }
+
+    return {
+      x: mouseX,       // Relative to element
+      y: mouseY,       // Relative to element
+      scrolledX,   // For content-space comparison
+      scrolledY,   // For content-space comparison
+      beat,        // Calculated from scrolled position
+      pitch        // Calculated from scrolled position
+    };
   };
 
   // Mouse event handlers
@@ -574,8 +613,13 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   return (
     <div 
         ref={editorRef} 
-        className="midi-editor relative overflow-auto border border-gray-700 rounded-md" 
+        className="midi-editor relative border border-gray-700 rounded-md" 
+        style={{ overflowY: 'auto', overflowX: 'hidden' }} 
         onClick={handleEditorClick}
+        onScroll={(e) => {
+          // setScrollX(e.currentTarget.scrollLeft); // X handled by inner div
+          setScrollY(e.currentTarget.scrollTop);
+        }}
     >
       <div className="piano-roll flex flex-col">
         <div className="flex">
@@ -596,14 +640,26 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           </div>
           <div 
             className="piano-roll-grid relative" 
-            style={{ width: `${editorWidth}px`, height: `${editorHeight}px` }}
+            style={{
+              width: `${editorWidth}px`,      // Visible width constraint
+              height: `${editorHeight}px`,     // Explicit height needed for overflow rules
+              overflowX: 'scroll',         // Force horizontal scrollbar always
+              overflowY: 'hidden'            // Hide vertical scrollbar
+            }}
+            onScroll={(e) => {
+              setScrollX(e.currentTarget.scrollLeft);
+              // Y scroll handled by outer container
+            }}
           >
             <canvas 
               ref={canvasRef}
-              className="absolute top-0 left-0 w-full h-full"
-              width={editorWidth}
-              height={editorHeight}
-              style={{ cursor: hoverCursor }}
+              style={{
+                display: 'block',
+                width: `${totalGridWidth}px`,   // Full content width
+                height: `${blockHeight}px`, // Full content height
+                cursor: hoverCursor
+              }}
+              // Width/Height attributes still set by editorDimensions in useEffect
               onMouseDown={handleCanvasMouseDown}
               onMouseUp={handleCanvasMouseUp}
               onMouseMove={handleCanvasMouseMove}
