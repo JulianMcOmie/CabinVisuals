@@ -119,6 +119,10 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [selectionBox, setSelectionBox] = useState<SelectionBox>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
 
+  // --- ADDED: State to track mouse button on down --- 
+  const [mouseDownButton, setMouseDownButton] = useState<number | null>(null);
+  // -------------------------------------------------
+
   const [scrollX, setScrollX] = useState(0);
   const [scrollY, setScrollY] = useState(0);
   const [zoomX, setZoomX] = useState(1);
@@ -233,6 +237,10 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setSelectedWindow('midiEditor');
+    // --- Record mouse button --- 
+    setMouseDownButton(e.button);
+    // -------------------------
+
     const coords = getCoordsAndDerived(e);
     if (!coords) return;
     
@@ -525,52 +533,44 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     };
     
     const handleMouseUp = (e: MouseEvent) => {
-      if (dragOperation === 'select') {
+      // Only process selection/creation if drag was 'select' AND it started with left button (0)
+      if (dragOperation === 'select' && mouseDownButton === 0) { 
         if (selectionBox) {
           const derivedCoords = getCoordsAndDerived(e);
 
-          // --- FIX: Only process selection if coords are valid --- 
           if (derivedCoords) { 
             const { action, newNote, selectedIds, selectedNotes } = handleSelectionBoxComplete(
               block,
               selectionBox,
               selectedNoteIds, 
               isDragging, 
-              derivedCoords, // Pass valid coords
+              { beat: derivedCoords.beat, pitch: derivedCoords.pitch }, 
               pixelsPerBeat, 
               pixelsPerSemitone
             );
             
             if (action === 'create-note' && newNote) {
-              // ... add new note ...
               const updatedBlock = { ...block };
               updatedBlock.notes = [...block.notes, newNote];
               updateMidiBlock(track.id, updatedBlock);
               setSelectedNoteIds([newNote.id]);
               storeSelectNotes([newNote]);
             } else {
-              // Update selection based on the box
               setSelectedNoteIds(selectedIds);
               storeSelectNotes(selectedNotes);
             }
           } else {
-              // Coords were null (mouseup far away?), just clear selection box visually
-              // but maybe don't alter the note selection state?
-              // Or perhaps clear the selection?
-              // Current behaviour: selection state is updated only if coords are valid.
               console.warn("MouseUp for selection box occurred too far away to get coordinates.");
           }
-          // ----------------------------------------------------
         } 
-        // Reset selection box state regardless of coords
-        setSelectionBox(null);
-      }
+      } // End of check for left-click selection
 
-      // Reset ALL drag operations
+      // Reset ALL drag operations and mouse button state regardless of button clicked
       setDragNoteId(null);
       setDragOperation('none'); 
       setSelectionBox(null); 
       setIsDragging(false);
+      setMouseDownButton(null); // <-- Reset mouse button state
     };
     
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -621,7 +621,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     pixelsPerBeat,
     pixelsPerSemitone,
     scrollX,
-    scrollY
+    scrollY,
+    mouseDownButton
   ]);
 
   const handleEditorClick = () => {
