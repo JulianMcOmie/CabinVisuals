@@ -1,7 +1,7 @@
 import Synthesizer from '../Synthesizer';
 import { MIDIBlock, VisualObject } from '../types';
 import { Property } from '../properties/Property';
-import VisualObjectEngine, { MappingContext, MappingUtils, NoteContext } from '../VisualObjectEngine';
+import VisualObjectEngine, { MappingContext, MappingUtils, NoteContext, PhysicsEnvelopeConfig } from '../VisualObjectEngine';
 
 class KickDrumSynth extends Synthesizer {
 
@@ -14,16 +14,16 @@ class KickDrumSynth extends Synthesizer {
 
     private initializeProperties(): void {
         this.properties = new Map<string, Property<any>>([
-            ['maxSize', new Property<number>('maxSize', 2.5, { uiType: 'slider', label: 'Max Size', min: 0.5, max: 8, step: 0.1 })],
+            ['baseSize', new Property<number>('baseSize', 3, { uiType: 'slider', label: 'Base Size', min: 0.1, max: 5, step: 0.1 })],
+            ['compressionFactor', new Property<number>('compressionFactor', 0.5, { uiType: 'slider', label: 'Compression Amount', min: 0, max: 2, step: 0.05 })],
+            ['minScaleFactor', new Property<number>('minScaleFactor', 0.1, { uiType: 'slider', label: 'Min Size Factor', min: 0.01, max: 0.5, step: 0.01 })],
             ['positionX', new Property<number>('positionX', 0, { uiType: 'slider', label: 'X Position', min: -10, max: 10, step: 0.1 })],
-            ['positionY', new Property<number>('positionY', -4, { uiType: 'slider', label: 'Y Position', min: -10, max: 10, step: 0.1 })],
+            ['positionY', new Property<number>('positionY', 0, { uiType: 'slider', label: 'Y Position', min: -10, max: 10, step: 0.1 })],
             ['positionZ', new Property<number>('positionZ', 0, { uiType: 'slider', label: 'Z Position', min: -10, max: 10, step: 0.1 })],
             ['baseColor', new Property<string>('baseColor', '#ff4400', { uiType: 'color', label: 'Color' })],
-            // ADSR controls size reduction (attack/decay define the "impact")
-            ['attack', new Property<number>('attack', 0.01, { uiType: 'slider', label: 'Impact Time (s)', min: 0.001, max: 0.1, step: 0.001 })],
-            ['decay', new Property<number>('decay', 0.15, { uiType: 'slider', label: 'Size Decay (s)', min: 0.01, max: 1, step: 0.005 })],
-            ['sustain', new Property<number>('sustain', 0, { uiType: 'slider', label: 'Sustain (Unused)', min: 0, max: 1, step: 0.01 })],
-            ['release', new Property<number>('release', 0.01, { uiType: 'slider', label: 'Release (Unused)', min: 0.01, max: 0.5, step: 0.005 })],
+            ['tension', new Property<number>('tension', 250, { uiType: 'slider', label: 'Tension', min: 10, max: 1000, step: 5 })],
+            ['friction', new Property<number>('friction', 15, { uiType: 'slider', label: 'Friction', min: 0, max: 50, step: 0.5 })],
+            ['initialVelocity', new Property<number>('initialVelocity', 5, { uiType: 'slider', label: 'Impact Velocity', min: 0, max: 20, step: 0.2 })],
         ]);
     }
 
@@ -31,34 +31,37 @@ class KickDrumSynth extends Synthesizer {
         const MUtils = MappingUtils;
 
         this.engine.defineObject('sphere')
-            .forEachInstance((ctx: MappingContext) => [{}]) // Single instance per note
-            .applyADSR((noteCtx: NoteContext) => ({ // Short envelope for impact
-                attack: this.getPropertyValue<number>('attack') ?? 0.01,
-                decay: this.getPropertyValue<number>('decay') ?? 0.15,
-                sustain: this.getPropertyValue<number>('sustain') ?? 0,
-                release: this.getPropertyValue<number>('release') ?? 0.01,
+            .applyPhysicsEnvelope((noteCtx: NoteContext): PhysicsEnvelopeConfig => ({
+                tension: this.getPropertyValue<number>('tension') ?? 250,
+                friction: this.getPropertyValue<number>('friction') ?? 15,
+                initialVelocity: (this.getPropertyValue<number>('initialVelocity') ?? 5) * MUtils.mapValue(noteCtx.note.velocity, 0, 127, 0.5, 1.5),
             }))
             .withPosition((ctx: MappingContext) => {
                 const x = this.getPropertyValue<number>('positionX') ?? 0;
-                const y = this.getPropertyValue<number>('positionY') ?? -4;
+                const y = this.getPropertyValue<number>('positionY') ?? 0;
                 const z = this.getPropertyValue<number>('positionZ') ?? 0;
                 return [x, y, z];
             })
             .withScale((ctx: MappingContext) => {
-                const maxSize = this.getPropertyValue<number>('maxSize') ?? 2.5;
-                // ADSR amplitude goes 0 -> 1 -> 0 quickly. We want size to go maxSize -> 0.
-                // So, scale = maxSize * (1 - adsrAmplitude)
-                const amplitude = ctx.adsrAmplitude ?? 0;
-                const scale = maxSize * (1.0 - amplitude);
-                return Math.max(0.001, scale); // Prevent zero or negative scale
+                const baseSize = this.getPropertyValue<number>('baseSize') ?? 1.5;
+                const compressionFactor = this.getPropertyValue<number>('compressionFactor') ?? 0.5;
+                const minScaleFactor = this.getPropertyValue<number>('minScaleFactor') ?? 0.1;
+                const physicsDisplacement = ctx.physicsValue ?? 0; // Oscillator value
+
+                // Positive physics displacement should decrease size (compression)
+                const targetScale = baseSize - (physicsDisplacement * compressionFactor);
+
+                // Ensure scale doesn't go below the minimum factor of base size
+                const minScale = baseSize * minScaleFactor;
+                const finalScale = Math.max(minScale, targetScale);
+
+                return finalScale; // Return a single number for uniform scaling
             })
             .withColor((ctx: MappingContext) => {
                 return this.getPropertyValue<string>('baseColor') ?? '#ff4400';
             })
             .withOpacity((ctx: MappingContext) => {
-                // Fade quickly as size decreases
-                const amplitude = ctx.adsrAmplitude ?? 0;
-                return Math.max(0, 1.0 - amplitude * 1.5); // Fade faster than size shrinks
+                return 1.0;
             });
     }
 

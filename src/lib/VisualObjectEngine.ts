@@ -309,32 +309,65 @@ class VisualObjectEngine {
                                     // Consider skipping only if *both* ADSR is idle AND physics is inactive/settled
                                 }
 
-                                // --- Physics Envelope Calculation for this Level ---
-                                let physicsValue: number | undefined = undefined;
-                                let currentPhysicsConfig: PhysicsEnvelopeConfig | undefined = undefined;
+                                // --- Physics Envelope Calculation (Cumulative) ---
+                                let cumulativePhysicsValue: number = 0; // Initialize to 0 upfront
 
                                 if (levelConfig.physicsEnvelopeConfig) {
-                                    currentPhysicsConfig = typeof levelConfig.physicsEnvelopeConfig === 'function'
-                                        ? levelConfig.physicsEnvelopeConfig.call(this.synthesizer, noteCtx)
-                                        : levelConfig.physicsEnvelopeConfig;
+                                    const physicsConfigProvider = levelConfig.physicsEnvelopeConfig;
 
-                                    const tension = currentPhysicsConfig.tension ?? DEFAULT_TENSION;
-                                    const friction = currentPhysicsConfig.friction ?? DEFAULT_FRICTION;
-                                    const initialVelocity = currentPhysicsConfig.initialVelocity ?? DEFAULT_INITIAL_VELOCITY;
+                                    // Iterate through ALL blocks and notes to find contributing past notes
+                                    midiBlocks.forEach(block => {
+                                        const blockAbsoluteStartBeat = block.startBeat;
 
-                                    physicsValue = PhysicsUtils.calculateDampedOscillator(
-                                        timeSinceNoteStart,
-                                        tension,
-                                        friction,
-                                        initialVelocity
-                                    );
+                                        block.notes.forEach(contributingNote => {
+                                            const contributingNoteCtx: NoteContext = { note: contributingNote };
 
-                                    // Optimization: Could potentially skip if physicsValue is negligible and ADSR is idle
-                                }
+                                            // Check if this past/present note *would have triggered* the base definition
+                                            if (definition.conditionFn.call(this.synthesizer, contributingNoteCtx)) {
+                                                const contributingNoteAbsoluteStartBeat = blockAbsoluteStartBeat + contributingNote.startBeat;
 
-                                // Early exit optimization (example - adjust threshold as needed)
+                                                // Only consider notes that started at or before the current time
+                                                if (contributingNoteAbsoluteStartBeat <= time) {
+                                                    const timeSinceContributingNoteStart = Math.max(0, (time - contributingNoteAbsoluteStartBeat) * secondsPerBeat);
+
+                                                    // Get physics parameters for THIS level, potentially evaluated using the contributing note's context
+                                                    const currentPhysicsConfig = typeof physicsConfigProvider === 'function'
+                                                        ? physicsConfigProvider.call(this.synthesizer, contributingNoteCtx)
+                                                        : physicsConfigProvider;
+
+                                                    const tension = currentPhysicsConfig?.tension ?? DEFAULT_TENSION;
+                                                    const friction = currentPhysicsConfig?.friction ?? DEFAULT_FRICTION;
+                                                    let initialVelocity = currentPhysicsConfig?.initialVelocity ?? DEFAULT_INITIAL_VELOCITY;
+
+                                                    // --- Example: Scale initial velocity by contributing note's velocity --- 
+                                                    const scaleVelocity = true; // Replace with property lookup if needed
+                                                    if (scaleVelocity && contributingNote.velocity !== undefined) { 
+                                                       initialVelocity *= MappingUtils.mapValue(contributingNote.velocity, 0, 127, 0.2, 1.8); 
+                                                    }
+                                                    // ---------------------------------------------------------------------
+
+                                                    // Skip calculation if time is zero and velocity is zero (no contribution)
+                                                    if (timeSinceContributingNoteStart <= 0 && initialVelocity === 0) return; 
+
+                                                    const contribution = PhysicsUtils.calculateDampedOscillator(
+                                                        timeSinceContributingNoteStart,
+                                                        tension,
+                                                        friction,
+                                                        initialVelocity
+                                                    );
+                                                    cumulativePhysicsValue += contribution; // Safe now, it's initialized
+                                                }
+                                            }
+                                        }); // end loop over contributing notes in block
+                                    }); // end loop over midiBlocks
+                                } // end if physicsEnvelopeConfig
+
+                                // Assign the calculated cumulative value (already a number)
+                                const physicsValue = cumulativePhysicsValue;
+
+                                // Early exit optimization (use the definite physicsValue)
                                 const isAdsrIdle = adsrAmplitude !== undefined && adsrAmplitude <= 0 && adsrPhase === 'idle';
-                                const isPhysicsSettled = physicsValue !== undefined && Math.abs(physicsValue) < 0.001; // Check if physics value is near zero
+                                const isPhysicsSettled = Math.abs(physicsValue) < 0.001;
 
                                 // If ADSR is defined and idle, AND physics is defined and settled, skip instance
                                 if (levelConfig.adsrConfig && isAdsrIdle && levelConfig.physicsEnvelopeConfig && isPhysicsSettled) {
@@ -344,27 +377,22 @@ class VisualObjectEngine {
                                 if (levelConfig.adsrConfig && !levelConfig.physicsEnvelopeConfig && isAdsrIdle) {
                                     return;
                                 }
-                                // If ONLY physics is defined and it's settled, skip instance
-                                // (Requires defining "settled" - potentially based on time or value threshold)
-                                // if (levelConfig.physicsEnvelopeConfig && !levelConfig.adsrConfig && isPhysicsSettled) {
-                                //    return;
-                                // }
 
 
                                 // --- Create Mapping Context for this Instance ---
                                 const currentContext: MappingContext = {
-                                    note: note,
+                                    note: note, 
                                     time: time,
                                     bpm: bpm,
-                                    timeSinceNoteStart: timeSinceNoteStart,
+                                    timeSinceNoteStart: timeSinceNoteStart, 
                                     noteProgressPercent: noteProgressPercent,
                                     noteDurationSeconds: noteDurationSeconds,
                                     level: levelConfig.level,
-                                    instanceData: instanceData, // Data specific to this instance
+                                    instanceData: instanceData,
                                     parentContext: parentContext,
                                     adsrAmplitude: adsrAmplitude,
                                     adsrPhase: adsrPhase,
-                                    physicsValue: physicsValue, // Add physics value to context
+                                    physicsValue: physicsValue, // Use the cumulative physics value
                                     // calculatedProperties will be filled below
                                 };
 
