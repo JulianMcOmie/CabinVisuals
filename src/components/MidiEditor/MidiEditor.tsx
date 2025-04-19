@@ -342,17 +342,23 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   }, [scrollY, pixelsPerSemitone]);
   // ----------------------------------------------------------------------
 
-  // --- ADDED: useEffect for smooth vertical zoom scroll adjustment ---
+  // --- ADDED: useEffect for smooth zoom scroll adjustment ---
   useEffect(() => {
-    if (zoomScrollAdjustmentRef.current.isAdjusting) {
-      // Reset the flag *before* potentially triggering onScroll via scrollTop assignment - REVERTED
-      // zoomScrollAdjustmentRef.current.isAdjusting = false; 
+    const adjustmentRef = zoomScrollAdjustmentRef.current;
 
+    // Use a stable reference to the ref's current value
+    if (adjustmentRef.isAdjusting) {
       const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
       if (gridElement) {
-        const { mouseX, proportionX, mouseY, proportionY, zoomDimension } = zoomScrollAdjustmentRef.current;
+        const { mouseX, proportionX, mouseY, proportionY, zoomDimension } = adjustmentRef;
         const viewportHeight = gridElement.clientHeight;
         const viewportWidth = gridElement.clientWidth;
+
+        // Set the flag immediately for the effect's duration
+        // Note: We are directly mutating the ref here which is generally okay for flags like this,
+        // but setting it true here ensures onScroll is blocked immediately.
+        // Re-set the flag true here to ensure it's true for the duration of this effect run
+        adjustmentRef.isAdjusting = true;
 
         if (zoomDimension === 'x') {
           // --- Horizontal Adjustment ---
@@ -362,9 +368,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
 
           if (!isNaN(targetScrollX) && isFinite(targetScrollX)) {
               gridElement.scrollLeft = targetScrollX;
-              // setScrollX(targetScrollX); // REMOVED: Update state via onScroll after adjustment
+              // setScrollX(targetScrollX); // REMOVED
           } else {
-              console.warn("Calculated invalid targetScrollX during zoom adjustment", { proportionX, newContentWidth, mouseX, targetScrollX });
+              console.warn("Calculated invalid targetScrollX", { proportionX, newContentWidth, mouseX, targetScrollX });
           }
           // ---------------------------
         } else if (zoomDimension === 'y') {
@@ -375,17 +381,27 @@ function MidiEditor({ block, track }: MidiEditorProps) {
 
           if (!isNaN(targetScrollY) && isFinite(targetScrollY)) {
               gridElement.scrollTop = targetScrollY;
-              // setScrollY(targetScrollY); // REMOVED: Update state via onScroll after adjustment
+              // setScrollY(targetScrollY); // REMOVED
           } else {
-              console.warn("Calculated invalid targetScrollY during zoom adjustment", { proportionY, newContentHeight, mouseY, targetScrollY });
+              console.warn("Calculated invalid targetScrollY", { proportionY, newContentHeight, mouseY, targetScrollY });
           }
           // -------------------------
         }
       }
-      // Reset the flag at the end of the adjustment logic
-      zoomScrollAdjustmentRef.current = { ...zoomScrollAdjustmentRef.current, isAdjusting: false, zoomDimension: 'none' };
+
+      // Reset the flag *after* a short delay to allow the triggered onScroll to be ignored
+      const timeoutId = setTimeout(() => {
+        // Check if the ref still exists before accessing/mutating
+        if (zoomScrollAdjustmentRef.current) {
+            zoomScrollAdjustmentRef.current.isAdjusting = false;
+            zoomScrollAdjustmentRef.current.zoomDimension = 'none'; // Also reset dimension here
+        }
+      }, 0);
+
+      // Cleanup timeout if effect re-runs before timeout fires
+      return () => clearTimeout(timeoutId);
     }
-  }, [pixelsPerBeat, pixelsPerSemitone]); // Run when EITHER zoom level changes
+  }, [pixelsPerBeat, pixelsPerSemitone, numMeasures]); // Added numMeasures as it's used in width calculation
   // -----------------------------------------------------------------
 
   // Helper to get coords and derived values, adjusted for scroll
