@@ -8,6 +8,7 @@ import MelodicOrbitSynth from '../lib/synthesizers/MelodicOrbitSynth';
 import ApproachingCubeSynth from '../lib/synthesizers/ApproachingCubeSynth';
 import BackgroundPlaneSynth from '../lib/synthesizers/BackgroundPlaneSynth';
 import BasicSynthesizer from '../lib/synthesizers/BasicSynthesizer';
+import PitchModulatedSynth from '../lib/synthesizers/PitchModulatedSynth';
 import KickDrumSynth from '../lib/synthesizers/KickDrumSynth';
 import SnareDrumSynth from '../lib/synthesizers/SnareDrumSynth';
 import HiHatSynth from '../lib/synthesizers/HiHatSynth';
@@ -41,7 +42,8 @@ const availableInstrumentsData: InstrumentCategories = {
     { id: 'MelodicOrbitSynth', name: 'Melodic Orbit Synth', constructor: MelodicOrbitSynth },
     { id: 'ApproachingCubeSynth', name: 'Approaching Cube Synth', constructor: ApproachingCubeSynth },
     { id: 'BackgroundPlaneSynth', name: 'Background Plane Synth', constructor: BackgroundPlaneSynth },
-    { id: 'BasicSynthesizer', name: 'Basic Synth', constructor: BasicSynthesizer }, 
+    { id: 'BasicSynthesizer', name: 'Basic Synth', constructor: BasicSynthesizer },
+    { id: 'PitchModulatedSynth', name: 'Pitch Modulated Synth', constructor: PitchModulatedSynth },
   ],
   Percussive: [
     { id: 'KickDrumSynth', name: 'Kick Drum', constructor: KickDrumSynth },
