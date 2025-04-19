@@ -10,9 +10,25 @@ import EffectInstance from '../lib/Effect';
 import SynthesizerInstance from '../lib/Synthesizer';
 
 import { TrackSlice, TrackState, createTrackSlice } from './trackSlice';
-import { InstrumentSlice, createInstrumentSlice } from './instrumentSlice';
-import { EffectSlice, createEffectSlice } from './effectSlice';
+import { InstrumentSlice, InstrumentDefinition, InstrumentCategories, availableInstrumentsData, createInstrumentSlice } from './instrumentSlice';
+import { EffectSlice, EffectDefinition, EffectCategories, availableEffectsData, createEffectSlice } from './effectSlice';
 import { UISlice, UIState, createUISlice } from './uiSlice';
+
+// --- Constructor Mappings --- 
+
+const synthesizerConstructors = new Map<string, new (...args: any[]) => SynthesizerInstance>();
+Object.values(availableInstrumentsData).flat().forEach((inst: InstrumentDefinition) => {
+    if (inst.constructor) { // Check if constructor exists
+        synthesizerConstructors.set(inst.constructor.name, inst.constructor);
+    }
+});
+
+const effectConstructors = new Map<string, new (...args: any[]) => EffectInstance>();
+Object.values(availableEffectsData).flat().forEach((effect: EffectDefinition) => {
+    if (effect.constructor) { // Check if constructor exists
+        effectConstructors.set(effect.constructor.name, effect.constructor);
+    }
+});
 
 // --- Combined AppState Definition ---
 
@@ -24,21 +40,20 @@ export type AppState = TimeSlice & AudioSlice & TrackSlice & InstrumentSlice & E
 // Define the structure of the data *as it will be saved*
 
 type SerializableSynth = {
-    type: string; // The constructor name of the specific Synthesizer subclass
-    settings: Record<string, any>; // Store parameters as a plain object
+    type: string; // Constructor name
+    settings: Record<string, any>;
 } | undefined;
 
 type SerializableEffect = {
-    type: string; // The constructor name of the specific Effect subclass
-    settings: Record<string, any>; // Store parameters as a plain object
+    type: string; // Constructor name
+    settings: Record<string, any>;
 };
 
 type SerializableClip = {
     id: string;
-    startBeat: number; // Assuming MIDIBlock has startBeat
-    endBeat: number;   // Assuming MIDIBlock has endBeat
-    notes: MIDINote[]; // Assuming notes are serializable
-    // Add other relevant serializable clip properties from MIDIBlock if needed
+    startBeat: number;
+    endBeat: number;
+    notes: MIDINote[];
 };
 
 type SerializableTrack = {
@@ -48,8 +63,7 @@ type SerializableTrack = {
     isSoloed: boolean;
     synth: SerializableSynth;
     effects: SerializableEffect[];
-    midiBlocks: SerializableClip[]; // Use midiBlocks based on TrackState
-    // Add other serializable track properties from TrackType if needed
+    midiBlocks: SerializableClip[];
 };
 
 // Define the overall structure of the persisted state
@@ -73,6 +87,41 @@ interface PersistentState {
     // Excluded: selectedTrackId, selectedBlockId, selectedTrack, selectedBlock, selectedNotes, actions
 }
 
+// --- Helper to apply settings --- 
+const applySettings = (instance: any, settings: Record<string, any>) => {
+    if (!instance || !settings) return;
+
+    // Prefer setPropertyValue if available (as defined in base classes)
+    if (typeof instance.setPropertyValue === 'function') {
+        for (const key in settings) {
+            if (Object.prototype.hasOwnProperty.call(settings, key)) {
+                try {
+                    instance.setPropertyValue(key, settings[key]);
+                } catch (e) {
+                    console.warn(`Failed to set property "${key}" on`, instance, e);
+                }
+            }
+        }
+    } else if (instance.properties instanceof Map) {
+         // Fallback: Directly manipulate properties Map if setPropertyValue doesn't exist
+         console.warn('Attempting to set properties directly on Map for', instance.constructor.name, '. Consider implementing setPropertyValue.');
+         for (const key in settings) {
+            if (Object.prototype.hasOwnProperty.call(settings, key)) {
+                if (instance.properties.has(key)) {
+                    try {
+                        instance.properties.get(key).value = settings[key];
+                    } catch (e) {
+                         console.warn(`Failed to set property map value "${key}" on`, instance, e);
+                    }
+                } else {
+                    console.warn(`Property "${key}" not found in properties Map for`, instance.constructor.name);
+                }
+            }
+         }
+    }
+    // TODO: Add other setting application methods if needed
+};
+
 // --- Store Creator ---
 
 const useStore = create<AppState>()(
@@ -90,97 +139,113 @@ const useStore = create<AppState>()(
       // storage: createJSONStorage(() => sessionStorage), // Optional: Use sessionStorage
 
       // Define which parts of the state to save
-      partialize: (state): PersistentState => {
+      partialize: (state): Partial<AppState> => {
         const persistentState: PersistentState = {};
-
-        // 1. Select TimeState properties
-        const timeStateKeys: (keyof TimeState)[] = [
-            'bpm', 'isPlaying', 'loopEnabled', 'loopStartBeat', 'loopEndBeat', 'numMeasures'
-        ];
-        timeStateKeys.forEach(key => {
-            if (key in state) {
-                persistentState[key as keyof PersistentState] = state[key] as any;
-            }
-        });
-
-        // 2. Select UIState properties
-        const uiStateKeys: (keyof UIState)[] = [
-            'isInstrumentSidebarVisible', 'selectedWindow'
-        ];
-        uiStateKeys.forEach(key => {
-            if (key in state) {
-                persistentState[key as keyof PersistentState] = state[key] as any;
-            }
-        });
-
-        // 3. Select and process TrackState properties
+        const timeStateKeys: (keyof TimeState)[] = [ 'bpm', 'isPlaying', 'loopEnabled', 'loopStartBeat', 'loopEndBeat', 'numMeasures' ];
+        timeStateKeys.forEach(key => { if (key in state) { persistentState[key as keyof PersistentState] = state[key] as any; } });
+        const uiStateKeys: (keyof UIState)[] = [ 'isInstrumentSidebarVisible', 'selectedWindow' ];
+        uiStateKeys.forEach(key => { if (key in state) { persistentState[key as keyof PersistentState] = state[key] as any; } });
         if (state.tracks && Array.isArray(state.tracks)) {
             persistentState.tracks = state.tracks.map((track: TrackType): SerializableTrack => {
-
-                // Helper to get settings
                 const getSerializableSettings = (instance: any): Record<string, any> => {
-                    if (instance && typeof instance.getSettings === 'function') {
-                        return instance.getSettings();
-                    } else if (instance && instance.properties instanceof Map) {
-                        // If settings are stored in the 'properties' Map
-                        const settings: Record<string, any> = {};
-                        instance.properties.forEach((prop: any, key: string) => {
-                            // Ensure the value itself is serializable, handle complex objects if necessary
-                            if (typeof prop.value !== 'function') { // Avoid trying to save functions
-                                settings[key] = prop.value;
-                            }
-                        });
-                        // Basic clone to be safe, although primitives are fine
-                        try {
-                           return JSON.parse(JSON.stringify(settings));
-                        } catch (e) {
-                            console.warn("Could not stringify/parse properties map for", instance, e);
-                            return {};
-                        }
-                    }
-                     return {}; // Default empty settings
+                   if (instance && typeof instance.getSettings === 'function') { return instance.getSettings(); }
+                   else if (instance && instance.properties instanceof Map) {
+                       const settings: Record<string, any> = {};
+                       instance.properties.forEach((prop: any, key: string) => { if (typeof prop.value !== 'function') { settings[key] = prop.value; } });
+                       try { return JSON.parse(JSON.stringify(settings)); } catch (e) { console.warn("Could not stringify/parse properties map for", instance, e); return {}; }
+                   } return {};
                 };
-
-                // Process Synth (using constructor.name for type)
                 const synthInstance = track.synthesizer as SynthesizerInstance;
-                const serializableSynth: SerializableSynth = synthInstance ? {
-                    type: synthInstance.constructor.name, // Use constructor name as type identifier
-                    settings: getSerializableSettings(synthInstance),
-                } : undefined;
-
-                // Process Effects (using constructor.name for type)
-                const serializableEffects: SerializableEffect[] = Array.isArray(track.effects) ?
-                    track.effects.map((effect: EffectInstance): SerializableEffect => ({
-                        type: effect.constructor.name, // Use constructor name as type identifier
-                        settings: getSerializableSettings(effect),
-                    })) : [];
-
-                // Process MIDIBlocks (Clips)
-                const serializableClips: SerializableClip[] = Array.isArray(track.midiBlocks) ?
-                    track.midiBlocks.map((clip: ClipType): SerializableClip => ({
-                        id: clip.id,
-                        startBeat: clip.startBeat,
-                        endBeat: clip.endBeat,
-                        notes: clip.notes || [],
-                    })) : [];
-
-                // Construct the serializable track object (without volume/pan)
+                const serializableSynth: SerializableSynth = synthInstance ? { type: synthInstance.constructor.name, settings: getSerializableSettings(synthInstance) } : undefined;
+                const serializableEffects: SerializableEffect[] = Array.isArray(track.effects) ? track.effects.map((effect: EffectInstance): SerializableEffect => ({ type: effect.constructor.name, settings: getSerializableSettings(effect) })) : [];
+                const serializableClips: SerializableClip[] = Array.isArray(track.midiBlocks) ? track.midiBlocks.map((clip: ClipType): SerializableClip => ({ id: clip.id, startBeat: clip.startBeat, endBeat: clip.endBeat, notes: clip.notes || [] })) : [];
                 return {
-                    id: track.id,
-                    name: track.name,
-                    isMuted: track.isMuted,
-                    isSoloed: track.isSoloed,
-                    synth: serializableSynth,
-                    effects: serializableEffects,
-                    midiBlocks: serializableClips,
+                    id: track.id, name: track.name, isMuted: track.isMuted, isSoloed: track.isSoloed,
+                    synth: serializableSynth, effects: serializableEffects, midiBlocks: serializableClips,
                 };
             });
         }
+        // Cast the specific PersistentState to the expected Partial<AppState>
+        return persistentState as Partial<AppState>;
+      },
 
-        // Excluded state slices (Audio, Instrument, Effect definitions) are omitted automatically
-        // by only including the keys processed above.
+      // Merge function to reconstruct instances during hydration
+      merge: (persistedStateUnknown: unknown, currentState: AppState): AppState => {
+        // Type assertion: Assume the persisted state matches our PersistentState interface
+        const persistedState = persistedStateUnknown as PersistentState;
+        console.log("Merging persisted state...", persistedState);
+        
+        const newState = { ...currentState } as any; 
 
-        return persistentState;
+        // Check if persistedState is actually an object after assertion
+        if (typeof persistedState !== 'object' || persistedState === null) {
+             console.warn("Persisted state is not an object, returning current state.");
+             return currentState;
+        }
+
+        // Iterate over the keys in the persisted state
+        for (const key in persistedState) {
+            if (!Object.prototype.hasOwnProperty.call(persistedState, key)) continue;
+
+            const typedKey = key as keyof PersistentState;
+            const persistedValue = persistedState[typedKey];
+
+            if (typedKey === 'tracks' && Array.isArray(persistedValue)) {
+                // --- Track Reconstruction --- 
+                newState.tracks = persistedValue.map((trackData: SerializableTrack): TrackType | null => {
+                    let reconstructedSynth: SynthesizerInstance | undefined = undefined;
+                    if (trackData.synth) {
+                        const SynthConstructor = synthesizerConstructors.get(trackData.synth.type);
+                        if (SynthConstructor) {
+                            try {
+                                reconstructedSynth = new SynthConstructor();
+                                applySettings(reconstructedSynth, trackData.synth.settings);
+                            } catch (e) {
+                                console.error(`Failed to reconstruct synthesizer "${trackData.synth.type}":`, e);
+                            }
+                        } else {
+                            console.warn(`Synthesizer constructor not found for type "${trackData.synth.type}".`);
+                        }
+                    }
+
+                    const reconstructedEffects: EffectInstance[] = (trackData.effects || []).map((effectData: SerializableEffect): EffectInstance | null => {
+                        const EffectConstructor = effectConstructors.get(effectData.type);
+                        if (EffectConstructor) {
+                             try {
+                                const newEffect = new EffectConstructor();
+                                applySettings(newEffect, effectData.settings);
+                                return newEffect;
+                             } catch (e) {
+                                 console.error(`Failed to reconstruct effect "${effectData.type}":`, e);
+                                 return null; // Skip failed effect
+                             }
+                        } else {
+                            console.warn(`Effect constructor not found for type "${effectData.type}".`);
+                            return null; // Skip unknown effect
+                        }
+                    }).filter((effect): effect is EffectInstance => effect !== null); // Filter out nulls
+
+                    // Reconstruct the track object
+                    return {
+                        id: trackData.id,
+                        name: trackData.name,
+                        isMuted: trackData.isMuted,
+                        isSoloed: trackData.isSoloed,
+                        midiBlocks: trackData.midiBlocks, 
+                        synthesizer: reconstructedSynth, 
+                        effects: reconstructedEffects,     
+                    } as TrackType; 
+
+                }).filter((track): track is TrackType => track !== null); 
+
+            } else if (typedKey in newState) {
+                newState[typedKey] = persistedValue as any; 
+            } else {
+                 console.warn(`Persisted key "${typedKey}" not found in current state, skipping merge.`);
+            }
+        }
+        console.log("Merged state:", newState);
+        return newState as AppState; 
       },
     }
   )

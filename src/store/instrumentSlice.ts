@@ -37,7 +37,7 @@ export interface InstrumentActions {}
 export type InstrumentSlice = InstrumentState & InstrumentActions;
 
 // Define the actual instrument data (moved here)
-const availableInstrumentsData: InstrumentCategories = {
+export const availableInstrumentsData: InstrumentCategories = {
   Melodic: [
     { id: 'SineWaveSynth', name: 'Sine Wave Synth', constructor: SineWaveSynth },
     { id: 'MelodicOrbitSynth', name: 'Melodic Orbit Synth', constructor: MelodicOrbitSynth },

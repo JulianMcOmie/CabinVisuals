@@ -37,7 +37,7 @@ export interface EffectActions {}
 export type EffectSlice = EffectState & EffectActions;
 
 // Define the actual effect data
-const availableEffectsData: EffectCategories = {
+export const availableEffectsData: EffectCategories = {
   Transform: [
     { id: 'ScaleEffect', name: 'Scale', constructor: ScaleEffect },
     { id: 'PositionOffsetEffect', name: 'Position Offset', constructor: PositionOffsetEffect },
