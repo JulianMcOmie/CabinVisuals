@@ -32,6 +32,7 @@ export interface TrackActions {
   removeEffectFromTrack: (trackId: string, effectIndex: number) => void;
   updateEffectPropertyOnTrack: (trackId: string, effectIndex: number, propertyName: string, value: any) => void;
   // reorderEffectsOnTrack: (trackId: string, draggedIndex: number, targetIndex: number) => void; // Reordering skipped
+  splitMidiBlock: (trackId: string, blockId: string, splitBeat: number) => void; // Added for splitting
 }
 
 export type TrackSlice = TrackState & TrackActions;
@@ -434,6 +435,83 @@ export const createTrackSlice: StateCreator<
           tracks: newTracks,
           selectedTrack: selections.selectedTrack, // Update selected track reference
           selectedBlock: selections.selectedBlock
+        };
+      });
+    },
+    splitMidiBlock: (trackId: string, blockId: string, splitBeat: number) => {
+      set((state) => {
+        const tracks = state.tracks;
+        const trackIndex = tracks.findIndex(t => t.id === trackId);
+        if (trackIndex === -1) return {}; // Track not found
+
+        const track = tracks[trackIndex];
+        const blockIndex = track.midiBlocks.findIndex(b => b.id === blockId);
+        if (blockIndex === -1) return {}; // Block not found
+
+        const blockToSplit = track.midiBlocks[blockIndex];
+
+        // Condition: Split beat must be strictly within the block
+        if (!(splitBeat > blockToSplit.startBeat && splitBeat < blockToSplit.endBeat)) {
+          return {}; // Do nothing if split point is at the edge or outside
+        }
+
+        const newBlockId1 = blockToSplit.id; // Keep original ID for the first part
+        const newBlockId2 = `block-${Date.now()}-${Math.random().toString(16).slice(2)}`; // Unique ID for the second part
+
+        const notes1: MIDINote[] = [];
+        const notes2: MIDINote[] = [];
+
+        blockToSplit.notes.forEach(note => {
+          const noteEndBeat = note.startBeat + note.duration;
+          if (note.startBeat < splitBeat) {
+            // Note starts before split point, goes to block 1
+            const newDuration = Math.min(note.duration, splitBeat - note.startBeat);
+            notes1.push({ ...note, duration: newDuration });
+          } else {
+            // Note starts at or after split point, goes to block 2
+            notes2.push(note);
+          }
+        });
+
+        const newBlock1: MIDIBlock = {
+          ...blockToSplit,
+          id: newBlockId1,
+          endBeat: splitBeat,
+          notes: notes1,
+        };
+
+        const newBlock2: MIDIBlock = {
+          ...blockToSplit, // Copy color etc.
+          id: newBlockId2,
+          startBeat: splitBeat,
+          // endBeat remains the same
+          notes: notes2,
+        };
+
+        // Update the track's midiBlocks
+        const updatedMidiBlocks = [
+          ...track.midiBlocks.slice(0, blockIndex),
+          newBlock1,
+          newBlock2,
+          ...track.midiBlocks.slice(blockIndex + 1)
+        ].sort((a, b) => a.startBeat - b.startBeat); // Ensure sorted order
+
+        const newTracks = [
+          ...tracks.slice(0, trackIndex),
+          { ...track, midiBlocks: updatedMidiBlocks },
+          ...tracks.slice(trackIndex + 1)
+        ];
+
+        // Update selection to keep the first part selected
+        const selections = getUpdatedSelections(newTracks, trackId, newBlockId1);
+
+        return {
+          tracks: newTracks,
+          selectedTrackId: trackId,
+          selectedBlockId: newBlockId1,
+          selectedTrack: selections.selectedTrack,
+          selectedBlock: selections.selectedBlock,
+          selectedNotes: null, // Clear note selection after split
         };
       });
     },

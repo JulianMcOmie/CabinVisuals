@@ -101,6 +101,8 @@ export default function Home() {
           width: 100vw;
           position: fixed;
           overflow: hidden;
+          padding-bottom: 50px; /* Add padding for the audio loader */
+          box-sizing: border-box; /* Ensure padding is included in height */
         }
         
         .playbar-container {

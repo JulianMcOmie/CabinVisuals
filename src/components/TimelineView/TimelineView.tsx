@@ -27,7 +27,10 @@ function TimelineView() {
     selectTrack, 
     seekTo, 
     setSelectedWindow,
-    selectedWindow
+    selectedWindow,
+    selectedTrackId,
+    selectedBlockId,
+    splitMidiBlock
   } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -174,6 +177,27 @@ function TimelineView() {
       };
     }
   }, [handleWheel]);
+
+  // Keyboard shortcut for splitting MIDI block
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Cmd+T (Mac) or Ctrl+T (Windows/Linux)
+      if (event.key === 't' && (event.metaKey || event.ctrlKey)) {
+        // Check if timeline is the selected window and a block is selected
+        if (selectedWindow === 'timelineView' && selectedTrackId && selectedBlockId) {
+          event.preventDefault(); // Prevent default browser action (e.g., new tab)
+          splitMidiBlock(selectedTrackId, selectedBlockId, currentBeat);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup listener on component unmount
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedWindow, selectedTrackId, selectedBlockId, currentBeat, splitMidiBlock]);
 
   const numMeasures = useStore(state => state.numMeasures);
   const renderMeasures = Math.max(MIN_VIEWPORT_MEASURES, numMeasures) + EXTRA_RENDER_MEASURES;
