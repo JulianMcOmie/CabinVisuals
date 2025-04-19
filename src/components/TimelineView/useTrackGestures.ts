@@ -13,7 +13,7 @@ export interface UseTrackGesturesProps {
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
   addMidiBlock: (trackId: string, block: MIDIBlock) => void;
   removeMidiBlock: (trackId: string, blockId: string) => void;
-  moveMidiBlock: (oldTrackId: string, newTrackId: string, block: MIDIBlock) => void;
+  moveMidiBlock: (blockId: string, oldTrackId: string, newTrackId: string, newStartBeat: number, newEndBeat: number) => void;
   selectBlock: (blockId: string | null) => void;
   selectedBlockId: string | null;
   timelineAreaRef: RefObject<HTMLDivElement | null>;
@@ -51,6 +51,7 @@ export function useTrackGestures({
   const [dragStartX, setDragStartX] = useState(0);
   const [originalDragTrackId, setOriginalDragTrackId] = useState<string | null>(null);
   const [dragInitialBlockState, setDragInitialBlockState] = useState<MIDIBlock | null>(null);
+  const [isCopyDrag, setIsCopyDrag] = useState(false); // State for option-drag
   
   // State for visual feedback during drag
   const [pendingUpdateBlock, setPendingUpdateBlock] = useState<MIDIBlock | null>(null);
@@ -149,49 +150,57 @@ export function useTrackGestures({
 
   // --- Effect for handling mouse drag listeners --- 
   useEffect(() => {
-    // Define handlers within the effect closure
-
     const handleMouseUp = () => {
       // Read the latest pending state from REFS
       const finalPendingBlock = pendingUpdateBlockRef.current;
       const finalTargetTrackId = pendingTargetTrackIdRef.current;
       const initialBlockState = dragInitialBlockState; // Get initial state captured on mouse down
+      const wasCopyDrag = isCopyDrag; // Capture copy drag state
 
       // Apply update only if drag was active and we have final state
       if (dragOperation !== 'none' && finalPendingBlock && originalDragTrackId && initialBlockState) {
+
          // --- Logic for adjusting notes on start resize --- 
-         let blockToUpdate = finalPendingBlock;
+         let blockToUpdateOrAdd = finalPendingBlock;
          if (dragOperation === 'start') {
             const oldBlockStartBeat = initialBlockState.startBeat;
             const newBlockStartBeat = finalPendingBlock.startBeat;
             const deltaBlockStartBeat = newBlockStartBeat - oldBlockStartBeat;
-
-            // Only adjust notes if the block start actually changed
             if (deltaBlockStartBeat !== 0) {
-                console.log(`Adjusting note starts by ${-deltaBlockStartBeat} due to block start change of ${deltaBlockStartBeat}`);
                 const adjustedNotes = finalPendingBlock.notes.map(note => ({
                     ...note,
-                    // Adjust note's startBeat inversely to block's startBeat change
                     startBeat: note.startBeat - deltaBlockStartBeat 
                 }));
-                // Create a new block object with the adjusted notes
-                blockToUpdate = { ...finalPendingBlock, notes: adjustedNotes };
+                blockToUpdateOrAdd = { ...finalPendingBlock, notes: adjustedNotes };
             }
          }
-         // --- End note adjustment logic --- 
+         // --- End note adjustment logic ---
 
-         if (dragOperation === 'move' && finalTargetTrackId && finalTargetTrackId !== originalDragTrackId) {
-             // Pass blockId, trackIds, and new beats to the corrected moveMidiBlock signature
+         // --- Commit Action --- 
+         if (wasCopyDrag && (dragOperation === 'move' || dragOperation === 'start' || dragOperation === 'end')) {
+            // Generate new ID for the copy
+            const newBlockId = `block-${crypto.randomUUID()}`;
+            // Create the final block to add with new ID and potentially adjusted notes/position
+            const blockToAdd: MIDIBlock = {
+                ...blockToUpdateOrAdd,
+                id: newBlockId,
+            };
+            // Add the new block to the target track
+            addMidiBlock(finalTargetTrackId ?? originalDragTrackId, blockToAdd);
+            // Select the newly added block
+            selectBlock(newBlockId); 
+         } else if (dragOperation === 'move' && finalTargetTrackId && finalTargetTrackId !== originalDragTrackId) {
+             // Handle regular move to different track
              moveMidiBlock(
-                 blockToUpdate.id, 
+                 blockToUpdateOrAdd.id, 
                  originalDragTrackId, 
                  finalTargetTrackId, 
-                 blockToUpdate.startBeat, // Use potentially adjusted beats
-                 blockToUpdate.endBeat
+                 blockToUpdateOrAdd.startBeat,
+                 blockToUpdateOrAdd.endBeat
              );
          } else {
-             // Use the potentially note-adjusted block for update (covers resize_start, resize_end, move within same track)
-             updateMidiBlock(originalDragTrackId, blockToUpdate);
+             // Handle regular update (resize or move within same track)
+             updateMidiBlock(originalDragTrackId, blockToUpdateOrAdd);
          }
       }
 
@@ -199,9 +208,10 @@ export function useTrackGestures({
       setDragOperation('none');
       setOriginalDragTrackId(null);
       setDragInitialBlockState(null);
-      setPendingUpdateBlock(null); // Reset visual state
+      setPendingUpdateBlock(null); 
       setPendingTargetTrackId(null);
       setDragStartX(0);
+      setIsCopyDrag(false); // Reset copy drag flag
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -256,74 +266,57 @@ export function useTrackGestures({
     if (dragOperation !== 'none') {
         window.addEventListener('mouseup', handleMouseUp);
         window.addEventListener('mousemove', handleMouseMove);
-        // console.log("Adding mouse listeners");
     }
 
     // Cleanup function
     return () => {
         window.removeEventListener('mouseup', handleMouseUp);
         window.removeEventListener('mousemove', handleMouseMove);
-        // console.log("Removing mouse listeners");
     };
   }, [
-      // Effect runs when drag operation changes or initial state is set/cleared
-      dragOperation, dragStartX, originalDragTrackId, dragInitialBlockState,
-      // Stable dependencies needed by handlers
-      updateMidiBlock, moveMidiBlock, // Store actions
-      timelineAreaRef,               // Ref to timeline area
-      effectivePixelsPerBeat, effectiveTrackHeight, // Calculated geometry
-      tracks,                        // Tracks array (for finding target track)
-      // Setters are needed for resetting state in handleMouseUp
+      // Dependencies: Add isCopyDrag state and addMidiBlock action
+      dragOperation, dragStartX, originalDragTrackId, dragInitialBlockState, isCopyDrag,
+      updateMidiBlock, moveMidiBlock, addMidiBlock, selectBlock, // Store actions
+      timelineAreaRef,               
+      effectivePixelsPerBeat, effectiveTrackHeight, 
+      tracks,                        
       setPendingUpdateBlock, setPendingTargetTrackId 
-      // Note: We deliberately OMIT pendingUpdateBlock/pendingTargetTrackId states
-      // and their refs to prevent listener churn. The latest values are accessed
-      // via refs updated in a separate effect.
   ]);
 
 
-  // --- Drag Start Handlers (wrapped in useCallback for potential optimization) --- 
-  const handleStartEdge = useCallback((trackId: string, blockId: string, clientX: number) => {
-    const track = findTrackById(trackId);
-    const block = track?.midiBlocks.find(b => b.id === blockId);
-    if (!block || !track) return;
+  // --- Drag Start Handlers --- 
+  // Modify handleStartEdge, handleEndEdge, handleMoveBlock to check Alt/Option key
 
-    setDragOperation('start');
-    setDragStartX(clientX);
-    setOriginalDragTrackId(trackId);
-    setDragInitialBlockState({ ...block });
-    // Initialize pending state for immediate visual feedback
-    setPendingUpdateBlock({ ...block });
-    setPendingTargetTrackId(trackId);
-    selectBlock(blockId);
-    // Refs will be updated by their effect
-  }, [findTrackById, selectBlock]); // Dependencies: stable helpers + selectBlock prop
-
-  const handleEndEdge = useCallback((trackId: string, blockId: string, clientX: number) => {
-    const track = findTrackById(trackId);
-    const block = track?.midiBlocks.find(b => b.id === blockId);
-    if (!block || !track) return;
-
-    setDragOperation('end');
+  const startDrag = (operation: 'start' | 'end' | 'move', trackId: string, block: MIDIBlock, clientX: number, altKey: boolean) => {
+    setDragOperation(operation);
     setDragStartX(clientX);
     setOriginalDragTrackId(trackId);
     setDragInitialBlockState({ ...block });
     setPendingUpdateBlock({ ...block });
     setPendingTargetTrackId(trackId);
-    selectBlock(blockId);
+    setIsCopyDrag(altKey && operation === 'move'); // Only allow copy on 'move' drag for now
+    selectBlock(block.id);
+  }
+
+  const handleStartEdge = useCallback((trackId: string, blockId: string, clientX: number, altKey: boolean) => {
+    const track = findTrackById(trackId);
+    const block = track?.midiBlocks.find(b => b.id === blockId);
+    if (!block || !track) return;
+    startDrag('start', trackId, block, clientX, altKey);
   }, [findTrackById, selectBlock]);
 
-  const handleMoveBlock = useCallback((trackId: string, blockId: string, clientX: number) => {
+  const handleEndEdge = useCallback((trackId: string, blockId: string, clientX: number, altKey: boolean) => {
     const track = findTrackById(trackId);
     const block = track?.midiBlocks.find(b => b.id === blockId);
     if (!block || !track) return;
+    startDrag('end', trackId, block, clientX, altKey);
+  }, [findTrackById, selectBlock]);
 
-    setDragOperation('move');
-    setDragStartX(clientX);
-    setOriginalDragTrackId(trackId);
-    setDragInitialBlockState({ ...block });
-    setPendingUpdateBlock({ ...block });
-    setPendingTargetTrackId(trackId);
-    selectBlock(blockId);
+  const handleMoveBlock = useCallback((trackId: string, blockId: string, clientX: number, altKey: boolean) => {
+    const track = findTrackById(trackId);
+    const block = track?.midiBlocks.find(b => b.id === blockId);
+    if (!block || !track) return;
+    startDrag('move', trackId, block, clientX, altKey);
   }, [findTrackById, selectBlock]);
 
   // --- Other Handlers --- 
@@ -476,6 +469,7 @@ export function useTrackGestures({
     // State needed for visual feedback
     pendingUpdateBlock,
     pendingTargetTrackId,
-    dragOperation
+    dragOperation,
+    isCopyDrag // Pass back isCopyDrag for potential visual cues
   };
 }

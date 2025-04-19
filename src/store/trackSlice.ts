@@ -11,6 +11,7 @@ export interface TrackState {
   selectedTrack: Track | null;
   selectedBlock: MIDIBlock | null;
   selectedNotes: MIDINote[] | null;
+  clipboardBlock: MIDIBlock | null; // Added for copy/paste
 }
 
 export interface TrackActions {
@@ -25,6 +26,7 @@ export interface TrackActions {
   updateTrack: (trackId: string, updatedProperties: Partial<Track>) => void;
   selectNotes: (notes: MIDINote[]) => void;
   reorderTracks: (draggedTrackId: string, targetTrackId: string | null) => void;
+  setClipboardBlock: (block: MIDIBlock | null) => void; // Added for copy/paste
   // Effect Actions
   addEffectToTrack: (trackId: string, effectToAdd: Effect) => void;
   removeEffectFromTrack: (trackId: string, effectIndex: number) => void;
@@ -63,6 +65,7 @@ export const createTrackSlice: StateCreator<
     selectedTrack: null,
     selectedBlock: null,
     selectedNotes: null,
+    clipboardBlock: null, // Initial state for clipboard
     selectTrack: (trackId: string | null) => {
       set((state: TrackState) => {
         const newSelectedTrackId = trackId;
@@ -360,6 +363,9 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
+    },
+    setClipboardBlock: (block: MIDIBlock | null) => {
+        set({ clipboardBlock: block });
     },
     // --- Effect Actions Implementations ---
     addEffectToTrack: (trackId: string, effectToAdd: Effect) => {

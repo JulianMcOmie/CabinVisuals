@@ -41,7 +41,13 @@ function TrackTimelineView({
     moveMidiBlock,
     timeManager,
     selectedWindow,
-    setSelectedWindow
+    setSelectedWindow,
+    clipboardBlock,
+    setClipboardBlock,
+    selectedTrackId,
+    selectedBlock,
+    currentBeat,
+    seekTo
   } = useStore();
   const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for hook, points to the container
   const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for the canvas element
@@ -70,7 +76,8 @@ function TrackTimelineView({
     fileInputRef,
     pendingUpdateBlock,    // The potential state of the block being dragged
     pendingTargetTrackId,  // The potential track ID if moved
-    dragOperation          // Current drag operation ('move', 'start', 'end', or 'none')
+    dragOperation,          // Current drag operation ('move', 'start', 'end', or 'none')
+    isCopyDrag
   } = useTrackGestures({
       tracks,
       updateMidiBlock,
@@ -114,7 +121,7 @@ function TrackTimelineView({
   };
 
   // Refactored Block Drawing Helper
-  const drawMidiBlock = (
+  const drawMidiBlock = useCallback((
     ctx: CanvasRenderingContext2D,
     blockData: MIDIBlock,
     trackTopY: number,
@@ -162,7 +169,7 @@ function TrackTimelineView({
 
       // Restore context state (removes clipping and resets globalAlpha/lineDash)
       ctx.restore();
-  }
+  }, [effectivePixelsPerBeat, effectiveTrackHeight, effectiveBlockVerticalPadding, effectiveBlockHeight]);
 
 
   // Canvas Drawing Logic
@@ -232,6 +239,12 @@ function TrackTimelineView({
         // Check if this block is the one being dragged
         const isBeingDragged = dragOperation !== 'none' && block.id === pendingUpdateBlock?.id;
 
+        // Determine alpha: opaque if copy-dragging, otherwise semi-transparent if moving
+        let alpha = 1;
+        if (isBeingDragged) {
+            alpha = isCopyDrag ? 1 : DRAGGED_BLOCK_OPACITY; // Keep original opaque on copy-drag
+        }
+
         const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
         const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
         const blockTopY = trackTopY + effectiveBlockVerticalPadding; // Use effective padding
@@ -242,7 +255,7 @@ function TrackTimelineView({
             block, // Block data
             trackTopY,
             isSelected,
-            isBeingDragged ? DRAGGED_BLOCK_OPACITY : 1, // Calculated alpha
+            alpha, // Use calculated alpha
         );
       });
     });
@@ -265,7 +278,7 @@ function TrackTimelineView({
                 context,
                 pendingUpdateBlock, // Pending block data
                 targetTrackTopY,    // Target track Y position
-                true,              // Ghost block is never selected visually
+                false,              // Ghost block is never selected visually
                 DRAGGED_BLOCK_OPACITY, // Alpha for ghost block
             );
         }
@@ -293,8 +306,68 @@ function TrackTimelineView({
       pendingTargetTrackId,
       dragOperation,
       drawMidiBlock, 
-      selectedWindow
+      selectedWindow,
+      isCopyDrag
   ]); // Add zoom dependencies
+
+
+  // --- Keyboard Listener for Copy/Paste --- 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only act if the timeline view is the selected window
+      if (selectedWindow !== 'timelineView') return;
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const isModifier = isMac ? e.metaKey : e.ctrlKey;
+
+      // --- Copy (Cmd/Ctrl + C) --- 
+      if (isModifier && e.key === 'c') {
+        if (selectedBlock) { // Use selectedBlock directly from store
+          // Deep clone the block data to avoid modifying original state
+          const blockToCopy = JSON.parse(JSON.stringify(selectedBlock));
+          setClipboardBlock(blockToCopy);
+          console.log('Copied block:', blockToCopy.id);
+          e.preventDefault();
+        }
+      }
+
+      // --- Paste (Cmd/Ctrl + V) ---
+      if (isModifier && e.key === 'v') {
+        if (clipboardBlock && selectedTrackId) { 
+          // Get current playhead position from store state
+          const playheadPos = currentBeat; 
+          // Calculate duration of the copied block
+          const duration = clipboardBlock.endBeat - clipboardBlock.startBeat;
+          // Calculate new beats based on playhead
+          const newStartBeat = playheadPos;
+          const newEndBeat = playheadPos + duration;
+          // Generate new ID
+          const newBlockId = `block-${crypto.randomUUID()}`;
+          // Create the new block object
+          const newPastedBlock: MIDIBlock = {
+            ...clipboardBlock,
+            id: newBlockId,
+            startBeat: newStartBeat,
+            endBeat: newEndBeat,
+          };
+
+          // Add the block to the selected track
+          addMidiBlock(selectedTrackId, newPastedBlock);
+          console.log('Pasted block:', newPastedBlock.id, 'to track:', selectedTrackId, 'at beat:', newStartBeat);
+
+          // Move playhead to the end of the pasted block using seekTo action
+          seekTo(newEndBeat);
+
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedWindow, selectedBlock, clipboardBlock, selectedTrackId, setClipboardBlock, addMidiBlock, timeManager, currentBeat, seekTo]); // Dependencies
 
 
   // Canvas Event Handlers
@@ -336,17 +409,18 @@ function TrackTimelineView({
       }
     }
 
-    // Call appropriate gesture handler
+    // Call appropriate gesture handler, passing altKey
+    const altKey = e.altKey;
     if (hitBlock && hitEdge === 'start') {
         e.stopPropagation();
-        handleStartEdge(clickedTrack.id, hitBlock.id, e.clientX);
+        handleStartEdge(clickedTrack.id, hitBlock.id, e.clientX, altKey);
     } else if (hitBlock && hitEdge === 'end') {
         e.stopPropagation();
-        handleEndEdge(clickedTrack.id, hitBlock.id, e.clientX);
+        handleEndEdge(clickedTrack.id, hitBlock.id, e.clientX, altKey);
     } else if (hitBlock) {
         e.stopPropagation();
         selectBlock(hitBlock.id); // Select the block first
-        handleMoveBlock(clickedTrack.id, hitBlock.id, e.clientX);
+        handleMoveBlock(clickedTrack.id, hitBlock.id, e.clientX, altKey);
     } else {
         // Clicked on empty track space
         selectBlock(null); // Deselect any selected block
