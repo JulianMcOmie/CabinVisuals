@@ -10,8 +10,10 @@ import { Property } from '../lib/properties/Property';
 import SliderPropertyControl from './properties/SliderPropertyControl';
 import NumberInputPropertyControl from './properties/NumberInputPropertyControl';
 import DropdownPropertyControl from './properties/DropdownPropertyControl';
-import ColorPropertyControl from './properties/ColorPropertyControl'; // Import the new control
+import ColorPropertyControl from './properties/ColorPropertyControl';
+import ColorRangePropertyControl from './properties/ColorRangePropertyControl'; // Import the new control
 import { InstrumentDefinition } from '../store/instrumentSlice'; // Import InstrumentDefinition
+import { ColorRange } from '../lib/types'; // Import ColorRange type
 
 interface SynthesizerDetailViewProps {
   track: Track;
@@ -36,12 +38,10 @@ function SynthesizerDetailView({ track }: SynthesizerDetailViewProps) {
   };
 
   // --- Handler for changing an individual property value ---
-  const handlePropertyChange = (propertyName: string, newValue: any) => {
-    if (!synthesizer) return;
-
-    const clonedSynth = synthesizer.clone();
-    clonedSynth.setPropertyValue(propertyName, newValue);
-    updateTrack(track.id, { synthesizer: clonedSynth });
+  const handlePropertyChange = (propertyName: string, value: any) => {
+    const newSynth = track.synthesizer.clone();
+    newSynth.setPropertyValue(propertyName, value);
+    updateTrack(track.id, { synthesizer: newSynth });
   };
 
   // Determine the current synthesizer ID for the dropdown
@@ -52,43 +52,63 @@ function SynthesizerDetailView({ track }: SynthesizerDetailViewProps) {
   // --- Function to render the correct control for a property ---
   const renderPropertyControl = (property: Property<any>) => {
     const key = `${track.id}-synth-prop-${property.name}`;
-    switch (property.uiType) {
+    let control: React.ReactNode = null;
+
+    switch (property.metadata.uiType) { // Use metadata.uiType
       case 'slider':
-        return (
+        control = (
           <SliderPropertyControl 
             key={key}
             property={property as Property<number>} 
             onChange={(value) => handlePropertyChange(property.name, value)} 
           />
         );
+        break;
       case 'numberInput':
-        return (
+        control = (
           <NumberInputPropertyControl 
             key={key}
             property={property as Property<number>} 
             onChange={(value) => handlePropertyChange(property.name, value)} 
           />
         );
+        break;
       case 'dropdown':
-        return (
+        control = (
           <DropdownPropertyControl
             key={key}
             property={property as Property<unknown>} 
             onChange={(value) => handlePropertyChange(property.name, value)} 
           />
         );
-      case 'color': // Add case for color
-        return (
+        break;
+      case 'color':
+        control = (
           <ColorPropertyControl
             key={key}
             property={property as Property<string>} 
             onChange={(value) => handlePropertyChange(property.name, value)} 
           />
         );
+        break;
+      case 'colorRange': 
+        control = (
+          <ColorRangePropertyControl
+            key={key}
+            property={property as Property<ColorRange>}
+            onChange={(value) => handlePropertyChange(property.name, value)}
+          />
+        );
+        break;
       default:
-        return <div key={key}>Unsupported property type: {property.uiType}</div>;
+        // Cast metadata to any to display the uiType in the error message
+        control = <div key={key}>Unsupported property type: {(property.metadata as any).uiType}</div>;
     }
+    return control;
   };
+
+  // --- Render the list of properties ---
+  const properties = Array.from(track.synthesizer.properties.values());
 
   return (
     <div style={{ marginBottom: '30px' }}>

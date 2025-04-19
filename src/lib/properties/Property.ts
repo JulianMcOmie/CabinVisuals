@@ -1,6 +1,6 @@
-import { Track } from "../types";
+import { Track, ColorRange } from "../types";
 
-export type UIType = 'slider' | 'numberInput' | 'dropdown' | 'color';
+export type UIType = 'slider' | 'numberInput' | 'dropdown' | 'color' | 'colorRange';
 
 // --- Metadata Interfaces ---
 
@@ -27,12 +27,16 @@ export interface DropdownMetadata<T> extends BaseMetadata {
 // Add metadata specific to color type (can just be BaseMetadata for now)
 export interface ColorMetadata extends BaseMetadata {}
 
+// Add metadata specific to colorRange type
+export interface ColorRangeMetadata extends BaseMetadata {}
+
 // --- Union Type for Metadata based on UIType ---
 
 export type PropertyMetadata<T> =
   | (NumericMetadata & { uiType: 'slider' | 'numberInput' })
   | (DropdownMetadata<T> & { uiType: 'dropdown' })
-  | (ColorMetadata & { uiType: 'color' });
+  | (ColorMetadata & { uiType: 'color' })
+  | (ColorRangeMetadata & { uiType: 'colorRange' });
 
 // --- Property Class ---
 

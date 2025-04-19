@@ -18,6 +18,7 @@ import ReverseKickEngineSynth from '../lib/synthesizers/ReverseKickEngineSynth';
 import RadialPulseSynth from '../lib/synthesizers/RadialPulseSynth';
 import RadialDrumSynth from '../lib/synthesizers/RadialDrumSynth';
 import SymmetricResonanceSynth from '../lib/synthesizers/SymmetricResonanceSynth';
+import GlowSynth from '../lib/synthesizers/GlowSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -51,6 +52,7 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'PitchModulatedSynth', name: 'Pitch Modulated Synth', constructor: PitchModulatedSynth },
     { id: 'PitchSphereSynth', name: 'Pitch Sphere Synth', constructor: PitchSphereSynth },
     { id: 'SymmetricResonanceSynth', name: 'Symmetric Resonance', constructor: SymmetricResonanceSynth },
+    { id: 'GlowSynth', name: 'Glow Synth', constructor: GlowSynth },
   ],
   Percussive: [
     { id: 'KickDrumSynth', name: 'Kick Drum', constructor: KickDrumSynth },

@@ -52,3 +52,9 @@ export interface Track {
   synthesizer: Synthesizer; // Now uses the imported class type
   effects: Effect[];
 }
+
+// Interface for the Color Range property type
+export interface ColorRange {
+  startHue: number; // 0-360
+  endHue: number;   // 0-360
+}
