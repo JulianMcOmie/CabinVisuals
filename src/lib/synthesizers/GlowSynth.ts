@@ -79,6 +79,11 @@ class GlowSynth extends Synthesizer {
             1.5,
             { label: 'Base Size', uiType: 'slider', min: 0.1, max: 5, step: 0.05 }
         ));
+        this.properties.set('expansionRate', new Property<number>(
+            'expansionRate',
+            2.0,
+            { label: 'Expansion Rate', uiType: 'slider', min: 0.0, max: 10.0, step: 0.1 }
+        ));
         this.properties.set('hueRange', new Property<ColorRange>(
             'hueRange',
             { startHue: 180, endHue: 300 },
@@ -127,8 +132,9 @@ class GlowSynth extends Synthesizer {
             })
             .withScale((ctx: MappingContext) => {
                 const baseSize = this.getPropertyValue<number>('baseSize') ?? 1.5;
-                const scaleFactor = 1.0 + (1.0 - (ctx.adsrAmplitude ?? 1.0)) * 2.0;
-                const finalSize = baseSize * scaleFactor;
+                const expansionRate = this.getPropertyValue<number>('expansionRate') ?? 2.0;
+                const currentSize = baseSize + expansionRate * ctx.timeSinceNoteStart;
+                const finalSize = Math.max(0.01, currentSize);
                 return [finalSize, finalSize, finalSize];
             })
             .withColor((ctx: MappingContext) => {
