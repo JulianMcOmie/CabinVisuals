@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import useStore from '../../store/store';
 import { MIDIBlock, MIDINote, Track } from '../../lib/types';
 
@@ -18,7 +18,12 @@ import {
   LOWEST_NOTE,
   RESIZE_HANDLE_WIDTH, // For note resize
   BLOCK_RESIZE_HANDLE_WIDTH,
-  GRID_SNAP
+  GRID_SNAP,
+  // --- ADDED: Zoom constants ---
+  MIN_PIXELS_PER_BEAT,
+  MAX_PIXELS_PER_BEAT,
+  ZOOM_SENSITIVITY 
+  // ---------------------------
 } from './utils/constants';
 
 import {
@@ -143,6 +148,49 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   
   // Copy/paste related state
   const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
+
+  // --- ADDED: Wheel Handler for Zoom --- 
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    // Check for Option key (Alt) or Ctrl key (often pinch-zoom)
+    if (e.altKey || e.ctrlKey) {
+      e.preventDefault(); // Prevent page scroll
+
+      // Determine zoom direction and intensity (prioritize deltaX)
+      let delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+      const zoomIntensity = Math.min(Math.abs(delta) / 50, 1); // Normalize intensity
+
+      setPixelsPerBeat(prevPixelsPerBeat => {
+        let newPixelsPerBeat;
+        if (delta < 0) {
+          // Zoom In (Increase pixelsPerBeat)
+          newPixelsPerBeat = prevPixelsPerBeat * Math.pow(ZOOM_SENSITIVITY, zoomIntensity);
+        } else {
+          // Zoom Out (Decrease pixelsPerBeat)
+          newPixelsPerBeat = prevPixelsPerBeat / Math.pow(ZOOM_SENSITIVITY, zoomIntensity);
+        }
+        
+        // Clamp the value within limits
+        return Math.max(MIN_PIXELS_PER_BEAT, Math.min(MAX_PIXELS_PER_BEAT, newPixelsPerBeat));
+      });
+    }
+    // If neither Alt nor Ctrl is pressed, allow default scroll behavior (handled by onScroll)
+  }, [setPixelsPerBeat]); // Dependencies: only needs the setter
+  // -------------------------------------
+
+  // --- ADDED: Effect to attach wheel listener with passive: false ---
+  useEffect(() => {
+    const gridElement = editorRef.current?.querySelector('.piano-roll-grid'); // Find the grid div
+    if (gridElement) {
+      // Type assertion needed because querySelector returns Element
+      const wheelHandler = (e: Event) => handleWheel(e as unknown as React.WheelEvent<HTMLDivElement>); 
+      gridElement.addEventListener('wheel', wheelHandler, { passive: false });
+
+      return () => {
+        gridElement.removeEventListener('wheel', wheelHandler);
+      };
+    }
+  }, [handleWheel]); // Re-attach if handleWheel changes (due to dependencies)
+  // --------------------------------------------------------------------
 
   const blockStartBeat = block.startBeat;
   const blockDuration = block.endBeat - block.startBeat;
@@ -773,7 +821,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
             }}
             onScroll={(e) => {
               setScrollX(e.currentTarget.scrollLeft);
-              // Y scroll handled by outer container
             }}
           >
             <canvas 

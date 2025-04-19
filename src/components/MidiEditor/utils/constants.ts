@@ -14,6 +14,12 @@ export const SELECTION_BOX_BORDER_COLOR = 'rgba(100, 181, 255, 0.8)'; // More op
 export const PASTE_OFFSET = 0.25; // Offset for pasted notes in beats
 export const MINIMUM_NOTE_DURATION = 0.1; // Minimum length of a note in beats
 
+// --- ADDED: Zoom Constants --- 
+export const MIN_PIXELS_PER_BEAT = 10;
+export const MAX_PIXELS_PER_BEAT = 500;
+export const ZOOM_SENSITIVITY = 1.1; // Multiplier for zoom step
+// -----------------------------
+
 // Common type definitions specific to MIDI Editor
 export type DragOperation = 'none' | 'select' | 'start' | 'end' | 'move';
 export type CursorType = 'default' | 'move' | 'w-resize' | 'e-resize';
