@@ -1,5 +1,6 @@
 import { MIDINote, MIDIBlock, VisualObject } from './types';
 import Synthesizer from './Synthesizer'; // Assuming Synthesizer provides getPropertyValue
+import { PhysicsUtils } from './PhysicsUtils'; // Import PhysicsUtils
 
 // --- Interfaces and Types ---
 
@@ -22,6 +23,15 @@ interface InstanceData {
   [key: string]: any;
 }
 
+// Define the physics envelope configuration
+interface PhysicsEnvelopeConfig {
+  tension?: number; // Spring stiffness
+  friction?: number; // Damping
+  initialVelocity?: number; // Initial impulse
+}
+
+type PhysicsEnvelopeConfigFn = (noteCtx: NoteContext) => PhysicsEnvelopeConfig;
+
 interface MappingContext {
   note: MIDINote;
   time: number; // Current global time (beats)
@@ -34,6 +44,7 @@ interface MappingContext {
   parentContext?: MappingContext; // Context of the parent
   adsrAmplitude?: number; // Current ADSR amplitude (0-1)
   adsrPhase?: 'attack' | 'decay' | 'sustain' | 'release' | 'idle'; // Current ADSR phase
+  physicsValue?: number; // Current value from physics envelope
   calculatedProperties?: VisualObjectProperties; // Read-only view of properties calculated so far
   // synthesizer: Synthesizer; // Direct access might be complex due to `this` binding
 }
@@ -86,6 +97,7 @@ interface DefinitionLevel {
     colorMapper?: MapperFn<string>;
     opacityMapper?: MapperFn<number>;
     adsrConfig?: ADSRConfig | ADSRConfigFn; // ADSR for this level
+    physicsEnvelopeConfig?: PhysicsEnvelopeConfig | PhysicsEnvelopeConfigFn; // Physics envelope for this level
 }
 
 
@@ -160,6 +172,11 @@ class ObjectDefinition {
         this.getCurrentLevelConfig().adsrConfig = config;
         return this;
     }
+
+    applyPhysicsEnvelope(config: PhysicsEnvelopeConfig | PhysicsEnvelopeConfigFn): this {
+        this.getCurrentLevelConfig().physicsEnvelopeConfig = config;
+        return this;
+    }
 }
 
 
@@ -225,6 +242,11 @@ class VisualObjectEngine {
         const allVisualObjects: VisualObject[] = [];
         const secondsPerBeat = 60 / bpm;
 
+        // Default values for physics parameters
+        const DEFAULT_TENSION = 100;
+        const DEFAULT_FRICTION = 10;
+        const DEFAULT_INITIAL_VELOCITY = 1;
+
         this.objectDefinitions.forEach(definition => {
             midiBlocks.forEach(block => {
                 const blockAbsoluteStartBeat = block.startBeat;
@@ -283,11 +305,51 @@ class VisualObjectEngine {
                                     adsrAmplitude = adsrResult.amplitude;
                                     adsrPhase = adsrResult.phase;
 
-                                    // Optimization: If amplitude is zero (and not in release needing processing), skip this instance
-                                    if (adsrAmplitude <= 0 && adsrPhase === 'idle') {
-                                        return;
-                                    }
+                                    // Optimization: If amplitude is zero (and not in release needing processing), could skip, but physics might still run
+                                    // Consider skipping only if *both* ADSR is idle AND physics is inactive/settled
                                 }
+
+                                // --- Physics Envelope Calculation for this Level ---
+                                let physicsValue: number | undefined = undefined;
+                                let currentPhysicsConfig: PhysicsEnvelopeConfig | undefined = undefined;
+
+                                if (levelConfig.physicsEnvelopeConfig) {
+                                    currentPhysicsConfig = typeof levelConfig.physicsEnvelopeConfig === 'function'
+                                        ? levelConfig.physicsEnvelopeConfig.call(this.synthesizer, noteCtx)
+                                        : levelConfig.physicsEnvelopeConfig;
+
+                                    const tension = currentPhysicsConfig.tension ?? DEFAULT_TENSION;
+                                    const friction = currentPhysicsConfig.friction ?? DEFAULT_FRICTION;
+                                    const initialVelocity = currentPhysicsConfig.initialVelocity ?? DEFAULT_INITIAL_VELOCITY;
+
+                                    physicsValue = PhysicsUtils.calculateDampedOscillator(
+                                        timeSinceNoteStart,
+                                        tension,
+                                        friction,
+                                        initialVelocity
+                                    );
+
+                                    // Optimization: Could potentially skip if physicsValue is negligible and ADSR is idle
+                                }
+
+                                // Early exit optimization (example - adjust threshold as needed)
+                                const isAdsrIdle = adsrAmplitude !== undefined && adsrAmplitude <= 0 && adsrPhase === 'idle';
+                                const isPhysicsSettled = physicsValue !== undefined && Math.abs(physicsValue) < 0.001; // Check if physics value is near zero
+
+                                // If ADSR is defined and idle, AND physics is defined and settled, skip instance
+                                if (levelConfig.adsrConfig && isAdsrIdle && levelConfig.physicsEnvelopeConfig && isPhysicsSettled) {
+                                    return;
+                                }
+                                // If ONLY ADSR is defined and it's idle, skip instance
+                                if (levelConfig.adsrConfig && !levelConfig.physicsEnvelopeConfig && isAdsrIdle) {
+                                    return;
+                                }
+                                // If ONLY physics is defined and it's settled, skip instance
+                                // (Requires defining "settled" - potentially based on time or value threshold)
+                                // if (levelConfig.physicsEnvelopeConfig && !levelConfig.adsrConfig && isPhysicsSettled) {
+                                //    return;
+                                // }
+
 
                                 // --- Create Mapping Context for this Instance ---
                                 const currentContext: MappingContext = {
@@ -302,6 +364,7 @@ class VisualObjectEngine {
                                     parentContext: parentContext,
                                     adsrAmplitude: adsrAmplitude,
                                     adsrPhase: adsrPhase,
+                                    physicsValue: physicsValue, // Add physics value to context
                                     // calculatedProperties will be filled below
                                 };
 
@@ -376,5 +439,5 @@ class VisualObjectEngine {
 }
 
 export default VisualObjectEngine;
-export type { MappingContext, NoteContext, InstanceData, ADSRConfig, ADSRConfigFn };
+export type { MappingContext, NoteContext, InstanceData, ADSRConfig, ADSRConfigFn, PhysicsEnvelopeConfig, PhysicsEnvelopeConfigFn };
 export { MappingUtils, ObjectDefinition }; 
