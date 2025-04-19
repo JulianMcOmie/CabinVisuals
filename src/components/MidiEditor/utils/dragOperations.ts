@@ -14,25 +14,45 @@ import { duplicateNotes, moveSelectedNotes, resizeNotesFromStart, resizeNotesFro
 export const handleOptionDrag = (
   block: MIDIBlock,
   selectedNoteIds: string[],
-  dragNoteId: string
+  dragNoteId: string | null // Allow null for safety
 ): {
   updatedBlock: MIDIBlock,
   newSelectedIds: string[],
-  newDragNoteId: string,
+  newDragNoteId: string | null, // Allow null
   notesToSelect: MIDINote[]
 } => {
-  // Duplicate the selected notes
+  if (!dragNoteId) {
+    // Safety check: Should not happen if called correctly, but handle gracefully
+    console.error("handleOptionDrag called with null dragNoteId");
+    return { updatedBlock: block, newSelectedIds: [], newDragNoteId: null, notesToSelect: [] };
+  }
+
+  // Duplicate the selected notes. Assuming duplicateNotes returns the new notes and their IDs.
   const { notes: notesToDuplicate, ids: newNoteIds } = duplicateNotes(block, selectedNoteIds);
-  
-  // Create duplicate notes and add them to the block
-  const updatedBlock = { ...block };
-  updatedBlock.notes = [...block.notes, ...notesToDuplicate];
-  
-  // Update the drag note ID to the duplicated version of the originally clicked note
-  const originalNoteIndex = block.notes.findIndex(note => note.id === dragNoteId);
-  const newDragNoteId = originalNoteIndex !== -1 
-    ? notesToDuplicate[newNoteIds.indexOf(notesToDuplicate[originalNoteIndex].id)].id
-    : dragNoteId;
+
+  // Create the updated block with original + duplicated notes
+  const updatedBlock = { 
+      ...block, 
+      notes: [...block.notes, ...notesToDuplicate] 
+  };
+
+  // --- FIX: Find the new ID corresponding to the original dragNoteId --- 
+  let newDragNoteId: string | null = null;
+  // Find the index of the original dragNoteId within the selectedNoteIds array
+  const originalSelectedIndex = selectedNoteIds.indexOf(dragNoteId);
+
+  if (originalSelectedIndex !== -1 && originalSelectedIndex < newNoteIds.length) {
+    // If found and the index is valid for the new IDs array, use the corresponding new ID
+    newDragNoteId = newNoteIds[originalSelectedIndex];
+  } else {
+    // Fallback or error case: Couldn't map the original drag ID to a new one.
+    // This might happen if dragNoteId wasn't actually in selectedNoteIds.
+    // Defaulting to null or the first new ID might be options, but null is safer.
+    console.warn(`Could not map original dragNoteId (${dragNoteId}) to a new ID during duplication.`);
+    // Optionally, just pick the first new note ID if available?
+    // newDragNoteId = newNoteIds.length > 0 ? newNoteIds[0] : null;
+  }
+  // ------------------------------------------------------------------
     
   return {
     updatedBlock,
