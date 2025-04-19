@@ -22,6 +22,7 @@ import {
 import {
   getCoordsFromEvent,
   findNoteAt,
+  generateNoteId
 } from './utils/utils';
 
 import { drawMidiEditor } from './utils/canvas';
@@ -120,10 +121,19 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     );
   }, [block.notes, blockDuration, blockStartBeat, editorWidth, editorHeight, selectionBox, isDragging, selectedNoteIds]);
 
+  // Helper to get coords and derived values
+  const getCoordsAndDerived = (e: MouseEvent | React.MouseEvent) => {
+    const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
+    if (!coords) return null;
+    
+    const { x, y, beat, pitch } = coords;
+    return { x, y, beat, pitch };
+  };
+
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setSelectedWindow('midiEditor');
-    const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
+    const coords = getCoordsAndDerived(e);
     if (!coords) return;
     
     const { x, y, beat, pitch } = coords;
@@ -191,15 +201,37 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           updatedBlock, 
           newSelectedIds, 
           newDragNoteId, 
-          notesToSelect 
+          notesToSelect
         } = handleOptionDrag(block, selectedIds, note.id);
         
-        // Update state based on the duplication results
+        // Apply state updates immediately
         updateMidiBlock(track.id, updatedBlock);
         setSelectedNoteIds(newSelectedIds);
         storeSelectNotes(notesToSelect);
         setDragNoteId(newDragNoteId);
+        
+        // Update initialDragStates for the newly created notes
+        setInitialDragStates(prev => {
+            const newStates = new Map(prev);
+            notesToSelect.forEach(newNote => {
+                newStates.set(newNote.id, { startBeat: newNote.startBeat, duration: newNote.duration });
+            });
+            return newStates;
+        });
+
         setIsDragging(true); // Skip drag threshold check
+      } else {
+         // Update initialDragStates for non-duplicate drag start
+          setInitialDragStates(prev => {
+            const newStates = new Map(); // Start fresh for this selection
+            selectedIds.forEach(id => {
+              const selectedNote = block.notes.find(n => n.id === id);
+              if (selectedNote) {
+                newStates.set(id, { startBeat: selectedNote.startBeat, duration: selectedNote.duration });
+              }
+            });
+            return newStates;
+          });
       }
     } else {
       // Clicked on empty space - will start selection box
@@ -229,7 +261,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     if (dragOperation === 'select') {
       // Handle selection box completion
       if (selectionBox) {
-        const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
+        const coords = getCoordsAndDerived(e);
         if (!coords) {
           setDragOperation('none');
           setSelectionBox(null);
@@ -276,7 +308,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     e.preventDefault();
     setSelectedWindow('midiEditor');
     
-    const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
+    const coords = getCoordsAndDerived(e);
     if (!coords) return;
     
     const result = findNoteAt(coords.x, coords.y, block.notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat, blockDuration);
@@ -289,7 +321,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   
   // Modified canvasMouseMove to handle selection box updates
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
+    const coords = getCoordsAndDerived(e);
     if (!coords) {
       setHoverCursor('default');
       return;
@@ -339,7 +371,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     const handleMouseMove = (e: MouseEvent) => {
       // Handle selection box updates
       if (dragOperation === 'select' && selectionBox) {
-        const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
+        const coords = getCoordsAndDerived(e);
         if (!coords) return;
         
         // Update selection box
@@ -365,46 +397,61 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         if (isDragThresholdMet(dragStart.x, dragStart.y, e.clientX, e.clientY)) {
           setIsDragging(true);
           
-          // Check for Alt/Option key when starting drag (for duplicating notes)
-          // Only check here if we didn't already duplicate at mousedown
-          if (dragOperation === 'move' && (e.altKey || e.metaKey)) {
+          // Handle Option/Alt key duplication HERE too
+          if (dragOperation === 'move' && (e.altKey || e.metaKey) && initialDragStates.size > 0) { // Ensure initial states exist
+            // Use initialDragStates.keys() as the IDs to duplicate
+            const idsToDuplicate = Array.from(initialDragStates.keys());
+            // Need the original primary drag note ID before duplication
+            const originalDragNoteId = dragNoteId; // Assume dragNoteId holds the original ID at this point
+            
             const { 
               updatedBlock, 
               newSelectedIds, 
               newDragNoteId, 
               notesToSelect 
-            } = handleOptionDrag(block, selectedNoteIds, dragNoteId);
+            } = handleOptionDrag(block, idsToDuplicate, originalDragNoteId);
             
-            // Update state based on the duplication results
+            // Apply state updates immediately
             updateMidiBlock(track.id, updatedBlock);
             setSelectedNoteIds(newSelectedIds);
             storeSelectNotes(notesToSelect);
             setDragNoteId(newDragNoteId);
+
+            // Update initialDragStates for the newly created notes
+            setInitialDragStates(prev => {
+                const newStates = new Map(); // Start fresh with only the new notes for this drag
+                notesToSelect.forEach(newNote => {
+                    newStates.set(newNote.id, { startBeat: newNote.startBeat, duration: newNote.duration });
+                });
+                return newStates;
+            });
+            // Proceed with the drag using the new notes
           }
         } else {
           return; // Don't start dragging yet
         }
       }
       
-      const coords = getCoordsFromEvent(e, canvasRef, pixelsPerBeat, pixelsPerSemitone);
-      if (!coords) return;
+      // Ensure coords use the *current* state after potential duplication
+      const derivedCoords = getCoordsAndDerived(e);
+      if (!derivedCoords) return;
       
       // Use utility function to handle drag movement
       if (dragOperation === 'move' || dragOperation === 'start' || dragOperation === 'end') {
+        // Pass the CURRENT dragNoteId and selectedNoteIds (updated if duplication happened)
         const updatedBlock = handleDragMove(
           block,
           dragOperation,
-          dragNoteId,
-          selectedNoteIds,
-          coords,
+          dragNoteId, // Use current dragNoteId
+          selectedNoteIds, // Use current selectedNoteIds
+          derivedCoords, // Pass the whole coords object
           clickOffset,
-          dragStart,
-          initialDragStates,
+          dragStart, // Pass original dragStart (client coords)
+          initialDragStates, // Pass potentially updated initialDragStates
           pixelsPerBeat,
           pixelsPerSemitone
         );
         
-        // Only update if the block has changed
         if (updatedBlock !== block) {
           updateMidiBlock(track.id, updatedBlock);
         }
@@ -463,7 +510,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     clickOffset,
     copiedNotes,
     setCopiedNotes,
-    selectedWindow
+    selectedWindow,
+    pixelsPerBeat,
+    pixelsPerSemitone
   ]);
 
   const handleEditorClick = () => {
