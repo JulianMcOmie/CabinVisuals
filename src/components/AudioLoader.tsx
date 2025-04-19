@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import useStore from '../store/store';
+import { saveAudioFile } from '../lib/idbHelper';
 
 const AudioLoader: React.FC = () => {
     const loadAudioAction = useStore(state => state.loadAudio);
@@ -15,6 +16,8 @@ const AudioLoader: React.FC = () => {
         setIsLoading(true);
         setError(null);
 
+        const fileToPersist = file;
+
         const reader = new FileReader();
 
         reader.onload = async (e) => {
@@ -27,6 +30,14 @@ const AudioLoader: React.FC = () => {
 
             try {
                 await loadAudioAction(arrayBuffer);
+
+                try {
+                    await saveAudioFile(fileToPersist);
+                    console.log('Audio file persisted to IndexedDB.');
+                } catch (idbError) {
+                    console.error('Failed to save audio file to IndexedDB:', idbError);
+                }
+
             } catch (err) {
                 console.error("Error loading audio:", err);
                 setError(err instanceof Error ? err.message : 'An unknown error occurred during audio loading.');

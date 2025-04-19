@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import TimelineView from '../src/components/TimelineView';
 import VisualizerView from '../src/components/VisualizerView';
 import PlaybarView from '../src/components/PlaybarView';
@@ -8,9 +8,36 @@ import DetailView from '../src/components/DetailView';
 import AudioLoader from '../src/components/AudioLoader';
 import InstrumentSidebar from '../src/components/InstrumentSidebar/InstrumentSidebar';
 import useStore from '../src/store/store';
+import { loadAudioFile } from '../src/lib/idbHelper';
 
 export default function Home() {
   const isInstrumentSidebarVisible = useStore((state) => state.isInstrumentSidebarVisible);
+  const loadAudioAction = useStore((state) => state.loadAudio);
+
+  useEffect(() => {
+    const attemptLoadPersistedAudio = async () => {
+      console.log('Attempting to load persisted audio from IndexedDB...');
+      try {
+        const persistedFile = await loadAudioFile();
+        if (persistedFile) {
+          console.log('Found persisted audio file, attempting to load...');
+          try {
+            const arrayBuffer = await persistedFile.arrayBuffer();
+            await loadAudioAction(arrayBuffer);
+            console.log('Successfully loaded persisted audio file into store.');
+          } catch (loadError) {
+            console.error('Error processing or loading persisted audio file:', loadError);
+          }
+        } else {
+          console.log('No persisted audio file found.');
+        }
+      } catch (idbError) {
+        console.error('Error accessing IndexedDB for persisted audio:', idbError);
+      }
+    };
+
+    attemptLoadPersistedAudio();
+  }, [loadAudioAction]);
 
   return (
     <main className="main-container">
