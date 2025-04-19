@@ -17,6 +17,8 @@ export interface VisualObjectProperties {
   // Basic properties
   color: string;
   opacity?: number;
+  emissive?: string;         // <-- Add emissive color
+  emissiveIntensity?: number; // <-- Add emissive intensity
   
   // Legacy property for simple 2D objects
   size?: number;

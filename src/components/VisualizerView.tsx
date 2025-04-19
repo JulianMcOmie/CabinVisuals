@@ -3,11 +3,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import useStore from '../store/store';
 import VisualizerManager, { VisualObject3D } from '../lib/VisualizerManager';
 
 // Scene component that handles animation and object rendering
-function Scene({ visualizerManager }: { visualizerManager: VisualizerManager }) {
+function Scene({ visualizerManager, currentBeat }: { visualizerManager: VisualizerManager, currentBeat: number }) {
   const [objects, setObjects] = useState<VisualObject3D[]>([]);
   
   // Update objects on each frame
@@ -30,8 +31,10 @@ function Scene({ visualizerManager }: { visualizerManager: VisualizerManager }) 
 function VisualObject({ object }: { object: VisualObject3D }) {
   const meshRef = useRef<THREE.Mesh>(null);
   
-  // Determine if the object should be transparent
   const isTransparent = object.opacity < 1.0;
+  // Use provided emissive properties, defaulting if undefined
+  const emissiveColor = object.emissive ?? object.color; // Default emissive to base color if not provided
+  const emissiveIntensity = object.emissiveIntensity ?? 0; // Default intensity to 0
 
   return (
     <mesh
@@ -51,6 +54,9 @@ function VisualObject({ object }: { object: VisualObject3D }) {
         opacity={object.opacity}
         transparent={isTransparent}
         depthWrite={!isTransparent}
+        emissive={emissiveColor}       // Apply emissive color
+        emissiveIntensity={emissiveIntensity} // Apply emissive intensity
+        toneMapped={false} // Disable tone mapping for emissive materials for stronger bloom
       />
     </mesh>
   );
@@ -100,8 +106,16 @@ function VisualizerView() {
       <h2 style={{ padding: '10px', margin: 0 }}>Visualizer View (Beat: {currentBeat.toFixed(2)})</h2>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {dimensions.width > 0 && dimensions.height > 0 && (
-          <Canvas style={{ background: '#000' }}>
-            <Scene visualizerManager={visualizerManager} />
+          <Canvas style={{ background: '#000' }} camera={{ position: [0, 0, 15] }}>
+            <Scene visualizerManager={visualizerManager} currentBeat={currentBeat} />
+            <EffectComposer>
+              <Bloom 
+                intensity={1.0}
+                luminanceThreshold={0.1}
+                luminanceSmoothing={0.2}
+                mipmapBlur={true}
+              />
+            </EffectComposer>
           </Canvas>
         )}
       </div>

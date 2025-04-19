@@ -16,6 +16,8 @@ import HiHatSynth from '../lib/synthesizers/HiHatSynth';
 import ShakerSynth from '../lib/synthesizers/ShakerSynth';
 import ReverseKickEngineSynth from '../lib/synthesizers/ReverseKickEngineSynth';
 import RadialPulseSynth from '../lib/synthesizers/RadialPulseSynth';
+import RadialDrumSynth from '../lib/synthesizers/RadialDrumSynth';
+import SymmetricResonanceSynth from '../lib/synthesizers/SymmetricResonanceSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -48,6 +50,7 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'BasicSynthesizer', name: 'Basic Synth', constructor: BasicSynthesizer },
     { id: 'PitchModulatedSynth', name: 'Pitch Modulated Synth', constructor: PitchModulatedSynth },
     { id: 'PitchSphereSynth', name: 'Pitch Sphere Synth', constructor: PitchSphereSynth },
+    { id: 'SymmetricResonanceSynth', name: 'Symmetric Resonance', constructor: SymmetricResonanceSynth },
   ],
   Percussive: [
     { id: 'KickDrumSynth', name: 'Kick Drum', constructor: KickDrumSynth },
@@ -56,6 +59,7 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'ShakerSynth', name: 'Shaker', constructor: ShakerSynth },
     { id: 'ReverseKickEngineSynth', name: 'Reverse Kick (Engine)', constructor: ReverseKickEngineSynth },
     { id: 'RadialPulseSynth', name: 'Radial Pulse', constructor: RadialPulseSynth },
+    { id: 'RadialDrumSynth', name: 'Radial Drum', constructor: RadialDrumSynth },
   ],
 };
 

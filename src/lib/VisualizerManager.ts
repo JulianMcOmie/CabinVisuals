@@ -11,6 +11,8 @@ export interface VisualObject3D {
   scale: [number, number, number];
   color: string;
   opacity: number;
+  emissive?: string;         // Add emissive color
+  emissiveIntensity?: number; // Add emissive intensity
 }
 
 class VisualizerManager {
@@ -145,6 +147,10 @@ class VisualizerManager {
         }
         const clampedOpacity = Math.max(0, Math.min(1, opacity));
 
+        // ---> Extract emissive properties <---
+        const emissive = props.emissive;
+        const emissiveIntensity = props.emissiveIntensity;
+
         if (clampedOpacity > 0) { 
            // Ensure unique ID even if multiple objects derive from the same note in one frame
            const renderId = stateKey
@@ -157,7 +163,9 @@ class VisualizerManager {
             rotation,
             scale,
             color,
-            opacity: clampedOpacity
+            opacity: clampedOpacity,
+            emissive: emissive,                 // Pass emissive color
+            emissiveIntensity: emissiveIntensity // Pass emissive intensity
           });
         }
       });
