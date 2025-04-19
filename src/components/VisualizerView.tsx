@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
@@ -67,6 +67,7 @@ function VisualizerView() {
   const { timeManager, currentBeat, tracks, setSelectedWindow } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Initialize VisualizerManager with timeManager and initial tracks
   const [visualizerManager] = useState(() => new VisualizerManager(timeManager, tracks));
@@ -92,6 +93,32 @@ function VisualizerView() {
     visualizerManager.setTracks(tracks);
   }, [tracks, visualizerManager]); // Depend on tracks and the manager instance
   
+  // Fullscreen change handler
+  const handleFullscreenChange = useCallback(() => {
+    setIsFullscreen(!!document.fullscreenElement);
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [handleFullscreenChange]);
+
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
   const handleVisualizerClick = () => {
     setSelectedWindow(null);
   };
@@ -101,9 +128,14 @@ function VisualizerView() {
       className="visualizer-view" 
       ref={containerRef} 
       onClick={handleVisualizerClick} 
-      style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+      style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}
     >
-      <h2 style={{ padding: '10px', margin: 0 }}>Visualizer View (Beat: {currentBeat.toFixed(2)})</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', flexShrink: 0 }}>
+        <h2 style={{ margin: 0 }}>Visualizer View (Beat: {currentBeat.toFixed(2)})</h2>
+        <button onClick={toggleFullscreen} style={{ padding: '5px 10px' }}>
+          {isFullscreen ? 'Exit Fullscreen' : 'Expand'}
+        </button>
+      </div>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {dimensions.width > 0 && dimensions.height > 0 && (
           <Canvas style={{ background: '#000' }} camera={{ position: [0, 0, 15] }}>

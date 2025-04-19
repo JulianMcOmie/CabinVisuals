@@ -96,8 +96,9 @@ function MeasuresHeader({
     if (!isSeeking || !overlayRef.current) return;
     const overlayRect = overlayRef.current.getBoundingClientRect();
     const mouseX = event.clientX - overlayRect.left;
-    const targetBeat = calculateBeatFromX(mouseX);
-    seekTo(targetBeat);
+    const targetBeatRaw = calculateBeatFromX(mouseX);
+    const targetBeatQuantized = Math.round(targetBeatRaw); // Quantize
+    seekTo(targetBeatQuantized); // Use quantized beat
   }, [isSeeking, seekTo, calculateBeatFromX]);
 
   const handleSeekEnd = useCallback(() => {
@@ -206,8 +207,8 @@ function MeasuresHeader({
     const mouseY = event.nativeEvent.offsetY;
     const mouseX = event.nativeEvent.offsetX;
     const clickedBeatRaw = calculateBeatFromX(mouseX);
-    // Quantization for initial beat might need context
-    const clickedBeat = quantizeBeat(clickedBeatRaw);
+    // Quantize to the nearest beat
+    const clickedBeatQuantized = Math.round(clickedBeatRaw);
 
     if (mouseY < TOP_SECTION_HEIGHT) {
       // --- Top Half: Initiate Loop Drag OR Project Resize ---
@@ -231,8 +232,8 @@ function MeasuresHeader({
       let dragType: typeof loopDragState.type = 'creating';
 
       if (loopStartBeat !== null && loopEndBeat !== null) {
-          const startDist = Math.abs(clickedBeatRaw - loopStartBeat);
-          const endDist = Math.abs(clickedBeatRaw - loopEndBeat);
+          const startDist = Math.abs(clickedBeatRaw - loopStartBeat); // Use raw for distance checking
+          const endDist = Math.abs(clickedBeatRaw - loopEndBeat);   // Use raw for distance checking
           const minHandleDist = handleBeatThreshold * 1.5; // Slightly larger beat threshold for handles
 
           if (startDist <= minHandleDist) {
@@ -249,7 +250,7 @@ function MeasuresHeader({
 
       setLoopDragState({
         type: dragType,
-        initialBeat: clickedBeat, // Use quantized beat for initial state?
+        initialBeat: clickedBeatQuantized, // Use quantized beat for loop creation/moving
         initialMouseX: mouseX, // Store initial X for click check
         initialStartBeat: loopStartBeat,
         initialEndBeat: loopEndBeat
@@ -259,7 +260,7 @@ function MeasuresHeader({
       // --- Bottom Half: Initiate Seeking ---
       event.preventDefault();
       setIsSeeking(true);
-      seekTo(clickedBeatRaw); // Use raw beat for seeking
+      seekTo(clickedBeatQuantized); // Use quantized beat for initial seek
     }
   };
 

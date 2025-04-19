@@ -50,7 +50,8 @@ function TimelineView() {
       midiBlocks: [],
       synthesizer: new BasicSynthesizer(),
       isSoloed: false,
-      isMuted: false
+      isMuted: false,
+      effects: []
     };
     
     addTrack(newTrack);
@@ -68,10 +69,11 @@ function TimelineView() {
     const containerRect = timelineContentRef.current.getBoundingClientRect();
     const mouseXRelative = event.clientX - containerRect.left;
     const mouseXInScrolledContent = mouseXRelative + timelineContentRef.current.scrollLeft;
-    
-    const targetBeat = Math.max(0, (mouseXInScrolledContent - SIDEBAR_WIDTH) / effectivePixelsPerBeat);
-    
-    seekTo(targetBeat);
+
+    const rawTargetBeat = Math.max(0, (mouseXInScrolledContent - SIDEBAR_WIDTH) / effectivePixelsPerBeat);
+    const quantizedTargetBeat = Math.round(rawTargetBeat); // Quantize to nearest beat
+
+    seekTo(quantizedTargetBeat); // Use quantized beat
 
   }, [isDragging, seekTo, effectivePixelsPerBeat]);
 
