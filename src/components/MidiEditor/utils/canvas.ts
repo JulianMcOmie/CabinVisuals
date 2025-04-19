@@ -7,7 +7,8 @@ import {
   SELECTION_BOX_COLOR,
   SELECTION_BOX_BORDER_COLOR,
   GRID_SNAP,
-  SelectionBox
+  SelectionBox,
+  BEATS_PER_MEASURE
 } from './constants';
 
 /**
@@ -66,7 +67,9 @@ const drawGrid = (
     // Style octave lines
     if (i % 12 === 0) {
       ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
     } else {
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
       ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
     }
     ctx.stroke();
@@ -78,14 +81,17 @@ const drawGrid = (
     const x = i * GRID_SNAP * pixelsPerBeat;
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, editorHeight);
+    ctx.lineTo(x, contentHeight); // Use the height passed (likely visible height)
     
     // Style beat/measure lines
     if (i % (4/GRID_SNAP) === 0) {
       ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
     } else if (i % (1/GRID_SNAP) === 0) {
       ctx.strokeStyle = '#444'; ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#444'; ctx.lineWidth = 0.5;
     } else {
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
       ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
     }
     ctx.stroke();
@@ -101,10 +107,13 @@ const drawMidiBlockBox = (
   blockStartBeat: number,
   pixelsPerBeat: number,
   pixelsPerSemitone: number
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): void => {
   // Draw block box
   ctx.strokeStyle = '#00FF00'; // Green color
   ctx.lineWidth = 3;
+  ctx.strokeRect(blockStartBeat * pixelsPerBeat, 0, blockDuration * pixelsPerBeat, pixelsPerSemitone * KEY_COUNT);
   ctx.strokeRect(blockStartBeat * pixelsPerBeat, 0, blockDuration * pixelsPerBeat, pixelsPerSemitone * KEY_COUNT);
 };
 

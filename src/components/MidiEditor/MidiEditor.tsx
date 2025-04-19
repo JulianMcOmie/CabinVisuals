@@ -154,6 +154,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     // Context translation for scrolling
     ctx.save();
+    // Context translation for scrolling
+    ctx.save();
     ctx.scale(dpr, dpr);
     // --- Apply both X and Y translation ---
     ctx.translate(-scrollX, -scrollY);
@@ -192,6 +194,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       numMeasures
   ]);
 
+  // Helper to get coords and derived values, adjusted for scroll
   // Helper to get coords and derived values, adjusted for scroll
   const getCoordsAndDerived = (e: MouseEvent | React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -363,9 +366,22 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     const result = findNoteAt(coords.x, coords.y, block.notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat, blockDuration);
     if (result) {
-      // Found a note, delete it using the utility function
-      const updatedBlock = handleContextMenuOnNote(block, result.note.id);
+      // Get the note ID that was clicked
+      const clickedNoteId = result.note.id;
+      // Check if this note was selected
+      const wasSelected = selectedNoteIds.includes(clickedNoteId);
+
+      // Call the utility function, passing the selected IDs
+      const updatedBlock = handleContextMenuOnNote(block, clickedNoteId, selectedNoteIds);
+      
+      // Update the block in the store
       updateMidiBlock(track.id, updatedBlock);
+
+      // If the clicked note was selected (meaning all selected notes were deleted), clear the selection
+      if (wasSelected) {
+        setSelectedNoteIds([]);
+        storeSelectNotes([]);
+      }
     }
   };
   
@@ -603,7 +619,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     setCopiedNotes,
     selectedWindow,
     pixelsPerBeat,
-    pixelsPerSemitone
+    pixelsPerSemitone,
+    scrollX,
+    scrollY
   ]);
 
   const handleEditorClick = () => {
