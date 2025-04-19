@@ -5,8 +5,12 @@ import { AppState } from './store'; // Import the combined AppState
 // Import Effect implementations
 import ScaleEffect from '../lib/effects/ScaleEffect';
 import DelayEffect from '../lib/effects/DelayEffect';
-import RadialDuplicateEffect from '../lib/effects/RadialDuplicateEffect'; // Import the new effect
-import GravityEffect from '../lib/effects/GravityEffect'; // Import the new effect
+import RadialDuplicateEffect from '../lib/effects/RadialDuplicateEffect';
+import GravityEffect from '../lib/effects/GravityEffect';
+import PositionOffsetEffect from '../lib/effects/PositionOffsetEffect';
+import RescalePositionEffect from '../lib/effects/RescalePositionEffect';
+import Rotate3DEffect from '../lib/effects/Rotate3DEffect';
+import PanEffect from '../lib/effects/PanEffect';
 
 // Define Effect structures
 export interface EffectDefinition {
@@ -35,13 +39,17 @@ export type EffectSlice = EffectState & EffectActions;
 const availableEffectsData: EffectCategories = {
   Transform: [
     { id: 'ScaleEffect', name: 'Scale', constructor: ScaleEffect },
+    { id: 'PositionOffsetEffect', name: 'Position Offset', constructor: PositionOffsetEffect },
+    { id: 'RescalePositionEffect', name: 'Rescale Position', constructor: RescalePositionEffect },
+    { id: 'Rotate3DEffect', name: '3D Rotate', constructor: Rotate3DEffect },
   ],
   Time: [
     { id: 'DelayEffect', name: 'Delay', constructor: DelayEffect },
   ],
-  Spatial: [ // Add new Spatial category
+  Spatial: [
     { id: 'RadialDuplicateEffect', name: 'Radial Duplicate', constructor: RadialDuplicateEffect },
-    { id: 'GravityEffect', name: 'Gravity', constructor: GravityEffect }, // Add Gravity
+    { id: 'GravityEffect', name: 'Gravity', constructor: GravityEffect },
+    { id: 'PanEffect', name: 'Pan', constructor: PanEffect },
   ]
 };
 

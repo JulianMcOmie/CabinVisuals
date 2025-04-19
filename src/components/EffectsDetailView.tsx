@@ -9,8 +9,7 @@ import { EffectDefinition } from '../store/effectSlice';
 import SliderPropertyControl from './properties/SliderPropertyControl';
 import NumberInputPropertyControl from './properties/NumberInputPropertyControl';
 import DropdownPropertyControl from './properties/DropdownPropertyControl';
-// Assume a ColorPropertyControl exists or add it if needed
-// import ColorPropertyControl from './properties/ColorPropertyControl';
+import ColorPropertyControl from './properties/ColorPropertyControl';
 
 interface EffectsDetailViewProps {
   track: Track;
@@ -35,7 +34,6 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
   };
 
   // --- Function to render the correct control for an effect property ---
-  // Similar to the synthesizer one, but calls updateEffectPropertyOnTrack
   const renderEffectPropertyControl = (effectIndex: number, property: Property<any>) => {
     const key = `${track.id}-effect-${effectIndex}-prop-${property.name}`;
     switch (property.uiType) {
@@ -63,29 +61,23 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
             onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
           />
         );
-      // case 'color': // Example if color property is added
-      //   return (
-      //     <ColorPropertyControl 
-      //       key={key} 
-      //       property={property as Property<string>} 
-      //       onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
-      //     />
-      //   );
+      case 'color':
+        return (
+          <ColorPropertyControl 
+            key={key} 
+            property={property as Property<string>} 
+            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
+          />
+        );
       default:
         return <div key={key}>Unsupported property type: {property.uiType}</div>;
     }
   };
 
   // --- Get Effect Name (Helper) ---
-  // Finds the name from availableEffects based on the instance constructor
   const getEffectName = (effectInstance: Effect): string => {
-    for (const category in availableEffects) {
-      const definition = availableEffects[category].find(def => effectInstance instanceof def.constructor);
-      if (definition) {
-        return definition.name;
-      }
-    }
-    return 'Unknown Effect'; // Fallback
+    const definition = allEffectDefinitions.find(def => effectInstance instanceof def.constructor);
+    return definition ? definition.name : 'Unknown Effect';
   };
 
   // --- Handler to add the selected effect ---
