@@ -136,7 +136,8 @@ export const moveSelectedNotes = (
   beatDelta: number,
   pitchDelta: number
 ): MIDIBlock => {
-  const blockDuration = block.endBeat - block.startBeat;
+  // We might not need blockDuration here anymore if we remove clamping
+  // const blockDuration = block.endBeat - block.startBeat;
   
   const updatedBlock = { ...block };
   updatedBlock.notes = block.notes.map(note => {
@@ -144,10 +145,12 @@ export const moveSelectedNotes = (
       const newStartBeat = note.startBeat + beatDelta;
       const newPitch = note.pitch + pitchDelta;
       
-      // Clamp values to valid ranges
+      // Keep pitch clamping, remove horizontal clamping
       return {
         ...note,
-        startBeat: Math.max(0, Math.min(blockDuration - note.duration, newStartBeat)),
+        // --- REMOVED CLAMPING --- 
+        startBeat: newStartBeat, 
+        // -----------------------
         pitch: Math.max(0, Math.min(127, newPitch))
       };
     }

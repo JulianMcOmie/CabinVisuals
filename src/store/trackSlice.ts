@@ -21,7 +21,7 @@ export interface TrackActions {
   addMidiBlock: (trackId: string, block: MIDIBlock) => void;
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
   removeMidiBlock: (trackId: string, blockId: string) => void;
-  moveMidiBlock: (oldTrackId: string, newTrackId: string, block: MIDIBlock) => void;
+  moveMidiBlock: (blockId: string, oldTrackId: string, newTrackId: string, newStartBeat: number, newEndBeat: number) => void;
   updateTrack: (trackId: string, updatedProperties: Partial<Track>) => void;
   selectNotes: (notes: MIDINote[]) => void;
   reorderTracks: (draggedTrackId: string, targetTrackId: string | null) => void;
@@ -170,16 +170,16 @@ export const createTrackSlice: StateCreator<
             };
        });
     },
-    updateMidiBlock: (trackId: string, updatedBlock: MIDIBlock) => {
-        set((state: TrackState & { tracks: Track[] }) => {
+    updateMidiBlock: (trackId: string, updatedBlockData: MIDIBlock) => {
+        set((state) => {
             let trackUpdated = false;
             const newTracks = state.tracks.map((t: Track) => {
                 if (t.id === trackId) {
                     let blockFoundInTrack = false;
                     const updatedMidiBlocks = t.midiBlocks.map((b: MIDIBlock) => {
-                        if (b.id === updatedBlock.id) {
+                        if (b.id === updatedBlockData.id) {
                             blockFoundInTrack = true;
-                            return updatedBlock;
+                            return { ...updatedBlockData }; 
                         }
                         return b;
                     });
@@ -196,19 +196,20 @@ export const createTrackSlice: StateCreator<
 
             const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
 
-            // Make sure numMeasures is extended if the block is moved outside the current track length
-            const currentNumMeasures = get().numMeasures; // Get current numMeasures from timeSlice
-            const requiredBeats = updatedBlock.endBeat;
-            const requiredMeasures = Math.ceil(requiredBeats / 4); // Calculate measures needed for the block
+            const currentNumMeasures = get().numMeasures; 
+            const requiredBeats = updatedBlockData.endBeat; 
+            const requiredMeasures = Math.ceil(requiredBeats / 4); 
 
             if (requiredMeasures > currentNumMeasures) {
-                get().setNumMeasures(requiredMeasures); // Call action from timeSlice
+                get().setNumMeasures(requiredMeasures);
             }
+
+            const updatedSelections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
 
             return {
                 tracks: newTracks,
-                selectedTrack: selections.selectedTrack,
-                selectedBlock: selections.selectedBlock
+                selectedTrack: updatedSelections.selectedTrack, 
+                selectedBlock: updatedSelections.selectedBlock 
             };
         });
     },
@@ -247,48 +248,55 @@ export const createTrackSlice: StateCreator<
              };
         });
     },
-    moveMidiBlock: (oldTrackId: string, newTrackId: string, block: MIDIBlock) => {
-        set((state: TrackState & { tracks: Track[] }) => {
-            let blockMoved = false;
-            const newTracks = state.tracks.map((t: Track) => {
-                // Remove block from old track
-                if (t.id === oldTrackId) {
-                    const updatedMidiBlocks = t.midiBlocks.filter(b => b.id !== block.id);
-                    if (updatedMidiBlocks.length < t.midiBlocks.length) {
-                        blockMoved = true; // Mark moved only if actually found and removed
-                        return { ...t, midiBlocks: updatedMidiBlocks };
-                    }
-                }
-                // Add block to new track (potentially replacing existing if ID matched, though unlikely)
-                if (t.id === newTrackId) {
-                    // Ensure block isn't duplicated if somehow oldTrackId === newTrackId
-                    const blockExists = t.midiBlocks.some(b => b.id === block.id);
-                    if (!blockExists) {
-                        return { ...t, midiBlocks: [...t.midiBlocks, block] };
-                    } else {
-                        // If block already exists (e.g., move within same track - should be handled by update), update it
-                        return { ...t, midiBlocks: t.midiBlocks.map(b => b.id === block.id ? block : b) };
-                    }
-                }
-                return t;
-            });
+    moveMidiBlock: (blockId: string, oldTrackId: string, newTrackId: string, newStartBeat: number, newEndBeat: number) => {
+      set((state) => {
+        const oldTrack = state.tracks.find(t => t.id === oldTrackId);
+        if (!oldTrack) return {}; // Old track not found
 
-            if (!blockMoved) {
-                console.warn(`moveMidiBlock: Block ID ${block.id} not found in original track ID ${oldTrackId}. No move performed.`);
-                return {}; // No change if block wasn't found in original track
-            }
+        const blockToMove = oldTrack.midiBlocks.find(b => b.id === blockId);
+        if (!blockToMove) return {}; // Block not found in old track
 
-            // Update selections - keep block selected, update track ID if needed
-            const selections = getUpdatedSelections(newTracks, newTrackId, block.id);
+        // Create the NEW block object with updated position and notes (notes themselves aren't changed by move)
+        const movedBlock = {
+          ...blockToMove,
+          startBeat: newStartBeat,
+          endBeat: newEndBeat,
+        };
 
-            return {
-                tracks: newTracks,
-                selectedTrackId: newTrackId, // Update selected track to the new one
-                selectedBlockId: block.id, // Keep the block selected
-                selectedTrack: selections.selectedTrack,
-                selectedBlock: selections.selectedBlock
-            };
+        const newTracks = state.tracks.map(track => {
+          // 1. Remove from Old Track
+          if (track.id === oldTrackId) {
+            const updatedMidiBlocks = track.midiBlocks.filter(b => b.id !== blockId);
+            return { ...track, midiBlocks: updatedMidiBlocks };
+          }
+          // 2. Add to New Track
+          if (track.id === newTrackId) {
+            const updatedMidiBlocks = [...track.midiBlocks, movedBlock].sort((a, b) => a.startBeat - b.startBeat);
+            return { ...track, midiBlocks: updatedMidiBlocks };
+          }
+          // 3. Return unchanged tracks
+          return track;
         });
+
+        // Update selections - keep block selected, update track ID if needed
+        const selections = getUpdatedSelections(newTracks, newTrackId, blockId);
+
+        // Ensure numMeasures accommodates the moved block
+        const currentNumMeasures = get().numMeasures;
+        const requiredBeats = movedBlock.endBeat;
+        const requiredMeasures = Math.ceil(requiredBeats / 4);
+        if (requiredMeasures > currentNumMeasures) {
+            get().setNumMeasures(requiredMeasures);
+        }
+
+        return {
+          tracks: newTracks,
+          selectedTrackId: newTrackId, // Explicitly update selected track ID
+          selectedBlockId: blockId, // Keep moved block selected
+          selectedTrack: selections.selectedTrack,
+          selectedBlock: selections.selectedBlock
+        };
+      });
     },
     selectNotes: (notes: MIDINote[]) => {
       set({ selectedNotes: notes });

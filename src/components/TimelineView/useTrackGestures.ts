@@ -155,13 +155,43 @@ export function useTrackGestures({
       // Read the latest pending state from REFS
       const finalPendingBlock = pendingUpdateBlockRef.current;
       const finalTargetTrackId = pendingTargetTrackIdRef.current;
+      const initialBlockState = dragInitialBlockState; // Get initial state captured on mouse down
 
       // Apply update only if drag was active and we have final state
-      if (dragOperation !== 'none' && finalPendingBlock && originalDragTrackId) {
+      if (dragOperation !== 'none' && finalPendingBlock && originalDragTrackId && initialBlockState) {
+         // --- Logic for adjusting notes on start resize --- 
+         let blockToUpdate = finalPendingBlock;
+         if (dragOperation === 'start') {
+            const oldBlockStartBeat = initialBlockState.startBeat;
+            const newBlockStartBeat = finalPendingBlock.startBeat;
+            const deltaBlockStartBeat = newBlockStartBeat - oldBlockStartBeat;
+
+            // Only adjust notes if the block start actually changed
+            if (deltaBlockStartBeat !== 0) {
+                console.log(`Adjusting note starts by ${-deltaBlockStartBeat} due to block start change of ${deltaBlockStartBeat}`);
+                const adjustedNotes = finalPendingBlock.notes.map(note => ({
+                    ...note,
+                    // Adjust note's startBeat inversely to block's startBeat change
+                    startBeat: note.startBeat - deltaBlockStartBeat 
+                }));
+                // Create a new block object with the adjusted notes
+                blockToUpdate = { ...finalPendingBlock, notes: adjustedNotes };
+            }
+         }
+         // --- End note adjustment logic --- 
+
          if (dragOperation === 'move' && finalTargetTrackId && finalTargetTrackId !== originalDragTrackId) {
-             moveMidiBlock(originalDragTrackId, finalTargetTrackId, finalPendingBlock);
+             // Pass blockId, trackIds, and new beats to the corrected moveMidiBlock signature
+             moveMidiBlock(
+                 blockToUpdate.id, 
+                 originalDragTrackId, 
+                 finalTargetTrackId, 
+                 blockToUpdate.startBeat, // Use potentially adjusted beats
+                 blockToUpdate.endBeat
+             );
          } else {
-             updateMidiBlock(originalDragTrackId, finalPendingBlock);
+             // Use the potentially note-adjusted block for update (covers resize_start, resize_end, move within same track)
+             updateMidiBlock(originalDragTrackId, blockToUpdate);
          }
       }
 
