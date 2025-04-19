@@ -449,7 +449,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       // Clicked on empty space
       if (e.button === 0) { // Only start selection on left click
         setDragOperation('select');
-        setSelectionBox({ startX: x, startY: y, endX: x, endY: y }); 
+        // Use scrolled coordinates for the selection box
+        setSelectionBox({ startX: scrolledX, startY: scrolledY, endX: scrolledX, endY: scrolledY }); 
         
         if (!e.shiftKey) {
           setSelectedNoteIds([]);
@@ -571,11 +572,11 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         const coords = getCoordsAndDerived(e);
         if (!coords) return;
         
-        // Update selection box
+        // Update selection box using scrolled coordinates
         setSelectionBox({
           ...selectionBox,
-          endX: coords.x,
-          endY: coords.y
+          endX: coords.scrolledX, // Use scrolled coordinate
+          endY: coords.scrolledY  // Use scrolled coordinate
         });
         
         // Check if drag threshold is met using utility function
