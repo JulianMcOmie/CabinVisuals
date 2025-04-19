@@ -46,6 +46,18 @@ interface MidiEditorProps {
   track: Track;
 }
 
+// Debounce function
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<F>): void => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => func(...args), waitFor);
+  };
+}
+
 function MidiEditor({ block, track }: MidiEditorProps) {
   const { 
     updateMidiBlock, 
@@ -57,9 +69,42 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const editorWidth = editorRef.current?.clientWidth || numMeasures * BEATS_PER_MEASURE * PIXELS_PER_BEAT; // Default width if ref not available
-  const editorHeight = editorRef.current?.clientHeight || KEY_COUNT * PIXELS_PER_SEMITONE; // Default height if ref not available
+  // --- NEW: State for reactive dimensions ---
+  const [editorDimensions, setEditorDimensions] = useState({ width: 0, height: 0 });
+  // -------------------------------------------
+
+  // Use state dimensions, fallback if needed
+  const editorWidth = editorDimensions.width || numMeasures * BEATS_PER_MEASURE * PIXELS_PER_BEAT; 
+  const editorHeight = editorDimensions.height || KEY_COUNT * PIXELS_PER_SEMITONE;
   
+  // --- NEW: Effect to listen for resize and update dimensions ---
+  useEffect(() => {
+    const editorElement = editorRef.current;
+    if (!editorElement) return;
+
+    // Function to update dimensions
+    const updateDimensions = () => {
+      setEditorDimensions({
+        width: editorElement.clientWidth,
+        height: editorElement.clientHeight,
+      });
+    };
+
+    // Initial dimensions
+    updateDimensions();
+
+    // Debounced resize handler
+    const handleResize = debounce(updateDimensions, 100); // Adjust debounce time as needed
+
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []); // Empty dependency array: run once on mount
+  // -------------------------------------------------------------
+
   // State for drag operations
   const [dragOperation, setDragOperation] = useState<DragOperation>('none');
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -94,10 +139,11 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (!editorDimensions.width || !editorDimensions.height) return;
     
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = editorWidth * dpr;
-    canvas.height = editorHeight * dpr;
+    canvas.width = editorDimensions.width * dpr;
+    canvas.height = editorDimensions.height * dpr;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -108,8 +154,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       ctx,
       block.notes,
       selectedNoteIds,
-      editorWidth,
-      editorHeight,
+      editorDimensions.width,
+      editorDimensions.height,
       blockWidth,
       blockHeight,
       blockDuration,
@@ -119,7 +165,19 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       pixelsPerBeat,
       pixelsPerSemitone
     );
-  }, [block.notes, blockDuration, blockStartBeat, editorWidth, editorHeight, selectionBox, isDragging, selectedNoteIds]);
+  }, [
+      block.notes, 
+      blockDuration, 
+      blockStartBeat, 
+      editorDimensions,
+      selectionBox, 
+      isDragging, 
+      selectedNoteIds,
+      blockWidth,
+      blockHeight,
+      pixelsPerBeat,
+      pixelsPerSemitone
+  ]);
 
   // Helper to get coords and derived values
   const getCoordsAndDerived = (e: MouseEvent | React.MouseEvent) => {
