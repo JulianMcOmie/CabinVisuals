@@ -58,7 +58,7 @@ class RadialDuplicateEffect extends Effect {
       for (let i = 0; i < numCopies; i++) {
         const angle = (i / numCopies) * 2 * Math.PI;
         const offsetX = Math.cos(angle) * radius;
-        const offsetZ = Math.sin(angle) * radius; // Corrected: Offset should be in XZ plane for radial
+        const offsetY = Math.sin(angle) * radius;
         
         // Create a shallow clone for the duplicate
         const duplicate: VisualObject = {
@@ -68,8 +68,8 @@ class RadialDuplicateEffect extends Effect {
             // Overwrite the base position
             position: [
               originalBasePos[0] + offsetX,
-              originalBasePos[1], // Keep original Y position by default
-              originalBasePos[2] + offsetZ
+              originalBasePos[1] + offsetY,
+              originalBasePos[2]
             ] 
           }
         };
