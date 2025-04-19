@@ -807,32 +807,34 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     <div
         ref={editorRef}
         className="midi-editor relative border border-gray-700 rounded-md"
-        style={{ overflow: 'hidden' }}
+        style={{ overflow: 'hidden', height: '100%' }}
         onClick={handleEditorClick}
     >
-      <div className="piano-roll flex flex-col">
+      <div className="piano-roll flex flex-col h-full">
         <div className="flex">
-          <div className="piano-roll-header">
+          <div className="piano-roll-header" style={{ overflow: 'hidden' }}>
             <PianoRollHeader 
               startBeat={block.startBeat} 
               endBeat={block.endBeat} 
               pixelsPerBeat={pixelsPerBeat} 
+              scrollX={scrollX}
             />
           </div>
         </div>
-        <div className="flex min-h-[768px]">
-          <div className="piano-keys">
+        <div className="flex" style={{ flex: 1, minHeight: 0 }}>
+          <div className="piano-keys" style={{ overflow: 'hidden', flexShrink: 0 }}>
             <PianoKeys 
               keyCount={KEY_COUNT} 
               keyHeight={pixelsPerSemitone} 
+              scrollY={scrollY}
             />
           </div>
           <div
             className="piano-roll-grid relative"
             style={{
-              width: `${editorWidth}px`,      // Visible width constraint
-              height: `${editorHeight}px`,     // Explicit height needed for overflow rules
-              overflow: 'scroll',         // Scroll in both directions
+              width: `${editorWidth}px`,
+              overflow: 'scroll',
+              height: '100%'
             }}
             onScroll={(e) => {
               // Update both scroll states

@@ -3,6 +3,7 @@ import React from 'react';
 interface PianoKeysProps {
   keyCount: number;
   keyHeight: number;
+  scrollY?: number;
 }
 
 // Constants
@@ -12,7 +13,11 @@ const LOWEST_NOTE = 21; // A0 MIDI note number
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const WHITE_KEYS = [0, 2, 4, 5, 7, 9, 11]; // Indices of white keys (C, D, E, F, G, A, B)
 
-function PianoKeys({ keyCount, keyHeight }: PianoKeysProps) {
+function PianoKeys({ 
+  keyCount, 
+  keyHeight, 
+  scrollY = 0
+}: PianoKeysProps) {
   const keys = [];
 
   for (let i = 0; i < keyCount; i++) {
@@ -53,7 +58,14 @@ function PianoKeys({ keyCount, keyHeight }: PianoKeysProps) {
 
   return (
     <div className="piano-keys" style={{ height: '100%' }}>
-      {keys}
+      <div 
+        style={{
+          transform: `translateY(-${scrollY}px)`,
+          position: 'relative'
+        }}
+      >
+        {keys}
+      </div>
     </div>
   );
 }

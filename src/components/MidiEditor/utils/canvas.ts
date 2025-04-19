@@ -81,7 +81,7 @@ const drawGrid = (
     const x = i * GRID_SNAP * pixelsPerBeat;
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, editorHeight); // Use the height passed (likely visible height)
+    ctx.lineTo(x, KEY_COUNT * pixelsPerSemitone);
     
     // Style beat/measure lines
     if (i % (4/GRID_SNAP) === 0) {
