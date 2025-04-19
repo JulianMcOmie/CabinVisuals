@@ -19,12 +19,15 @@ import {
   RESIZE_HANDLE_WIDTH, // For note resize
   BLOCK_RESIZE_HANDLE_WIDTH,
   GRID_SNAP,
-  // --- ADDED: Zoom constants ---
   MIN_PIXELS_PER_BEAT,
   MAX_PIXELS_PER_BEAT,
-  ZOOM_SENSITIVITY 
-  // ---------------------------
+  ZOOM_SENSITIVITY
 } from './utils/constants';
+
+// --- ADDED: Vertical Zoom constants ---
+const MIN_PIXELS_PER_SEMITONE = 5; // Example minimum height
+const MAX_PIXELS_PER_SEMITONE = 50; // Example maximum height
+// ---------------------------
 
 import {
   getCoordsFromEvent,
@@ -144,7 +147,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [zoomX, setZoomX] = useState(1);
   const [zoomY, setZoomY] = useState(1);
   const [pixelsPerBeat, setPixelsPerBeat] = useState(PIXELS_PER_BEAT); //useState(editorWidth / (numMeasures * BEATS_PER_MEASURE));
-  const [pixelsPerSemitone, setPixelsPerSemitone] = useState(PIXELS_PER_SEMITONE);
+  const [pixelsPerSemitone, setPixelsPerSemitone] = useState(PIXELS_PER_SEMITONE); // Make this stateful for zoom
   
   // Copy/paste related state
   const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
@@ -156,25 +159,42 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       e.preventDefault(); // Prevent page scroll
 
       // Determine zoom direction and intensity (prioritize deltaX)
-      let delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
-      const zoomIntensity = Math.min(Math.abs(delta) / 50, 1); // Normalize intensity
+      const zoomIntensityX = Math.min(Math.abs(e.deltaX) / 50, 1); // Normalize intensity for X
+      const zoomIntensityY = Math.min(Math.abs(e.deltaY) / 50, 1); // Normalize intensity for Y
 
-      setPixelsPerBeat(prevPixelsPerBeat => {
-        let newPixelsPerBeat;
-        if (delta < 0) {
-          // Zoom In (Increase pixelsPerBeat)
-          newPixelsPerBeat = prevPixelsPerBeat * Math.pow(ZOOM_SENSITIVITY, zoomIntensity);
-        } else {
-          // Zoom Out (Decrease pixelsPerBeat)
-          newPixelsPerBeat = prevPixelsPerBeat / Math.pow(ZOOM_SENSITIVITY, zoomIntensity);
-        }
-        
-        // Clamp the value within limits
-        return Math.max(MIN_PIXELS_PER_BEAT, Math.min(MAX_PIXELS_PER_BEAT, newPixelsPerBeat));
-      });
+      // Check if horizontal scroll magnitude is greater
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        // Horizontal Zoom
+        setPixelsPerBeat((prevPixelsPerBeat: number) => {
+          let newPixelsPerBeat;
+          if (e.deltaX < 0) {
+            // Zoom In (Increase pixelsPerBeat)
+            newPixelsPerBeat = prevPixelsPerBeat * Math.pow(ZOOM_SENSITIVITY, zoomIntensityX);
+          } else {
+            // Zoom Out (Decrease pixelsPerBeat)
+            newPixelsPerBeat = prevPixelsPerBeat / Math.pow(ZOOM_SENSITIVITY, zoomIntensityX);
+          }
+          // Clamp the value within limits
+          return Math.max(MIN_PIXELS_PER_BEAT, Math.min(MAX_PIXELS_PER_BEAT, newPixelsPerBeat));
+        });
+      } else if (e.deltaY !== 0) { // Only zoom vertically if there's vertical scroll
+        // Vertical Zoom
+        setPixelsPerSemitone((prevPixelsPerSemitone: number) => {
+            let newPixelsPerSemitone;
+            if (e.deltaY < 0) {
+                // Zoom In (Increase pixelsPerSemitone)
+                newPixelsPerSemitone = prevPixelsPerSemitone * Math.pow(ZOOM_SENSITIVITY, zoomIntensityY);
+            } else {
+                // Zoom Out (Decrease pixelsPerSemitone)
+                newPixelsPerSemitone = prevPixelsPerSemitone / Math.pow(ZOOM_SENSITIVITY, zoomIntensityY);
+            }
+            // Clamp the value within limits
+            return Math.max(MIN_PIXELS_PER_SEMITONE, Math.min(MAX_PIXELS_PER_SEMITONE, newPixelsPerSemitone));
+        });
+      }
     }
     // If neither Alt nor Ctrl is pressed, allow default scroll behavior (handled by onScroll)
-  }, [setPixelsPerBeat]); // Dependencies: only needs the setter
+  }, [setPixelsPerBeat, setPixelsPerSemitone]); // Dependencies: added setPixelsPerSemitone
   // -------------------------------------
 
   // --- ADDED: Effect to attach wheel listener with passive: false ---
@@ -784,15 +804,11 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   }
   
   return (
-    <div 
-        ref={editorRef} 
-        className="midi-editor relative border border-gray-700 rounded-md" 
-        style={{ overflowY: 'auto', overflowX: 'hidden' }} 
+    <div
+        ref={editorRef}
+        className="midi-editor relative border border-gray-700 rounded-md"
+        style={{ overflow: 'hidden' }}
         onClick={handleEditorClick}
-        onScroll={(e) => {
-          // setScrollX(e.currentTarget.scrollLeft); // X handled by inner div
-          setScrollY(e.currentTarget.scrollTop);
-        }}
     >
       <div className="piano-roll flex flex-col">
         <div className="flex">
@@ -811,19 +827,20 @@ function MidiEditor({ block, track }: MidiEditorProps) {
               keyHeight={pixelsPerSemitone} 
             />
           </div>
-          <div 
-            className="piano-roll-grid relative" 
+          <div
+            className="piano-roll-grid relative"
             style={{
               width: `${editorWidth}px`,      // Visible width constraint
               height: `${editorHeight}px`,     // Explicit height needed for overflow rules
-              overflowX: 'scroll',         // Force horizontal scrollbar always
-              overflowY: 'hidden'            // Hide vertical scrollbar
+              overflow: 'scroll',         // Scroll in both directions
             }}
             onScroll={(e) => {
+              // Update both scroll states
               setScrollX(e.currentTarget.scrollLeft);
+              setScrollY(e.currentTarget.scrollTop);
             }}
           >
-            <canvas 
+            <canvas
               ref={canvasRef}
               style={{
                 display: 'block',
