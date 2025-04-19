@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The `VisualObjectEngine` facilitates the declarative creation of complex, MIDI-driven visual objects within a Synthesizer. It allows Synthesizers to define rules for generating visual objects based on MIDI input, time, and custom synthesizer properties using a declarative, chainable API. This enables complex visual behaviors like nested generation and intricate property mapping with minimal boilerplate code.
+The `VisualObjectEngine` facilitates the declarative creation of complex, MIDI-driven visual objects within a Synthesizer. It allows Synthesizers to define rules for generating visual objects based on MIDI input, time, and custom synthesizer properties using a declarative, chainable API. This enables complex visual behaviors like nested generation, intricate property mapping (including ADSR and physics-based envelopes) with minimal boilerplate code.
 
 The engine relies on the Synthesizer instance being immutable; when synthesizer properties change, a new Synthesizer instance (with its own engine configuration) is created. Mapper and generator functions defined within the Synthesizer's scope capture the correct `this.properties` via closure.
 
@@ -63,6 +63,15 @@ Methods called on the object returned by `defineObject` or subsequent chaining m
     *   `config`: Can be a static config object *or* a function receiving `noteCtx` that returns a config object (allowing ADSR parameters to be derived from `this.properties`).
     *   Calculated `adsrAmplitude` and `adsrPhase` are added to the `MappingContext`.
 
+*   **`.applyPhysicsEnvelope(config: PhysicsEnvelopeConfig | ((noteCtx: NoteContext) => PhysicsEnvelopeConfig)): ObjectDefinition`**
+    *   Applies a physics-based (damped harmonic oscillator) envelope to instances at the current level.
+    *   `config`: Can be a static config object *or* a function receiving `noteCtx` that returns a config object. The config object can contain:
+        *   `tension?: number`: Spring stiffness (default: 100). Controls oscillation frequency.
+        *   `friction?: number`: Damping factor (default: 10). Controls decay rate.
+        *   `initialVelocity?: number`: Initial impulse strength (default: 1).
+    *   Calculated `physicsValue` (the oscillator's displacement) is added to the `MappingContext`.
+    *   This can be used alongside or instead of `.applyADSR()`; mapper functions decide how to use the resulting `adsrAmplitude` and `physicsValue`.
+
 ## 4. `MappingContext` Object
 
 Passed to `mapperFn` and `generatorFn` callbacks. Contains data specific to the instance being generated/configured.
@@ -76,8 +85,9 @@ Passed to `mapperFn` and `generatorFn` callbacks. Contains data specific to the 
 *   `level: number`: Current nesting depth (1 = initial).
 *   `instanceData: any`: Data for this instance from its `.forEachInstance` generator.
 *   `parentContext?: MappingContext`: Context of the parent instance (undefined for level 1). Access parent state via `parentContext.calculatedProperties`, etc.
-*   `adsrAmplitude?: number`: Current ADSR amplitude (0-1) for this level.
-*   `adsrPhase?: 'attack' | 'decay' | 'sustain' | 'release' | 'idle'`: Current ADSR phase for this level.
+*   `adsrAmplitude?: number`: Current ADSR amplitude (0-1) for this level (if `.applyADSR` was used).
+*   `adsrPhase?: 'attack' | 'decay' | 'sustain' | 'release' | 'idle'`: Current ADSR phase for this level (if `.applyADSR` was used).
+*   `physicsValue?: number`: Current displacement value from the physics envelope (if `.applyPhysicsEnvelope` was used).
 *   `calculatedProperties?: VisualObjectProperties`: Read-only view of properties calculated so far for the *current* instance (primarily for parent context access).
 *   **(Note:** `synthProps` are *not* in the context; access them via closure using `this.properties` or `this.getPropertyValue` within the mapper/generator function definition).
 
@@ -95,28 +105,56 @@ Provides utility functions for use within mappers and generators.
 
 ```typescript
 // --- Inside Synthesizer Constructor ---
-this.engine = new VisualObjectEngine();
+this.engine = new VisualObjectEngine(this); // Pass synthesizer instance
 const MUtils = MappingUtils;
 
+// Example 1: Using ADSR for opacity, Physics for scale
 this.engine.defineObject('cube')
     .when(noteCtx => noteCtx.note.velocity > 50)
     .applyADSR(noteCtx => ({ // Get ADSR params from synth properties
-        attack: this.getPropertyValue('attack') ?? 0.1,
-        decay: this.getPropertyValue('decay') ?? 0.5,
-        sustain: this.getPropertyValue('sustain') ?? 0.7,
-        release: this.getPropertyValue('release') ?? 1.0,
+        attack: this.getPropertyValue('attack') ?? 0.05,
+        decay: this.getPropertyValue('decay') ?? 0.2,
+        sustain: this.getPropertyValue('sustain') ?? 0.6,
+        release: this.getPropertyValue('release') ?? 0.8,
     }))
-    .forEachInstance(noteCtx => [/* level 1 instance data */])
-    .withPosition(ctx => { // Access synth props via `this`
-        const baseHeight = this.getPropertyValue('height') ?? 0;
-        return [ ctx.instanceData.x, baseHeight, ctx.instanceData.z ];
+    .applyPhysicsEnvelope(noteCtx => ({ // Get Physics params from synth properties
+        tension: this.getPropertyValue('kickTension') ?? 150,
+        friction: this.getPropertyValue('kickFriction') ?? 12,
+        initialVelocity: MUtils.mapValue(noteCtx.note.velocity, 0, 127, 0.5, 1.5) // Velocity affects impact
+    }))
+    .forEachInstance(noteCtx => [ { xPos: MUtils.mapPitchToRange(noteCtx.note.pitch, -5, 5) } ]) // Level 1
+    .withPosition(ctx => {
+        const baseHeight = this.getPropertyValue('baseHeight') ?? 0;
+        return [ ctx.instanceData.xPos, baseHeight, 0 ];
     })
-    .withScale(ctx => /* use ctx.adsrAmplitude */)
-    .setType('sphere')
-    .applyADSR(ADSR_B) // Can still use static config
-    .forEachInstance(parentCtx => [/* level 2 instance data */])
-    .withPosition(ctx => [ /* use ctx.adsrAmplitude from ADSR_B */ ])
+    .withOpacity(ctx => ctx.adsrAmplitude ?? 1) // Use ADSR for opacity
+    .withScale(ctx => {
+        const baseScale = this.getPropertyValue('baseScale') ?? 1;
+        const impactScale = ctx.physicsValue ?? 0; // Get physics value
+        // Use physics value to additively modify scale (example)
+        const scale = baseScale + impactScale * (this.getPropertyValue('impactScaleAmount') ?? 1.0);
+        return Math.max(0.01, scale); // Ensure scale is positive
+    })
     .withColor(ctx => MUtils.mapPitchToHSL(ctx.note.pitch, 80, 70));
+
+// Example 2: Nested structure with different physics on level 2
+this.engine.defineObject('sphere')
+    .applyPhysicsEnvelope({ tension: 200, friction: 8, initialVelocity: 1.2 })
+    .withPosition(ctx => [0, ctx.physicsValue * 2, 0]) // Use physics for vertical bounce
+    .forEachInstance(parentCtx => [
+        { angle: 0 }, { angle: Math.PI / 2 }, { angle: Math.PI }, { angle: 3 * Math.PI / 2}
+    ]) // Level 2: Generate 4 children
+    .setType('torus')
+    .applyPhysicsEnvelope({ tension: 50, friction: 5, initialVelocity: 0.5 }) // Different physics for children
+    .withPosition(ctx => {
+        const parentPos = ctx.parentContext?.calculatedProperties?.position ?? [0,0,0];
+        const radius = 2 + (ctx.parentContext?.physicsValue ?? 0); // Parent physics affects radius
+        const x = parentPos[0] + radius * Math.cos(ctx.instanceData.angle);
+        const z = parentPos[2] + radius * Math.sin(ctx.instanceData.angle);
+        return [ x, parentPos[1], z ];
+    })
+    .withScale(ctx => 0.2 + (ctx.physicsValue ?? 0) * 0.5) // Child physics affects its own scale
+    .withColor(ctx => MUtils.mapValueToHSL(ctx.instanceData.angle, 90, 60, 0, Math.PI * 2));
 
 // --- Inside Synthesizer.getObjectsAtTime(time, midiBlocks, bpm) ---
 return this.engine.getObjectsAtTime(time, midiBlocks, bpm);
