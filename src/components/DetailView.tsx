@@ -24,7 +24,15 @@ function DetailView() {
       }}
     >
       <h2 style={{ padding: '10px', margin: 0 }}>Detail View</h2>
-      <div className="detail-container" style={{ flex: 1, overflowY: 'auto', padding: 0, backgroundColor: '#222' }}>
+      <div 
+        className="detail-container" 
+        style={{ 
+          flex: 1, 
+          overflow: 'hidden',
+          padding: 0, 
+          backgroundColor: '#222' 
+        }}
+      >
         {isMidiEditorVisible ? (
           <MidiEditor block={selectedBlock} track={selectedTrack} />
         ) : selectedTrack ? (

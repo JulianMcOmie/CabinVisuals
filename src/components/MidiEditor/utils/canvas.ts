@@ -7,7 +7,8 @@ import {
   SELECTION_BOX_COLOR,
   SELECTION_BOX_BORDER_COLOR,
   GRID_SNAP,
-  SelectionBox
+  SelectionBox,
+  BEATS_PER_MEASURE
 } from './constants';
 
 /**
@@ -19,27 +20,27 @@ export const drawMidiEditor = (
   selectedNoteIds: string[],
   editorWidth: number,
   editorHeight: number,
-  blockWidth: number,
-  blockHeight: number,
   blockDuration: number,
   blockStartBeat: number,
+  totalGridWidth: number,
   selectionBox: SelectionBox,
   isDragging: boolean,
   pixelsPerBeat: number,
   pixelsPerSemitone: number
 ): void => {
-  ctx.clearRect(0, 0, editorWidth, editorHeight);
+  // Calculate total beats for grid drawing
+  const totalBeats = totalGridWidth / pixelsPerBeat;
   
-  // Draw grid
-  drawGrid(ctx, editorWidth, editorHeight, blockDuration, pixelsPerBeat, pixelsPerSemitone);
+  // Draw grid using total dimensions
+  drawGrid(ctx, totalGridWidth, editorHeight, totalBeats, pixelsPerBeat, pixelsPerSemitone);
 
-  // Draw block box
-  drawMidiBlockBox(ctx, blockDuration, blockHeight, blockStartBeat, pixelsPerBeat);
+  // Draw block box relative to context
+  drawMidiBlockBox(ctx, blockDuration, blockStartBeat, pixelsPerBeat, pixelsPerSemitone);
   
-  // Draw notes
+  // Draw notes relative to context
   drawNotes(ctx, notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat);
   
-  // Draw selection box if active
+  // Draw selection box if active (relative to context)
   if (selectionBox && isDragging) {
     drawSelectionBox(ctx, selectionBox);
   }
@@ -50,9 +51,9 @@ export const drawMidiEditor = (
  */
 const drawGrid = (
   ctx: CanvasRenderingContext2D,
-  editorWidth: number,
+  totalGridWidth: number,
   editorHeight: number,
-  blockDuration: number,
+  totalBeats: number,
   pixelsPerBeat: number,
   pixelsPerSemitone: number
 ): void => {
@@ -61,39 +62,38 @@ const drawGrid = (
     const y = i * pixelsPerSemitone;
     ctx.beginPath();
     ctx.moveTo(0, y);
-    ctx.lineTo(editorWidth, y);
+    ctx.lineTo(totalGridWidth, y);
     
-    // Check if this is an octave line (every 12th line)
+    // Style octave lines
     if (i % 12 === 0) {
-      ctx.strokeStyle = '#666';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
     } else {
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
     }
-    
     ctx.stroke();
   }
   
   // Draw vertical lines (beats)
-  for (let i = 0; i <= Math.ceil(editorWidth / (GRID_SNAP * pixelsPerBeat)); i++) {
+  const totalVerticalLines = Math.ceil(totalBeats / GRID_SNAP);
+  for (let i = 0; i <= totalVerticalLines; i++) {
     const x = i * GRID_SNAP * pixelsPerBeat;
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, editorHeight);
+    ctx.lineTo(x, KEY_COUNT * pixelsPerSemitone);
     
-    // Different styles for different beat divisions
+    // Style beat/measure lines
     if (i % (4/GRID_SNAP) === 0) {
-      ctx.strokeStyle = '#666'; // Measure lines
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
     } else if (i % (1/GRID_SNAP) === 0) {
-      ctx.strokeStyle = '#444'; // Beat lines
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#444'; ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#444'; ctx.lineWidth = 0.5;
     } else {
-      ctx.strokeStyle = '#333'; // Grid lines
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
     }
-    
     ctx.stroke();
   }
 };
@@ -104,14 +104,15 @@ const drawGrid = (
 const drawMidiBlockBox = (
   ctx: CanvasRenderingContext2D,
   blockDuration: number,
-  blockHeight: number,
   blockStartBeat: number,
-  pixelsPerBeat: number
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number
 ): void => {
   // Draw block box
   ctx.strokeStyle = '#00FF00'; // Green color
   ctx.lineWidth = 3;
-  ctx.strokeRect(blockStartBeat * pixelsPerBeat, 0, blockDuration * pixelsPerBeat, blockHeight);
+  ctx.strokeRect(blockStartBeat * pixelsPerBeat, 0, blockDuration * pixelsPerBeat, pixelsPerSemitone * KEY_COUNT);
+  ctx.strokeRect(blockStartBeat * pixelsPerBeat, 0, blockDuration * pixelsPerBeat, pixelsPerSemitone * KEY_COUNT);
 };
 
 /**

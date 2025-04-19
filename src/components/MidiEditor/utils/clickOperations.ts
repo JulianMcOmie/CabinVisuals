@@ -134,9 +134,25 @@ export const handleSelectionBoxComplete = (
  */
 export const handleContextMenuOnNote = (
   block: MIDIBlock,
-  noteId: string
+  noteIdToDelete: string,
+  selectedNoteIds: string[]
 ): MIDIBlock => {
-  const updatedBlock = { ...block };
-  updatedBlock.notes = block.notes.filter(note => note.id !== noteId);
-  return updatedBlock;
+  let notesToKeep: MIDINote[];
+
+  // Check if the right-clicked note is part of the current selection
+  if (selectedNoteIds.includes(noteIdToDelete)) {
+    // If yes, delete ALL selected notes
+    console.log("Right-clicked selected note, deleting all selected notes:", selectedNoteIds);
+    notesToKeep = block.notes.filter(note => !selectedNoteIds.includes(note.id));
+  } else {
+    // If no, delete only the single clicked note
+    console.log("Right-clicked unselected note, deleting only note:", noteIdToDelete);
+    notesToKeep = block.notes.filter(note => note.id !== noteIdToDelete);
+  }
+
+  // Return the updated block
+  return {
+    ...block,
+    notes: notesToKeep,
+  };
 }; 
