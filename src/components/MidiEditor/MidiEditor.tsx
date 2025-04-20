@@ -985,7 +985,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
             }}
           >
             <canvas
-              ref={canvasRef}
+              ref={canvasRef} 
               style={{
                 display: 'block',
                 width: `${totalGridWidth}px`,   // Full content width
