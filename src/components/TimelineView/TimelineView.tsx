@@ -367,30 +367,6 @@ function TimelineView() {
                 effectiveTrackHeight={effectiveTrackHeight}
               />
             </div>
-
-            {/* Single TrackTimelineView for all tracks */}
-            <div 
-              className="timelines-column"
-              style={{
-                flex: 1,
-                position: 'relative',
-                height: '100%'
-              }}
-            >
-              <TrackTimelineView
-                tracks={tracks}
-                horizontalZoom={horizontalZoom}
-                verticalZoom={verticalZoom}
-                pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
-                trackHeightBase={TRACK_HEIGHT_BASE}
-                numMeasures={numMeasures}
-                renderMeasures={renderMeasures}
-                scrollLeft={scrollLeft}
-                timelineVisibleWidth={timelineVisibleWidth > 0 ? timelineVisibleWidth : 0}
-                scrollTop={scrollTop}
-                timelineVisibleHeight={timelineVisibleHeight > 0 ? timelineVisibleHeight : 0}
-              />
-            </div>
           </div>
           
           {/* Message when no tracks exist */}
@@ -405,6 +381,32 @@ function TimelineView() {
               Click the + button to add a track
             </div>
           )}
+        </div>
+
+        {/* Single TrackTimelineView for all tracks */}
+        <div 
+            className="timelines-column"
+            style={{
+            flex: 1,
+            position: 'absolute',
+            left: `${SIDEBAR_WIDTH}px`,
+            top: '40px',
+            height: '100%',
+            }}
+        >
+            <TrackTimelineView
+            tracks={tracks}
+            horizontalZoom={horizontalZoom}
+            verticalZoom={verticalZoom}
+            pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
+            trackHeightBase={TRACK_HEIGHT_BASE}
+            numMeasures={numMeasures}
+            renderMeasures={renderMeasures}
+            scrollLeft={scrollLeft}
+            timelineVisibleWidth={timelineVisibleWidth > 0 ? timelineVisibleWidth : 0}
+            scrollTop={scrollTop}
+            timelineVisibleHeight={timelineVisibleHeight > 0 ? timelineVisibleHeight : 0}
+            />
         </div>
 
         {/* Playhead */} 
