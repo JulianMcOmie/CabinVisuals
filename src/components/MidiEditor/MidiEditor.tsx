@@ -186,7 +186,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     <div
         ref={editorRef}
         className="midi-editor relative border border-gray-700 rounded-md"
-        style={{ overflow: 'hidden', height: '100%' }}
+        style={{ overflow: 'hidden', height: '100%', }}
         onClick={handleEditorClick}
     >
       <div className="piano-roll flex flex-col h-full">
@@ -211,7 +211,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
           <div
             className="piano-roll-grid relative"
             style={{
-              width: `${editorWidth}px`,
+              width: `${totalGridWidth}px`,
               overflow: 'scroll',
               height: '100%'
             }}

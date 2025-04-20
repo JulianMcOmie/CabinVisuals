@@ -91,10 +91,7 @@ export const pasteNotes = (
 ): { updatedBlock: MIDIBlock, pastedNoteIds: string[] } => {
   if (copiedNotes.length === 0) {
     return { updatedBlock: block, pastedNoteIds: [] };
-  }
-  
-  const blockDuration = block.endBeat - block.startBeat;
-  
+  }  
   // Find the leftmost position of copied notes to calculate relative positions
   const minBeat = Math.min(...copiedNotes.map(note => note.startBeat));
   
