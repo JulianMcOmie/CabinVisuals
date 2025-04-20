@@ -52,7 +52,7 @@ class ColorEffect extends Effect {
         const yRange = Math.max(0.001, maxY - minY); // Avoid division by zero
 
         return objects.map(obj => {
-            const yPos = obj.properties.position[1]; // Get Y position
+            const yPos = obj.properties.position?.[1] ?? minY; // Get Y position, default to minY if missing
 
             // Calculate interpolation factor (clamped between 0 and 1)
             const factor = Math.max(0, Math.min(1, (yPos - minY) / yRange));

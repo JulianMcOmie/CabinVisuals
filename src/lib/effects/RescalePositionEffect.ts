@@ -22,9 +22,9 @@ class RescalePositionEffect extends Effect {
             properties: {
                 ...obj.properties,
                 position: [
-                    obj.properties.position[0] * scaleX,
-                    obj.properties.position[1] * scaleY,
-                    obj.properties.position[2] * scaleZ,
+                    (obj.properties.position?.[0] ?? 0) * scaleX,
+                    (obj.properties.position?.[1] ?? 0) * scaleY,
+                    (obj.properties.position?.[2] ?? 0) * scaleZ,
                 ],
             },
         }));
