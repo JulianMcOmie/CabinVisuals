@@ -1,9 +1,45 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Track, MIDIBlock } from '../../lib/types';
 import useStore from '../../store/store';
 // Removed MidiBlockView import
 import { useTrackGestures, UseTrackGesturesProps } from './useTrackGestures'; // Import the new hook and its props type
 
+// --- Throttle Utility (Inline) ---
+// Define the type for the throttled function including the cancel method
+type ThrottledFunction<A extends any[], R> = {
+  (...args: A): R | undefined;
+  cancel(): void;
+};
+
+function throttle<A extends any[], R>(func: (...args: A) => R, limit: number): ThrottledFunction<A, R> {
+  let inThrottle: boolean;
+  let lastResult: R | undefined;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const throttled = (...args: A) => {
+    if (!inThrottle) {
+      inThrottle = true;
+      timeoutId = setTimeout(() => {
+         inThrottle = false;
+         timeoutId = null; // Clear timeoutId when throttle period ends
+       }, limit);
+      lastResult = func(...args);
+    }
+    return lastResult;
+  };
+
+  // Add a cancel method
+  throttled.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    inThrottle = false; // Reset throttle state
+  };
+
+  return throttled;
+}
+// --- End Throttle Utility ---
 
 // Padding/geometry constants (relative to track height)
 const BLOCK_VERTICAL_PADDING_FACTOR = 0.1; // e.g., 10% of track height
@@ -52,6 +88,60 @@ function TrackTimelineView({
   const timelineAreaRef = useRef<HTMLDivElement>(null); // Keep ref for hook, points to the container
   const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for the canvas element
 
+  // State for viewport dimensions and scroll position
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0); // Added for vertical scroll
+  const [visibleWidth, setVisibleWidth] = useState(0);
+  const [visibleHeight, setVisibleHeight] = useState(0); // Added for vertical dimension
+
+  // Calculate total dimensions in base coordinates (needed for scroll range)
+  const totalBaseWidth = renderMeasures * 4 * pixelsPerBeatBase;
+  const totalBaseHeight = tracks.length * trackHeightBase;
+
+  // --- Scroll and Resize Handling ---
+  const throttledSetScroll = useMemo(() => throttle((left: number, top: number) => {
+      setScrollLeft(left);
+      setScrollTop(top);
+  }, 50), []); // Throttle scroll updates (e.g., max once per 50ms)
+
+  useEffect(() => {
+    const container = timelineAreaRef.current;
+    if (!container) return;
+
+    // Initial setup
+    setVisibleWidth(container.clientWidth);
+    setVisibleHeight(container.clientHeight);
+    setScrollLeft(container.scrollLeft);
+    setScrollTop(container.scrollTop);
+
+    // Scroll listener
+    const handleScroll = () => {
+        // Use throttled function
+        throttledSetScroll(container.scrollLeft, container.scrollTop);
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+
+    // Resize observer
+    const resizeObserver = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        setVisibleWidth(entry.contentRect.width);
+        setVisibleHeight(entry.contentRect.height);
+        // Re-read scroll on resize? Optional, depends if resize affects scroll
+        // throttledSetScroll(container.scrollLeft, container.scrollTop);
+      }
+    });
+    resizeObserver.observe(container);
+
+    // Cleanup
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      resizeObserver.unobserve(container);
+      // Call cancel on the throttled function
+      throttledSetScroll.cancel();
+    };
+  }, [throttledSetScroll]); // Dependency on the throttled function
+
+
   // Calculate effective values based on zoom
   const effectiveTrackHeight = trackHeightBase * verticalZoom;
   const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;
@@ -95,7 +185,9 @@ function TrackTimelineView({
       trackHeightBase,
       numMeasures, // Pass actual numMeasures to hook if needed for its logic
       renderMeasures,
-      selectedWindow
+      selectedWindow,
+      // scrollLeft,
+      // scrollTop,
   } as UseTrackGesturesProps); // Cast to satisfy hook's expected props
 
   // Helper function to draw rounded rectangles
@@ -124,191 +216,244 @@ function TrackTimelineView({
   const drawMidiBlock = useCallback((
     ctx: CanvasRenderingContext2D,
     blockData: MIDIBlock,
-    trackTopY: number,
+    trackIndex: number, // Use index to calculate base Y
     isSelected: boolean,
-    alpha: number, // Alpha transparency (0 to 1)
+    alpha: number,
   ) => {
-      // Use passed-in blockData instead of block from closure
-      const leftPosition = blockData.startBeat * effectivePixelsPerBeat;
-      const blockWidth = (blockData.endBeat - blockData.startBeat) * effectivePixelsPerBeat;
-      const blockTopY = trackTopY + effectiveBlockVerticalPadding;
+      // Calculate position and dimensions in BASE coordinates
+      const leftPosition = blockData.startBeat * pixelsPerBeatBase;
+      const blockWidth = (blockData.endBeat - blockData.startBeat) * pixelsPerBeatBase;
+      const blockBaseTopY = trackIndex * trackHeightBase;
+      const blockPadding = trackHeightBase * BLOCK_VERTICAL_PADDING_FACTOR;
+      const blockEffectiveHeight = trackHeightBase - 2 * blockPadding;
+      const blockDrawY = blockBaseTopY + blockPadding;
 
       // Save context state before potentially changing alpha or line dash
       ctx.save();
-
       ctx.globalAlpha = alpha;
 
-      // Draw the block shape
-      drawRoundedRect(ctx, leftPosition, blockTopY, blockWidth, effectiveBlockHeight, BLOCK_CORNER_RADIUS);
+      // Draw the block shape using BASE coordinates
+      // The context transform handles zoom/pan
+      drawRoundedRect(ctx, leftPosition, blockDrawY, blockWidth, blockEffectiveHeight, BLOCK_CORNER_RADIUS / horizontalZoom); // Scale radius? Maybe keep fixed.
       ctx.fillStyle = '#4a90e2';
       ctx.fill();
 
       if (isSelected) {
         ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([]); // Ensure solid line
+        // Adjust line width based on zoom so it doesn't get too thick/thin
+        ctx.lineWidth = 2 / Math.min(horizontalZoom, verticalZoom); // Example scaling
+        ctx.setLineDash([]);
         ctx.stroke();
       }
 
-      // Draw block text
+      // Draw block text (consider scaling font size based on zoom)
       ctx.fillStyle = 'white';
-      // Adjust font size if needed based on DPR or zoom
       const baseFontSize = 12;
-      ctx.font = `bold ${baseFontSize * (window.devicePixelRatio || 1)}px sans-serif`; 
+      // Scale font size - apply AFTER other transforms or handle carefully
+      // Option 1: Apply scaling factor here (might need to undo translate/scale first?)
+      // Option 2: Set font before main transform? Less flexible.
+      // Let's try scaling it simply, adjusting baseline might be needed
+      ctx.font = `bold ${baseFontSize / horizontalZoom}px sans-serif`; // Scale font size inversely with zoom
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       const text = `${blockData.notes.length} notes`;
-      const textX = leftPosition + EDGE_RESIZE_WIDTH + 4;
-      const textY = trackTopY + effectiveTrackHeight / 2;
+      const textX = leftPosition + (EDGE_RESIZE_WIDTH + 4) / horizontalZoom; // Scale padding
+      const textY = blockBaseTopY + trackHeightBase / 2;
 
-      // Simple rectangular clipping for text
-      ctx.beginPath(); // Start a new path for clipping
-      ctx.rect(textX - 4, trackTopY, blockWidth - EDGE_RESIZE_WIDTH * 1.5, effectiveTrackHeight); 
+      // Simple rectangular clipping for text (use BASE coordinates)
+      ctx.beginPath();
+      ctx.rect(textX - (4 / horizontalZoom), blockBaseTopY, blockWidth - (EDGE_RESIZE_WIDTH * 1.5) / horizontalZoom, trackHeightBase);
       ctx.clip();
       ctx.fillText(text, textX, textY);
 
-      // Restore context state (removes clipping and resets globalAlpha/lineDash)
+      // Restore context state (removes clipping and resets alpha/lineWidth etc.)
       ctx.restore();
-  }, [effectivePixelsPerBeat, effectiveTrackHeight, effectiveBlockVerticalPadding, effectiveBlockHeight]);
+  }, [pixelsPerBeatBase, trackHeightBase, horizontalZoom, verticalZoom]);
 
 
-  // Canvas Drawing Logic
+  // --- Canvas Drawing Logic (Optimized with Transforms) ---
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
-    if (!canvas || !context) return;
+    const container = timelineAreaRef.current;
+    // Ensure we have dimensions > 0 before drawing
+    if (!canvas || !context || !container || visibleWidth <= 0 || visibleHeight <= 0) return;
 
-    const dpr = window.devicePixelRatio || 1; // Get Device Pixel Ratio
-    // Calculate width/height based on RENDER measures and zoom
-    const baseCanvasWidth = totalRenderBeats * effectivePixelsPerBeat; // Use render beats
-    const baseCanvasHeight = tracks.length * effectiveTrackHeight; // Use effective value
+    const dpr = window.devicePixelRatio || 1;
 
-    // Set canvas physical size (higher resolution)
-    canvas.width = baseCanvasWidth * dpr;
-    canvas.height = baseCanvasHeight * dpr;
+    // --- Set Fixed Canvas Size ---
+    const currentCanvasWidth = Math.round(visibleWidth * dpr);
+    const currentCanvasHeight = Math.round(visibleHeight * dpr);
+    if (canvas.width !== currentCanvasWidth) {
+        canvas.width = currentCanvasWidth;
+    }
+    if (canvas.height !== currentCanvasHeight) {
+        canvas.height = currentCanvasHeight;
+    }
+    canvas.style.width = `${visibleWidth}px`;
+    canvas.style.height = `${visibleHeight}px`;
 
-    // Set canvas display size (CSS pixels)
-    canvas.style.width = `${baseCanvasWidth}px`;
-    canvas.style.height = `${baseCanvasHeight}px`;
+    // --- Calculate Visible Range (in Base Coordinates) ---
+    const worldViewLeft = scrollLeft / horizontalZoom;
+    const worldViewTop = scrollTop / verticalZoom;
+    const worldViewWidth = visibleWidth / horizontalZoom;
+    const worldViewHeight = visibleHeight / verticalZoom;
 
-    // Scale the context to account for DPR
-    context.scale(dpr, dpr);
+    const startVisibleBeat = Math.max(0, worldViewLeft / pixelsPerBeatBase);
+    const endVisibleBeat = Math.min(totalBaseWidth / pixelsPerBeatBase, (worldViewLeft + worldViewWidth) / pixelsPerBeatBase);
+    const startVisibleTrackIndex = Math.max(0, Math.floor(worldViewTop / trackHeightBase));
+    const endVisibleTrackIndex = Math.min(tracks.length, Math.ceil((worldViewTop + worldViewHeight) / trackHeightBase));
+
+    // Add buffer to visible range (in beats/tracks) to prevent popping
+    const horizontalBufferBeats = 5; // Render +/- 5 beats
+    const verticalBufferTracks = 1; // Render +/- 1 track
+    const drawStartBeat = Math.max(0, startVisibleBeat - horizontalBufferBeats);
+    const drawEndBeat = Math.min(totalBaseWidth / pixelsPerBeatBase, endVisibleBeat + horizontalBufferBeats);
+    const drawStartTrackIndex = Math.max(0, startVisibleTrackIndex - verticalBufferTracks);
+    const drawEndTrackIndex = Math.min(tracks.length, endVisibleTrackIndex + verticalBufferTracks);
 
 
-    // Clear canvas (using base dimensions)
-    context.fillStyle = '#222';
-    context.fillRect(0, 0, baseCanvasWidth, baseCanvasHeight);
+    // --- Apply Transformations ---
+    context.save();
+    context.scale(dpr, dpr); // Apply DPR scaling first
+    context.fillStyle = '#222'; // Background color
+    context.fillRect(0, 0, visibleWidth, visibleHeight); // Clear screen (CSS pixels)
 
-    // Draw Grid Lines (up to renderMeasures)
-    context.lineWidth = 1; // Note: lineWidth might appear thinner due to scaling
-    for (let i = 0; i <= totalRenderBeats; i++) { // Loop up to render beats
-      const x = i * effectivePixelsPerBeat; // Use effective value
-      const isMeasureLine = i % 4 === 0;
-      const isBeyondSong = i > actualSongBeats; // Check if beat is beyond actual song
+    context.translate(-scrollLeft, -scrollTop); // Apply scroll translation
+    context.scale(horizontalZoom, verticalZoom); // Apply zoom
 
-      // Use dimmer colors for lines beyond the song length
-      let strokeStyle = '#333'; // Default beat line
-      if (isMeasureLine) {
-        strokeStyle = isBeyondSong ? '#444' : '#555'; // Dimmer measure line if beyond song
-      } else if (isBeyondSong) {
-        strokeStyle = '#282828'; // Dimmer beat line if beyond song
-      }
+    // --- Drawing commands use BASE coordinates ---
 
-      context.strokeStyle = strokeStyle;
-      context.beginPath();
-      context.moveTo(x, 0);
-      context.lineTo(x, baseCanvasHeight); // Use base height
-      context.stroke();
+    // --- Draw Grid Lines (Visible Range Only) ---
+    context.lineWidth = 1 / horizontalZoom; // Scale line width
+    const firstBeatToDraw = Math.floor(drawStartBeat);
+    const lastBeatToDraw = Math.ceil(drawEndBeat);
+
+    for (let beat = firstBeatToDraw; beat <= lastBeatToDraw; beat++) {
+        const x = beat * pixelsPerBeatBase; // BASE coordinate
+        const isMeasureLine = beat % 4 === 0;
+        const isBeyondSong = beat > numMeasures * 4; // Use actual song measures
+
+        let strokeStyle = '#333';
+        if (isMeasureLine) strokeStyle = isBeyondSong ? '#444' : '#555';
+        else if (isBeyondSong) strokeStyle = '#282828';
+
+        context.strokeStyle = strokeStyle;
+        context.beginPath();
+        // Draw line across the visible track range (in base coordinates)
+        const lineTopY = drawStartTrackIndex * trackHeightBase;
+        const lineBottomY = drawEndTrackIndex * trackHeightBase;
+        context.moveTo(x, lineTopY);
+        context.lineTo(x, lineBottomY);
+        context.stroke();
     }
 
-     // Draw Track Separators (only need one color)
-     tracks.forEach((track, trackIndex) => {
-      const trackTopY = trackIndex * effectiveTrackHeight; // Use effective value
+     // --- Draw Track Separators (Visible Range Only) ---
+     context.strokeStyle = '#333';
+     context.lineWidth = 1 / verticalZoom; // Scale line width
+     for (let i = drawStartTrackIndex; i < drawEndTrackIndex; i++) {
+        const y = (i + 1) * trackHeightBase; // BASE coordinate
+        context.beginPath();
+        // Draw line across the visible beat range (in base coordinates)
+        const lineLeftX = drawStartBeat * pixelsPerBeatBase;
+        const lineRightX = drawEndBeat * pixelsPerBeatBase;
+        context.moveTo(lineLeftX, y);
+        context.lineTo(lineRightX, y);
+        context.stroke();
+     }
 
-      // Draw track separator line across the full render width
-      context.strokeStyle = '#333'; // Consistent separator color
-      context.lineWidth = 1;
-      context.beginPath();
-      context.moveTo(0, trackTopY + effectiveTrackHeight); // Use effective value
-      context.lineTo(baseCanvasWidth, trackTopY + effectiveTrackHeight); // Use base render width
-      context.stroke();
+    // --- Draw MIDI Blocks (Visible Range Only) ---
+    for (let trackIndex = drawStartTrackIndex; trackIndex < drawEndTrackIndex; trackIndex++) {
+        const track = tracks[trackIndex];
+        if (!track) continue; // Should not happen if indices are correct
 
-      // Draw MIDI Blocks for this track (Blocks should only exist within numMeasures)
-      track.midiBlocks.forEach(block => {
-        const isSelected = block.id === selectedBlockId;
-        // Check if this block is the one being dragged
-        const isBeingDragged = dragOperation !== 'none' && block.id === pendingUpdateBlock?.id;
+        const trackTopY = trackIndex * trackHeightBase; // Base Y
 
-        // Determine alpha: opaque if copy-dragging, otherwise semi-transparent if moving
-        let alpha = 1;
-        if (isBeingDragged) {
-            alpha = isCopyDrag ? 1 : DRAGGED_BLOCK_OPACITY; // Keep original opaque on copy-drag
-        }
+        track.midiBlocks.forEach(block => {
+            // Visibility Check (using BASE coordinates and visible beat range)
+            const isHorizontallyVisible = block.endBeat > drawStartBeat && block.startBeat < drawEndBeat;
 
-        const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
-        const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
-        const blockTopY = trackTopY + effectiveBlockVerticalPadding; // Use effective padding
+            if (isHorizontallyVisible) {
+                const isSelected = block.id === selectedBlockId;
+                const isBeingDragged = dragOperation !== 'none' && block.id === pendingUpdateBlock?.id;
+                let alpha = 1;
+                if (isBeingDragged) {
+                    alpha = isCopyDrag ? 1 : DRAGGED_BLOCK_OPACITY;
+                }
 
-        // Call the helper function to draw the block
-        drawMidiBlock(
-            context,
-            block, // Block data
-            trackTopY,
-            isSelected,
-            alpha, // Use calculated alpha
-        );
-      });
-    });
+                // Call helper, passing trackIndex for base Y calculation
+                drawMidiBlock(
+                    context,
+                    block,
+                    trackIndex, // Pass index
+                    isSelected,
+                    alpha
+                );
+            }
+        });
+    }
 
-    // Draw Disabled Area Overlay
-    const disabledAreaStartX = actualSongBeats * effectivePixelsPerBeat; // Position where song ends
-    context.fillStyle = DISABLED_AREA_COLOR;
-    context.fillRect(disabledAreaStartX, 0, baseCanvasWidth - disabledAreaStartX, baseCanvasHeight);
 
-    // --- Draw Pending ("Ghost") Block if Dragging --- 
+    // --- Draw Disabled Area Overlay (Visible Range Only) ---
+    const disabledAreaStartBeat = numMeasures * 4; // Use actual song measures
+    if (drawEndBeat > disabledAreaStartBeat) { // Only draw if disabled area is visible
+        const disabledAreaStartX = disabledAreaStartBeat * pixelsPerBeatBase; // Base X
+        const disabledAreaVisibleX = Math.max(disabledAreaStartX, drawStartBeat * pixelsPerBeatBase);
+        const disabledAreaVisibleEndX = drawEndBeat * pixelsPerBeatBase;
+
+        context.fillStyle = DISABLED_AREA_COLOR;
+        // Fill rect using BASE coordinates across visible track range
+        const topY = drawStartTrackIndex * trackHeightBase;
+        const bottomY = drawEndTrackIndex * trackHeightBase;
+        context.fillRect(disabledAreaVisibleX, topY, disabledAreaVisibleEndX - disabledAreaVisibleX, bottomY - topY);
+    }
+
+
+    // --- Draw Pending ("Ghost") Block if Dragging (Check Visibility) ---
     if (dragOperation !== 'none' && pendingUpdateBlock && pendingTargetTrackId) {
         const targetTrackIndex = tracks.findIndex(t => t.id === pendingTargetTrackId);
-        
-        // Only draw if the target track is found
-        if (targetTrackIndex !== -1) {
-            const targetTrackTopY = targetTrackIndex * effectiveTrackHeight;
-            
-            // Call the helper function to draw the ghost block
-            drawMidiBlock(
-                context,
-                pendingUpdateBlock, // Pending block data
-                targetTrackTopY,    // Target track Y position
-                false,              // Ghost block is never selected visually
-                DRAGGED_BLOCK_OPACITY, // Alpha for ghost block
-            );
+
+        // Check if target track AND block are within the drawn range
+        if (targetTrackIndex >= drawStartTrackIndex && targetTrackIndex < drawEndTrackIndex) {
+            const isPendingHorizontallyVisible = pendingUpdateBlock.endBeat > drawStartBeat && pendingUpdateBlock.startBeat < drawEndBeat;
+
+            if (isPendingHorizontallyVisible) {
+                drawMidiBlock(
+                    context,
+                    pendingUpdateBlock,
+                    targetTrackIndex, // Pass index
+                    false,
+                    DRAGGED_BLOCK_OPACITY
+                );
+            }
         }
     }
 
+    // --- Restore Context ---
+    context.restore(); // Remove transforms, clipping, etc.
+
   }, [
+      // Key dependencies for drawing
       tracks,
-      // Include new props in dependencies
-      numMeasures,
-      renderMeasures,
-      // Existing dependencies
-      selectedBlockId,
+      scrollLeft,
+      scrollTop,
+      visibleWidth,
+      visibleHeight,
       horizontalZoom,
       verticalZoom,
-      pixelsPerBeatBase,
-      trackHeightBase,
-      effectivePixelsPerBeat, // Derived from zoom
-      effectiveTrackHeight, // Derived from zoom
-      effectiveBlockVerticalPadding, // Derived from zoom
-      effectiveBlockHeight, // Derived from zoom
-      actualSongBeats, // Derived from numMeasures
-      totalRenderBeats, // Derived from renderMeasures
-      // Add pending state dependencies
+      numMeasures, // For disabled area calculation
+      renderMeasures, // For totalBaseWidth
+      selectedBlockId,
       pendingUpdateBlock,
       pendingTargetTrackId,
       dragOperation,
-      drawMidiBlock, 
-      selectedWindow,
-      isCopyDrag
-  ]); // Add zoom dependencies
+      isCopyDrag,
+      // Base dimensions and draw helper
+      pixelsPerBeatBase,
+      trackHeightBase,
+      drawMidiBlock,
+      // selectedWindow? // If needed for conditional drawing/logic
+  ]);
 
 
   // --- Keyboard Listener for Copy/Paste --- 
@@ -370,164 +515,182 @@ function TrackTimelineView({
   }, [selectedWindow, selectedBlock, clipboardBlock, selectedTrackId, setClipboardBlock, addMidiBlock, timeManager, currentBeat, seekTo]); // Dependencies
 
 
-  // Canvas Event Handlers
+  // --- Coordinate Transformation Helper ---
+  const getTimelineCoordsFromEvent = (e: React.MouseEvent<HTMLCanvasElement>): { beat: number; trackIndex: number; worldX: number; worldY: number } | null => {
+    const canvas = canvasRef.current;
+    const container = timelineAreaRef.current;
+    if (!canvas || !container) return null;
+
+    const rect = canvas.getBoundingClientRect(); // Use canvas rect
+
+    // Mouse position relative to canvas element (CSS pixels)
+    const cssPixelX = e.clientX - rect.left;
+    const cssPixelY = e.clientY - rect.top;
+
+    // Transform CSS pixels to world coordinates (base pixel space)
+    const worldX = (cssPixelX + container.scrollLeft) / horizontalZoom;
+    const worldY = (cssPixelY + container.scrollTop) / verticalZoom;
+
+    // Convert world coordinates to beat and track index
+    const beat = worldX / pixelsPerBeatBase;
+    const trackIndex = Math.floor(worldY / trackHeightBase);
+
+    return { beat, trackIndex, worldX, worldY };
+  };
+
+
+  // --- Canvas Event Handlers (Use Transformed Coords) ---
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setSelectedWindow('timelineView'); // Set window on mouse down
+    setSelectedWindow('timelineView');
     if (e.button !== 0) return;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
+    const coords = getTimelineCoordsFromEvent(e);
+    if (!coords) return;
+    const { beat, trackIndex, worldX, worldY } = coords;
 
-    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
     if (trackIndex < 0 || trackIndex >= tracks.length) return; // Click outside track bounds
 
     const clickedTrack = tracks[trackIndex];
     let hitBlock: MIDIBlock | null = null;
     let hitEdge: 'start' | 'end' | null = null;
 
-    // Hit detection for blocks within the clicked track
-    for (const block of clickedTrack.midiBlocks) {
-      const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
-      const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
-      const blockTop = trackIndex * effectiveTrackHeight + effectiveBlockVerticalPadding; // Use effective values
-      const blockBottom = blockTop + effectiveBlockHeight; // Use effective height
+    // Hit detection using world coordinates (base pixels)
+    const blockBaseTop = trackIndex * trackHeightBase;
+    const blockPadding = trackHeightBase * BLOCK_VERTICAL_PADDING_FACTOR;
+    const blockDrawTop = blockBaseTop + blockPadding;
+    const blockDrawBottom = blockBaseTop + trackHeightBase - blockPadding;
 
-      if (offsetX >= leftPosition && offsetX <= leftPosition + blockWidth &&
-          offsetY >= blockTop && offsetY <= blockBottom)
-      {
-        hitBlock = block;
-        // Check for edge hits
-        if (offsetX <= leftPosition + EDGE_RESIZE_WIDTH) {
-          hitEdge = 'start';
-        } else if (offsetX >= leftPosition + blockWidth - EDGE_RESIZE_WIDTH) {
-          hitEdge = 'end';
+    for (const block of clickedTrack.midiBlocks) {
+        const blockStartX = block.startBeat * pixelsPerBeatBase;
+        const blockEndX = block.endBeat * pixelsPerBeatBase;
+
+        if (worldX >= blockStartX && worldX <= blockEndX &&
+            worldY >= blockDrawTop && worldY <= blockDrawBottom)
+        {
+            hitBlock = block;
+            // Check edge hits using world coordinates (adjust resize width by zoom?)
+            const edgeWidthWorld = EDGE_RESIZE_WIDTH / horizontalZoom;
+            if (worldX <= blockStartX + edgeWidthWorld) {
+                hitEdge = 'start';
+            } else if (worldX >= blockEndX - edgeWidthWorld) {
+                hitEdge = 'end';
+            }
+            break;
         }
-        break; // Found a block, stop searching
-      }
     }
 
-    // Call appropriate gesture handler, passing altKey
+    // Call gesture handlers - NOTE: These handlers in useTrackGestures
+    // might expect screen coordinates (clientX) or world coordinates.
+    // This needs to be consistent. Assuming they are updated to handle worldX/beat.
     const altKey = e.altKey;
     if (hitBlock && hitEdge === 'start') {
         e.stopPropagation();
-        handleStartEdge(clickedTrack.id, hitBlock.id, e.clientX, altKey);
+        handleStartEdge(clickedTrack.id, hitBlock.id, e.clientX, altKey); // Pass original clientX for now, hook needs update
     } else if (hitBlock && hitEdge === 'end') {
         e.stopPropagation();
-        handleEndEdge(clickedTrack.id, hitBlock.id, e.clientX, altKey);
+        handleEndEdge(clickedTrack.id, hitBlock.id, e.clientX, altKey); // Pass original clientX for now, hook needs update
     } else if (hitBlock) {
         e.stopPropagation();
-        selectBlock(hitBlock.id); // Select the block first
-        handleMoveBlock(clickedTrack.id, hitBlock.id, e.clientX, altKey);
+        selectBlock(hitBlock.id);
+        handleMoveBlock(clickedTrack.id, hitBlock.id, e.clientX, altKey); // Pass original clientX for now, hook needs update
     } else {
-        // Clicked on empty track space
-        selectBlock(null); // Deselect any selected block
-        // Potentially initiate rubber-band selection here in the future
+        selectBlock(null);
     }
   };
 
   const handleCanvasDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
      setSelectedWindow('timelineView');
-     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left; // Use clientX for consistency with hook if needed
-    const offsetY = e.clientY - rect.top;
+     const coords = getTimelineCoordsFromEvent(e);
+     if (!coords) return;
+     const { beat, trackIndex } = coords; // Use beat and trackIndex
 
-    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
      if (trackIndex < 0 || trackIndex >= tracks.length) return;
+     const clickedTrackId = tracks[trackIndex].id;
 
-    const clickedTrackId = tracks[trackIndex].id;
-    // Pass the original event and trackId to the hook
-    handleDoubleClick(e, clickedTrackId);
+     // Pass original event and trackId. Hook needs update if it uses event coords.
+     handleDoubleClick(e, clickedTrackId);
   };
 
  const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setSelectedWindow('timelineView');
-    e.preventDefault(); // Prevent default browser context menu
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
-
-    const clickedBeat = offsetX / effectivePixelsPerBeat;
-    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
-
-    // Allow context menu anywhere
+    e.preventDefault();
+    const coords = getTimelineCoordsFromEvent(e);
+    if (!coords) {
+        handleContextMenu(e, null, null); // Show context menu even if coords fail?
+        return;
+    }
+    const { beat, trackIndex, worldX, worldY } = coords;
 
     if (trackIndex < 0 || trackIndex >= tracks.length) {
-        // Context menu outside tracks
-        handleContextMenu(e, null, null); // Pass null trackId
+        handleContextMenu(e, null, null); // Context menu outside tracks
         return;
     }
 
     const clickedTrack = tracks[trackIndex];
     let hitBlock: MIDIBlock | null = null;
 
-    // Hit detection (simplified for context menu - just need block ID)
+    // Simplified Hit detection using world coordinates
+    const blockBaseTop = trackIndex * trackHeightBase;
+    const blockPadding = trackHeightBase * BLOCK_VERTICAL_PADDING_FACTOR;
+    const blockDrawTop = blockBaseTop + blockPadding;
+    const blockDrawBottom = blockBaseTop + trackHeightBase - blockPadding;
+
     for (const block of clickedTrack.midiBlocks) {
-      const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
-      const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
-       const blockTop = trackIndex * effectiveTrackHeight + effectiveBlockVerticalPadding; // Use effective values
-       const blockBottom = blockTop + effectiveBlockHeight; // Use effective height
-
-
-      if (offsetX >= leftPosition && offsetX <= leftPosition + blockWidth &&
-          offsetY >= blockTop && offsetY <= blockBottom)
-      {
-        hitBlock = block;
-        break;
-      }
+        const blockStartX = block.startBeat * pixelsPerBeatBase;
+        const blockEndX = block.endBeat * pixelsPerBeatBase;
+        if (worldX >= blockStartX && worldX <= blockEndX &&
+            worldY >= blockDrawTop && worldY <= blockDrawBottom) {
+            hitBlock = block;
+            break;
+        }
     }
-
-    // Call context menu handler from hook, passing event, blockId (or null), and trackId
+    // Hook needs consistent coordinates (event vs world)
     handleContextMenu(e, hitBlock?.id ?? null, clickedTrack.id);
  };
 
- // New: Handle Mouse Move for Cursor Changes
+ // Handle Mouse Move for Cursor Changes (Use World Coords)
  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    // Calculate mouse position relative to the *displayed* canvas size
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
+    const coords = getTimelineCoordsFromEvent(e);
+    if (!canvas || !coords) {
+        if (canvas) canvas.style.cursor = 'default';
+        return;
+    };
+    const { beat, trackIndex, worldX, worldY } = coords;
 
-    let cursorStyle = 'default'; // Default cursor
+    let cursorStyle = 'default';
 
-    const trackIndex = Math.floor(offsetY / effectiveTrackHeight); // Use effective height
     if (trackIndex >= 0 && trackIndex < tracks.length) {
-      const hoveredTrack = tracks[trackIndex];
-      // Hit detection logic similar to mouseDown
-      for (const block of hoveredTrack.midiBlocks) {
-        const leftPosition = block.startBeat * effectivePixelsPerBeat; // Use effective value
-        const blockWidth = (block.endBeat - block.startBeat) * effectivePixelsPerBeat; // Use effective value
-        const blockTop = trackIndex * effectiveTrackHeight + effectiveBlockVerticalPadding; // Use effective values
-        const blockBottom = blockTop + effectiveBlockHeight; // Use effective height
+        const hoveredTrack = tracks[trackIndex];
+        const blockBaseTop = trackIndex * trackHeightBase;
+        const blockPadding = trackHeightBase * BLOCK_VERTICAL_PADDING_FACTOR;
+        const blockDrawTop = blockBaseTop + blockPadding;
+        const blockDrawBottom = blockBaseTop + trackHeightBase - blockPadding;
+        const edgeWidthWorld = EDGE_RESIZE_WIDTH / horizontalZoom;
 
-        if (offsetX >= leftPosition && offsetX <= leftPosition + blockWidth &&
-            offsetY >= blockTop && offsetY <= blockBottom)
-        {
-          // Check for edge hits first
-          if (offsetX <= leftPosition + EDGE_RESIZE_WIDTH || offsetX >= leftPosition + blockWidth - EDGE_RESIZE_WIDTH) {
-            cursorStyle = 'ew-resize'; // East-West resize cursor for edges
-          } else {
-            cursorStyle = 'grab'; // Grab cursor for moving the block body
-          }
-          break; // Found a block, set cursor and stop searching
+        for (const block of hoveredTrack.midiBlocks) {
+            const blockStartX = block.startBeat * pixelsPerBeatBase;
+            const blockEndX = block.endBeat * pixelsPerBeatBase;
+
+            if (worldX >= blockStartX && worldX <= blockEndX &&
+                worldY >= blockDrawTop && worldY <= blockDrawBottom)
+            {
+                if (worldX <= blockStartX + edgeWidthWorld || worldX >= blockEndX - edgeWidthWorld) {
+                    cursorStyle = 'ew-resize';
+                } else {
+                    cursorStyle = 'grab';
+                }
+                break;
+            }
         }
-      }
     }
-    // Only update if style changed to avoid unnecessary DOM manipulation
+
     if (canvas.style.cursor !== cursorStyle) {
         canvas.style.cursor = cursorStyle;
     }
  };
 
-  // New: Handle Mouse Leave to Reset Cursor
+  // Mouse Leave handler remains the same
   const handleCanvasMouseLeave = () => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -538,33 +701,43 @@ function TrackTimelineView({
 
   return (
     <div
-      ref={timelineAreaRef} // Keep this ref on the container div
-      className="all-tracks-timeline-view-container" // Renamed class for clarity
+      ref={timelineAreaRef} // Ref for scroll/resize/coords
+      className="all-tracks-timeline-view-container"
       style={{
-        width: '100%', // Container takes full width
+        overflow: 'scroll', // Enable both scrollbars
+        width: '100%',
+        height: '100%', // Make container fill its parent space
         backgroundColor: '#222',
-        position: 'absolute', // Needed for positioning context menu correctly relative to scroll
-        border: selectedWindow === 'timelineView' 
-          ? '1px dotted rgba(255, 255, 255, 0.4)' // Visual feedback when selected
-          : '1px solid transparent' // Match parent's border style if needed
+        position: 'relative', // Needed for positioning context menu maybe? Check hook.
+        border: selectedWindow === 'timelineView'
+          ? '1px dotted rgba(255, 255, 255, 0.4)'
+          : '1px solid transparent',
+        cursor: 'default' // Default cursor for the container
       }}
     >
-      <canvas
-        ref={canvasRef}
-        onMouseDown={handleCanvasMouseDown}
-        onDoubleClick={handleCanvasDoubleClick}
-        onContextMenu={handleCanvasContextMenu}
-        onMouseMove={handleCanvasMouseMove} // Added mouse move handler
-        onMouseLeave={handleCanvasMouseLeave} // Added mouse leave handler
-        style={{ 
-          display: 'block', // Prevents extra space below canvas
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%', // Make canvas fill the container width
-          // height: '100%', // Remove percentage height; useEffect sets explicit pixel height
-        }}
-      />
+      {/* Inner div to establish the full scrollable size */}
+      <div style={{
+           width: `${totalBaseWidth * horizontalZoom}px`,
+           height: `${totalBaseHeight * verticalZoom}px`,
+           position: 'relative', // To contain the absolute canvas
+           pointerEvents: 'none' // Don't intercept mouse events for the canvas
+         }}>
+         <canvas
+            ref={canvasRef}
+            onMouseDown={handleCanvasMouseDown}
+            onDoubleClick={handleCanvasDoubleClick}
+            onContextMenu={handleCanvasContextMenu}
+            onMouseMove={handleCanvasMouseMove} // Use updated handler
+            onMouseLeave={handleCanvasMouseLeave}
+            style={{
+              display: 'block',
+              position: 'absolute', // Position canvas absolutely within the scroll container
+              top: 0,
+              left: 0,
+              // Width/height styles are set dynamically in useEffect to match container
+            }}
+          />
+      </div>
 
       {/* Keep File Input and Context Menu */}
       <input
