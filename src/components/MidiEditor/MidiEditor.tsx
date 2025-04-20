@@ -8,10 +8,13 @@ import { MIDIBlock, MIDINote, Track } from '../../lib/types';
 import PianoRollHeader from './components/PianoRollHeader';
 import PianoKeys from './components/PianoKeys';
 
+// Import shared utils
+// import { debounce } from './utils/debounce'; // Path updated below
+
 // Import utils
 import {
-  PIXELS_PER_BEAT,
-  PIXELS_PER_SEMITONE,
+  // PIXELS_PER_BEAT, // Provided by useZoomScroll
+  // PIXELS_PER_SEMITONE, // Provided by useZoomScroll
   KEY_COUNT,
   SelectionBox,
   BEATS_PER_MEASURE,
@@ -19,22 +22,27 @@ import {
   RESIZE_HANDLE_WIDTH, // For note resize
   BLOCK_RESIZE_HANDLE_WIDTH,
   GRID_SNAP,
-  MIN_PIXELS_PER_BEAT,
-  MAX_PIXELS_PER_BEAT,
-  ZOOM_SENSITIVITY,
-  PLAYHEAD_DRAG_WIDTH // <-- Add constant
+  // MIN_PIXELS_PER_BEAT, // Used within useZoomScroll
+  // MAX_PIXELS_PER_BEAT, // Used within useZoomScroll
+  // ZOOM_SENSITIVITY, // Used within useZoomScroll
+  PLAYHEAD_DRAG_WIDTH, // <-- Add constant
+  PIXELS_PER_BEAT, // Import original constant name
+  PIXELS_PER_SEMITONE, // Import original constant name
+  // DEFAULT_PIXELS_PER_BEAT, // Remove incorrect import
+  // DEFAULT_PIXELS_PER_SEMITONE // Remove incorrect import
 } from './utils/constants';
 
-// --- ADDED: Vertical Zoom constants ---
-const MIN_PIXELS_PER_SEMITONE = 5; // Example minimum height
-const MAX_PIXELS_PER_SEMITONE = 50; // Example maximum height
-// ---------------------------
+// --- REMOVED: Vertical Zoom constants (moved to useZoomScroll) ---
+// const MIN_PIXELS_PER_SEMITONE = 5; 
+// const MAX_PIXELS_PER_SEMITONE = 50; 
+// ------------------------------------------------------------
 
 import {
-  getCoordsFromEvent,
+  getCoordsFromEvent, // Keep? 
   findNoteAt,
   generateNoteId,
-  getCoordsAndDerived
+  getCoordsAndDerived,
+  debounce // Import debounce from utils.ts now
 } from './utils/utils';
 
 import { drawMidiEditor } from './utils/canvas';
@@ -54,6 +62,9 @@ import {
 
 import { handleKeyboardShortcuts } from './utils/keyboardHandlers';
 
+// Import the new hook
+import { useZoomScroll } from './hooks/useZoomScroll';
+
 // Define CursorType including ew-resize
 type CursorType = 'default' | 'move' | 'w-resize' | 'e-resize' | 'ew-resize' | 'col-resize'; // <-- Add col-resize
 
@@ -63,18 +74,6 @@ type DragOperation = 'none' | 'move' | 'start' | 'end' | 'select' | 'resize-star
 interface MidiEditorProps {
   block: MIDIBlock;
   track: Track;
-}
-
-// Debounce function
-function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  return (...args: Parameters<F>): void => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => func(...args), waitFor);
-  };
 }
 
 function MidiEditor({ block, track }: MidiEditorProps) {
@@ -95,6 +94,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // -------------------------------------------
 
   // Use state dimensions, fallback if needed
+  // Use original constants for initial calculation before state/hook values are ready
   const editorWidth = editorDimensions.width || numMeasures * BEATS_PER_MEASURE * PIXELS_PER_BEAT; 
   const editorHeight = editorDimensions.height || KEY_COUNT * PIXELS_PER_SEMITONE;
   
@@ -114,7 +114,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     // Initial dimensions
     updateDimensions();
 
-    // Debounced resize handler
+    // Debounced resize handler - Use imported debounce
     const handleResize = debounce(updateDimensions, 100); // Adjust debounce time as needed
 
     window.addEventListener('resize', handleResize);
@@ -147,134 +147,18 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const [initialBlockState, setInitialBlockState] = useState<MIDIBlock | null>(null);
   // ---------------------------------------------------------
 
-  const [scrollX, setScrollX] = useState(0);
-  const [scrollY, setScrollY] = useState(0);
-  const [zoomX, setZoomX] = useState(1);
-  const [zoomY, setZoomY] = useState(1);
-  const [pixelsPerBeat, setPixelsPerBeat] = useState(PIXELS_PER_BEAT); //useState(editorWidth / (numMeasures * BEATS_PER_MEASURE));
-  const [pixelsPerSemitone, setPixelsPerSemitone] = useState(PIXELS_PER_SEMITONE); // Make this stateful for zoom
-  
-  // --- Refs for smooth vertical zoom scroll adjustment ---
-  const zoomScrollAdjustmentRef = useRef({
-    isAdjusting: false,
-    mouseY: 0,
-    proportionY: 0,
-    mouseX: 0, // Added for horizontal
-    proportionX: 0, // Added for horizontal
-    zoomDimension: 'none' as 'x' | 'y' | 'none', // Added to track dimension
-  });
-  // ------------------------------------------------------
-  
+  // --- Call the useZoomScroll hook ---
+  const { 
+    pixelsPerBeat, 
+    pixelsPerSemitone, 
+    scrollX, 
+    scrollY, 
+    handleGridScroll 
+  } = useZoomScroll({ editorRef, numMeasures });
+  // -----------------------------------
+
   // Copy/paste related state
   const [copiedNotes, setCopiedNotes] = useState<MIDINote[]>([]);
-
-  // --- ADDED: Wheel Handler for Zoom --- 
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    // Check for Option key (Alt) or Ctrl key (often pinch-zoom)
-    if (e.altKey || e.ctrlKey) {
-      e.preventDefault(); // Prevent page scroll
-
-      // Determine zoom direction and intensity (prioritize deltaX)
-      const zoomIntensityX = Math.min(Math.abs(e.deltaX) / 50, 1); // Normalize intensity for X
-      const zoomIntensityY = Math.min(Math.abs(e.deltaY) / 50, 1); // Normalize intensity for Y
-
-      // Check if horizontal scroll magnitude is greater
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        // Horizontal Zoom
-        setPixelsPerBeat((prevPixelsPerBeat: number) => {
-          // --- Capture scroll state BEFORE zoom ---
-          const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
-          if (gridElement) {
-              const rect = gridElement.getBoundingClientRect();
-              const mouseX = e.clientX - rect.left; // Mouse X relative to grid element
-              const currentScrollX = gridElement.scrollLeft;
-              const currentContentWidth = numMeasures * BEATS_PER_MEASURE * prevPixelsPerBeat;
-              
-              if (currentContentWidth > 0) { // Avoid division by zero
-                zoomScrollAdjustmentRef.current = {
-                  ...zoomScrollAdjustmentRef.current, // Preserve Y values
-                  isAdjusting: true,
-                  mouseX: mouseX,
-                  proportionX: (mouseX + currentScrollX) / currentContentWidth,
-                  zoomDimension: 'x',
-                };
-              } else {
-                // If content width is 0, reset adjustment flags
-                zoomScrollAdjustmentRef.current = { ...zoomScrollAdjustmentRef.current, isAdjusting: false, zoomDimension: 'none' };
-              }
-          }
-          // ----------------------------------------
-
-          let newPixelsPerBeat;
-          if (e.deltaX < 0) {
-            // Zoom In (Increase pixelsPerBeat)
-            newPixelsPerBeat = prevPixelsPerBeat * Math.pow(ZOOM_SENSITIVITY, zoomIntensityX);
-          } else {
-            // Zoom Out (Decrease pixelsPerBeat)
-            newPixelsPerBeat = prevPixelsPerBeat / Math.pow(ZOOM_SENSITIVITY, zoomIntensityX);
-          }
-          // Clamp the value within limits
-          return Math.max(MIN_PIXELS_PER_BEAT, Math.min(MAX_PIXELS_PER_BEAT, newPixelsPerBeat));
-        });
-      } else if (e.deltaY !== 0) { // Only zoom vertically if there's vertical scroll
-        // Vertical Zoom
-        setPixelsPerSemitone((prevPixelsPerSemitone: number) => {
-            // --- Capture scroll state BEFORE zoom ---
-            const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
-            if (gridElement) {
-                const rect = gridElement.getBoundingClientRect();
-                const mouseY = e.clientY - rect.top; // Mouse Y relative to grid element
-                const currentScrollY = gridElement.scrollTop;
-                const currentContentHeight = KEY_COUNT * prevPixelsPerSemitone;
-                
-                if (currentContentHeight > 0) { // Avoid division by zero
-                  zoomScrollAdjustmentRef.current = {
-                    ...zoomScrollAdjustmentRef.current, // Preserve X values
-                    isAdjusting: true,
-                    mouseY: mouseY,
-                    proportionY: (mouseY + currentScrollY) / currentContentHeight,
-                    zoomDimension: 'y',
-                  };
-                } else {
-                  // If content height is 0, reset adjustment
-                  zoomScrollAdjustmentRef.current = { ...zoomScrollAdjustmentRef.current, isAdjusting: false, zoomDimension: 'none' };
-                }
-            }
-            // ----------------------------------------
-
-            let newPixelsPerSemitone;
-            if (e.deltaY < 0) {
-                // Zoom In (Increase pixelsPerSemitone)
-                newPixelsPerSemitone = prevPixelsPerSemitone * Math.pow(ZOOM_SENSITIVITY, zoomIntensityY);
-            } else {
-                // Zoom Out (Decrease pixelsPerSemitone)
-                newPixelsPerSemitone = prevPixelsPerSemitone / Math.pow(ZOOM_SENSITIVITY, zoomIntensityY);
-            }
-            // Clamp the value within limits
-            const finalPixelsPerSemitone = Math.max(MIN_PIXELS_PER_SEMITONE, Math.min(MAX_PIXELS_PER_SEMITONE, newPixelsPerSemitone));
-            // setScrollY(scrollY + finalPixelsPerSemitone - pixelsPerSemitone); // REMOVED: Automatic scroll adjustment during vertical zoom
-            return finalPixelsPerSemitone;
-        });
-      }
-    }
-    // If neither Alt nor Ctrl is pressed, allow default scroll behavior (handled by onScroll)
-  }, [setPixelsPerBeat, setPixelsPerSemitone]); // Dependencies: added setPixelsPerSemitone
-  // -------------------------------------
-
-  // --- ADDED: Effect to attach wheel listener with passive: false ---
-  useEffect(() => {
-    const gridElement = editorRef.current?.querySelector('.piano-roll-grid'); // Find the grid div
-    if (gridElement) {
-      // Type assertion needed because querySelector returns Element
-      const wheelHandler = (e: Event) => handleWheel(e as unknown as React.WheelEvent<HTMLDivElement>); 
-      gridElement.addEventListener('wheel', wheelHandler, { passive: false });
-
-      return () => {
-        gridElement.removeEventListener('wheel', wheelHandler);
-      };
-    }
-  }, [handleWheel]); // Re-attach if handleWheel changes (due to dependencies)
-  // --------------------------------------------------------------------
 
   const blockStartBeat = block.startBeat;
   const blockDuration = block.endBeat - block.startBeat;
@@ -343,73 +227,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       currentBeat
   ]);
 
-  // --- ADDED: useEffect to log scrollY and pixelsPerSemitone together ---
-  useEffect(() => {
-    console.log({ scrollY, pixelsPerSemitone });
-  }, [scrollY, pixelsPerSemitone]);
-  // ----------------------------------------------------------------------
-
-  // --- ADDED: useEffect for smooth zoom scroll adjustment ---
-  useEffect(() => {
-    const adjustmentRef = zoomScrollAdjustmentRef.current;
-
-    // Use a stable reference to the ref's current value
-    if (adjustmentRef.isAdjusting) {
-      const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
-      if (gridElement) {
-        const { mouseX, proportionX, mouseY, proportionY, zoomDimension } = adjustmentRef;
-        const viewportHeight = gridElement.clientHeight;
-        const viewportWidth = gridElement.clientWidth;
-
-        // Set the flag immediately for the effect's duration
-        // Note: We are directly mutating the ref here which is generally okay for flags like this,
-        // but setting it true here ensures onScroll is blocked immediately.
-        // Re-set the flag true here to ensure it's true for the duration of this effect run
-        adjustmentRef.isAdjusting = true;
-
-        if (zoomDimension === 'x') {
-          // --- Horizontal Adjustment ---
-          const newContentWidth = numMeasures * BEATS_PER_MEASURE * pixelsPerBeat;
-          let targetScrollX = (proportionX * newContentWidth) - mouseX;
-          targetScrollX = Math.max(0, Math.min(targetScrollX, newContentWidth - viewportWidth));
-
-          if (!isNaN(targetScrollX) && isFinite(targetScrollX)) {
-              gridElement.scrollLeft = targetScrollX;
-          } else {
-              console.warn("Calculated invalid targetScrollX", { proportionX, newContentWidth, mouseX, targetScrollX });
-          }
-          // ---------------------------
-        } else if (zoomDimension === 'y') {
-          // --- Vertical Adjustment ---
-          const newContentHeight = KEY_COUNT * pixelsPerSemitone;
-          let targetScrollY = (proportionY * newContentHeight) - mouseY;
-          targetScrollY = Math.max(0, Math.min(targetScrollY, newContentHeight - viewportHeight));
-
-          if (!isNaN(targetScrollY) && isFinite(targetScrollY)) {
-              gridElement.scrollTop = targetScrollY;
-              // setScrollY(targetScrollY); // REMOVED
-          } else {
-              console.warn("Calculated invalid targetScrollY", { proportionY, newContentHeight, mouseY, targetScrollY });
-          }
-          // -------------------------
-        }
-      }
-
-      // Reset the flag *after* a short delay to allow the triggered onScroll to be ignored
-      const timeoutId = setTimeout(() => {
-        // Check if the ref still exists before accessing/mutating
-        if (zoomScrollAdjustmentRef.current) {
-            zoomScrollAdjustmentRef.current.isAdjusting = false;
-            zoomScrollAdjustmentRef.current.zoomDimension = 'none'; // Also reset dimension here
-        }
-      }, 0);
-
-      // Cleanup timeout if effect re-runs before timeout fires
-      return () => clearTimeout(timeoutId);
-    }
-  }, [pixelsPerBeat, pixelsPerSemitone, numMeasures]); // Added numMeasures as it's used in width calculation
-  // -----------------------------------------------------------------
-
   // Wrap getCoordsAndDerived in useCallback to ensure stable reference for dependencies
   const getCoordsAndDerivedCallback = useCallback((e: MouseEvent | React.MouseEvent) => {
     // Add check for canvasRef.current
@@ -419,7 +236,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     }
     // Now it's safe to pass canvasRef as RefObject<HTMLCanvasElement>
     return getCoordsAndDerived(e, canvasRef as React.RefObject<HTMLCanvasElement>, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone);
-  }, [canvasRef, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone]); // Add dependencies
+  }, [canvasRef, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone]); // Dependencies now include values from useZoomScroll
 
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -953,15 +770,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
               overflow: 'scroll',
               height: '100%'
             }}
-            onScroll={(e) => {
-              // Prevent scroll state update if we are programmatically adjusting scroll during zoom
-              if (zoomScrollAdjustmentRef.current.isAdjusting) {
-                return; 
-              }
-              // Update both scroll states
-              setScrollX(e.currentTarget.scrollLeft);
-              setScrollY(e.currentTarget.scrollTop);
-            }}
+            onScroll={handleGridScroll} // Use handler from hook
           >
             <canvas
               ref={canvasRef} 

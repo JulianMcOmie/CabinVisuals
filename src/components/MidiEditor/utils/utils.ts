@@ -201,4 +201,20 @@ export const getCoordsAndDerived = (
         beat,        // Calculated from scrolled position
         pitch        // Calculated from scrolled position
     };
-}; 
+};
+
+/**
+ * Debounce function
+ * Delays invoking a function until after wait milliseconds have elapsed
+ * since the last time the debounced function was invoked.
+ */
+export function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  
+    return (...args: Parameters<F>): void => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => func(...args), waitFor);
+    };
+} 
