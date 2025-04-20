@@ -339,8 +339,8 @@ export function useTrackGestures({
 
     const newBlock: MIDIBlock = {
       id: `block-${Date.now()}`,
-      startBeat: beat, // Use calculated/passed beat
-      endBeat: beat + 4, // Use calculated/passed beat
+      startBeat: beat,
+      endBeat: beat + 4,
       notes: []
     };
 

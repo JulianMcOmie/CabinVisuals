@@ -193,8 +193,6 @@ function TrackTimelineView({
     if (!canvas || !context || timelineVisibleWidth <= 0 || timelineVisibleHeight <= 0) return;
 
     const dpr = window.devicePixelRatio || 1; // Get Device Pixel Ratio
-    // No longer need totalTracksHeight here, canvas height is based on viewport
-    // const totalTracksHeight = tracks.length * effectiveTrackHeight;
 
     // *** Viewport Culling: Set canvas size based on viewport ***
     const canvasWidth = timelineVisibleWidth;
@@ -229,7 +227,7 @@ function TrackTimelineView({
     context.fillRect(0, 0, canvasWidth, canvasHeight); // Clear with CSS dimensions
 
     // *** Translate context based on scroll ***
-    context.translate(-scrollLeft, 0); 
+    context.translate(-scrollLeft, -scrollTop); 
 
     // --- Draw Grid Lines (culled horizontally) ---
     context.lineWidth = 1; 
