@@ -30,6 +30,9 @@ export interface UseTrackGesturesProps {
   // Add visible dimensions (already passed, ensure they are here)
   timelineVisibleWidth: number;
   timelineVisibleHeight: number;
+  // Add missing props back
+  numMeasures: number;
+  renderMeasures: number;
 }
 
 export function useTrackGestures({
@@ -54,6 +57,9 @@ export function useTrackGestures({
   // Destructure visible dimensions
   timelineVisibleWidth,
   timelineVisibleHeight,
+  // Add missing props back
+  numMeasures,
+  renderMeasures,
 }: UseTrackGesturesProps) {
   // Calculate effective values based on zoom
   const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;

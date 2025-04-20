@@ -3,7 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import useStore from '../../store/store';
 import InstrumentsView from './InstrumentsView/InstrumentsView';
-import TrackTimelineView from './TrackTimelineView';
+import TrackTimelineView, { TrackTimelineViewHandle } from './TrackTimelineView';
 import MeasuresHeader from './MeasuresHeader';
 import BasicSynthesizer from '../../lib/synthesizers/BasicSynthesizer';
 import { Track } from '../../lib/types';
@@ -35,6 +35,7 @@ function TimelineView() {
   } = useStore();
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
+  const trackTimelineViewRef = useRef<TrackTimelineViewHandle>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [scrollLeft, setScrollLeft] = useState(0); // State for horizontal scroll position
   const [scrollTop, setScrollTop] = useState(0); // State for vertical scroll position
@@ -232,6 +233,36 @@ function TimelineView() {
     };
   }, [selectedWindow, selectedTrackId, selectedBlockId, currentBeat, splitMidiBlock]);
 
+  const handleContentMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (trackTimelineViewRef.current?.handleMouseDown) {
+      trackTimelineViewRef.current.handleMouseDown(event);
+    }
+  };
+
+  const handleContentMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (trackTimelineViewRef.current?.handleMouseMove) {
+      trackTimelineViewRef.current.handleMouseMove(event);
+    }
+  };
+
+  const handleContentDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (trackTimelineViewRef.current?.handleDoubleClick) {
+      trackTimelineViewRef.current.handleDoubleClick(event);
+    }
+  };
+
+  const handleContentContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (trackTimelineViewRef.current?.handleContextMenu) {
+      trackTimelineViewRef.current.handleContextMenu(event);
+    }
+  };
+
+  const handleContentMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
+      if (trackTimelineViewRef.current?.handleMouseLeave) {
+          trackTimelineViewRef.current.handleMouseLeave(event);
+      }
+  };
+
   const numMeasures = useStore(state => state.numMeasures);
   const renderMeasures = Math.max(MIN_VIEWPORT_MEASURES, numMeasures) + EXTRA_RENDER_MEASURES;
 
@@ -298,18 +329,50 @@ function TimelineView() {
             +
           </button>
         </div>
+
+        {/* Single TrackTimelineView for all tracks */}
+        <div 
+              className="timelines-column"
+              style={{
+                flex: 1,
+                position: 'absolute',
+                left: `${SIDEBAR_WIDTH}px`,
+                top: '40px',
+                height: '100%'
+              }}
+            >
+              <TrackTimelineView
+                ref={trackTimelineViewRef}
+                tracks={tracks}
+                horizontalZoom={horizontalZoom}
+                verticalZoom={verticalZoom}
+                pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
+                trackHeightBase={TRACK_HEIGHT_BASE}
+                numMeasures={numMeasures}
+                renderMeasures={renderMeasures}
+                scrollLeft={scrollLeft}
+                timelineVisibleWidth={timelineVisibleWidth > 0 ? timelineVisibleWidth : 0}
+                scrollTop={scrollTop}
+                timelineVisibleHeight={timelineVisibleHeight > 0 ? timelineVisibleHeight : 0}
+              />
+            </div>
         
         {/* Main scrollable area */}
         <div 
           ref={timelineContentRef}
           className="timeline-content" 
           onScroll={handleScroll}
+          onMouseDown={handleContentMouseDown}
+          onMouseMove={handleContentMouseMove}
+          onDoubleClick={handleContentDoubleClick}
+          onContextMenu={handleContentContextMenu}
+          onMouseLeave={handleContentMouseLeave}
           style={{ 
             flex: 1, 
             overflowY: 'auto',
             overflowX: 'auto',
             position: 'relative',
-            backgroundColor: '#111'
+            backgroundColor: 'transparent'
           }}
         >
           {/* Fixed sidebar background that extends full height */}
@@ -383,31 +446,7 @@ function TimelineView() {
           )}
         </div>
 
-        {/* Single TrackTimelineView for all tracks */}
-        <div 
-              className="timelines-column"
-              style={{
-                flex: 1,
-                position: 'absolute',
-                left: `${SIDEBAR_WIDTH}px`,
-                top: '40px',
-                height: '100%'
-              }}
-            >
-              <TrackTimelineView
-                tracks={tracks}
-                horizontalZoom={horizontalZoom}
-                verticalZoom={verticalZoom}
-                pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
-                trackHeightBase={TRACK_HEIGHT_BASE}
-                numMeasures={numMeasures}
-                renderMeasures={renderMeasures}
-                scrollLeft={scrollLeft}
-                timelineVisibleWidth={timelineVisibleWidth > 0 ? timelineVisibleWidth : 0}
-                scrollTop={scrollTop}
-                timelineVisibleHeight={timelineVisibleHeight > 0 ? timelineVisibleHeight : 0}
-              />
-            </div>
+        
 
         {/* Playhead */} 
         <div 
