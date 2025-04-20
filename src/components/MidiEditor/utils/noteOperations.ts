@@ -101,7 +101,7 @@ export const pasteNotes = (
     // Calculate position relative to the leftmost note and add paste offset
     const relativePosition = note.startBeat - minBeat;
     //const newStartBeat = minBeat + relativePosition + offset;
-    const newStartBeat = currentBeat + relativePosition + offset;
+    const newStartBeat = currentBeat + relativePosition;// + offset;
 
     // Ensure the note fits within the block
     if (newStartBeat + note.duration > blockDuration) {

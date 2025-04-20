@@ -139,7 +139,7 @@ export const useMidiEditorInteractions = ({
 
             if (currentDragOp === 'drag-playhead') {
                 let newBeat = coords.scrolledX / currentPixelsPerBeat;
-                newBeat = Math.round(newBeat);
+                newBeat = Math.round(newBeat * 4) / 4;
                 const maxBeat = numMeasures * BEATS_PER_MEASURE;
                 newBeat = Math.max(0, Math.min(newBeat, maxBeat));
                 seekTo(newBeat);
