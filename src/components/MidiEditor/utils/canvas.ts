@@ -26,7 +26,8 @@ export const drawMidiEditor = (
   selectionBox: SelectionBox,
   isDragging: boolean,
   pixelsPerBeat: number,
-  pixelsPerSemitone: number
+  pixelsPerSemitone: number,
+  currentBeat: number
 ): void => {
   // Calculate total beats for grid drawing
   const totalBeats = totalGridWidth / pixelsPerBeat;
@@ -40,6 +41,9 @@ export const drawMidiEditor = (
   // Draw notes relative to context
   drawNotes(ctx, notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat);
   
+  // Draw playhead relative to context
+  drawPlayhead(ctx, currentBeat, blockStartBeat, pixelsPerBeat, editorHeight);
+
   // Draw selection box if active (relative to context)
   if (selectionBox && isDragging) {
     drawSelectionBox(ctx, selectionBox);
@@ -187,3 +191,22 @@ const drawSelectionBox = (
   ctx.lineWidth = 1;
   ctx.strokeRect(left, top, width, height);
 }; 
+
+/**
+ * Draws the playhead line
+ */
+const drawPlayhead = (
+  ctx: CanvasRenderingContext2D,
+  currentBeat: number,
+  blockStartBeat: number,
+  pixelsPerBeat: number,
+  editorHeight: number
+): void => {
+  const playheadX = currentBeat * pixelsPerBeat;
+  ctx.beginPath();
+  ctx.moveTo(playheadX, 0);
+  ctx.lineTo(playheadX, editorHeight);
+  ctx.strokeStyle = '#FF0000'; // Use a constant or default red
+  ctx.lineWidth = 2;
+  ctx.stroke();
+};

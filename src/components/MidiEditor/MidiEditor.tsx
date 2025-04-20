@@ -80,7 +80,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     selectNotes: storeSelectNotes, 
     setSelectedWindow,
     selectedWindow,
-    numMeasures
+    numMeasures,
+    currentBeat
   } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -316,7 +317,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       selectionBox,
       isDragging,
       pixelsPerBeat,
-      pixelsPerSemitone
+      pixelsPerSemitone,
+      currentBeat
     );
 
     ctx.restore(); 
@@ -333,7 +335,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       pixelsPerSemitone,
       scrollX, 
       scrollY,
-      numMeasures
+      numMeasures,
+      currentBeat
   ]);
 
   // --- ADDED: useEffect to log scrollY and pixelsPerSemitone together ---
