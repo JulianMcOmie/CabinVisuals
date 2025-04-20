@@ -11,8 +11,9 @@ export const getKeyboardAction = (
   metaKey: boolean,
   block: MIDIBlock,
   selectedNoteIds: string[],
-    copiedNotes: MIDINote[],
-  currentBeat: number
+  copiedNotes: MIDINote[],
+  currentBeat: number,
+  numMeasures: number
 ): {
   action: 'delete' | 'escape' | 'copy' | 'paste' | 'none',
   updatedBlock?: MIDIBlock,
@@ -47,7 +48,7 @@ export const getKeyboardAction = (
   // Paste with Ctrl+V / Cmd+V
   if ((ctrlKey || metaKey) && key === 'v' && copiedNotes.length > 0) {
     
-    const { updatedBlock, pastedNoteIds } = pasteNotes(block, copiedNotes, 0, currentBeat);
+    const { updatedBlock, pastedNoteIds } = pasteNotes(block, copiedNotes, 0, currentBeat, numMeasures);
     return { 
       action: 'paste', 
       updatedBlock,
@@ -74,7 +75,8 @@ export const handleKeyboardShortcuts = (
   storeSelectNotes: (notes: MIDINote[]) => void,
   setCopiedNotes: (notes: MIDINote[]) => void,
   seekTo: (beat: number) => void,
-  currentBeat: number
+  currentBeat: number,
+  numMeasures: number
 ): void => {
   // Skip if focus is on input element
   if (
@@ -91,7 +93,8 @@ export const handleKeyboardShortcuts = (
     block,
     selectedNoteIds,
     copiedNotes,
-    currentBeat
+    currentBeat,
+    numMeasures
   );
   
   switch (result.action) {

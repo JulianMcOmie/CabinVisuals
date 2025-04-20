@@ -43,24 +43,22 @@ export const useZoomScroll = ({
         zoomDimension: 'none' as 'x' | 'y' | 'none',
     });
 
-    // Wheel Handler for Zoom
+    // Wheel Handler for Zoom and Scroll Forwarding
     const handleWheel = useCallback((e: WheelEvent) => {
+        const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
+        if (!gridElement) return; // Need grid element for scroll/zoom logic
+
         // Check for Option key (Alt) or Ctrl key (often pinch-zoom)
         if (e.altKey || e.ctrlKey) {
-            e.preventDefault(); // Prevent page scroll
+            e.preventDefault(); // Prevent page scroll ONLY when zooming
 
             const zoomIntensityX = Math.min(Math.abs(e.deltaX) / 50, 1);
             const zoomIntensityY = Math.min(Math.abs(e.deltaY) / 50, 1);
 
-            const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
-            if (!gridElement) return; // Exit if grid element not found
-
-            const rect = gridElement.getBoundingClientRect();
-
             if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
                 // Horizontal Zoom
                 setPixelsPerBeat((prevPixelsPerBeat) => {
-                    const mouseX = e.clientX - rect.left;
+                    const mouseX = e.clientX - gridElement.getBoundingClientRect().left;
                     const currentScrollX = gridElement.scrollLeft;
                     const currentContentWidth = numMeasures * BEATS_PER_MEASURE * prevPixelsPerBeat;
 
@@ -82,7 +80,7 @@ export const useZoomScroll = ({
             } else if (e.deltaY !== 0) {
                 // Vertical Zoom
                 setPixelsPerSemitone((prevPixelsPerSemitone) => {
-                    const mouseY = e.clientY - rect.top;
+                    const mouseY = e.clientY - gridElement.getBoundingClientRect().top;
                     const currentScrollY = gridElement.scrollTop;
                     const currentContentHeight = KEY_COUNT * prevPixelsPerSemitone;
 
@@ -102,23 +100,52 @@ export const useZoomScroll = ({
                     return Math.max(MIN_PIXELS_PER_SEMITONE, Math.min(MAX_PIXELS_PER_SEMITONE, newPixelsPerSemitone));
                 });
             }
+        } else {
+            // --- Normal Scroll Forwarding --- 
+            // Check if the event target is within the piano keys area
+            const keysElement = editorRef.current?.querySelector('.piano-keys');
+            let targetElement = e.target as Element | null;
+            let isScrollOverKeys = false;
+            while (targetElement && targetElement !== editorRef.current) {
+                if (targetElement === keysElement) {
+                    isScrollOverKeys = true;
+                    break;
+                }
+                targetElement = targetElement.parentElement;
+            }
+
+            if (isScrollOverKeys) {
+                // Manually forward scroll delta to the grid element
+                gridElement.scrollTop += e.deltaY;
+                gridElement.scrollLeft += e.deltaX;
+                // Prevent the browser's default scroll action for this event,
+                // as we are handling it manually by forwarding to the grid.
+                e.preventDefault(); 
+            }
+            // If not over keys (presumably over the grid), allow default browser scroll
+            // which should target the grid element correctly.
+            // --------------------------------
         }
-        // Allow default scroll if modifier keys not pressed (handled by onScroll)
     }, [numMeasures, editorRef]); // Dependencies
 
     // Effect to attach wheel listener with passive: false
     useEffect(() => {
-        const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
-        if (gridElement) {
+        // Attach listener to the main editor container referenced by editorRef
+        const editorElement = editorRef.current;
+        // const gridElement = editorRef.current?.querySelector('.piano-roll-grid'); // No longer query here for listener
+        
+        if (editorElement) { // Check if the main editor element exists
             // Type assertion needed because addEventListener expects EventListener type
             const wheelHandler = (e: Event) => handleWheel(e as WheelEvent); 
-            gridElement.addEventListener('wheel', wheelHandler, { passive: false });
+            // Add listener to the main container
+            editorElement.addEventListener('wheel', wheelHandler, { passive: false });
 
             return () => {
-                gridElement.removeEventListener('wheel', wheelHandler);
+                // Remove listener from the main container
+                editorElement.removeEventListener('wheel', wheelHandler);
             };
         }
-    }, [editorRef, handleWheel]); // Re-attach if handleWheel changes
+    }, [editorRef, handleWheel]); // Re-attach if handleWheel or editorRef changes
 
     // Effect for smooth zoom scroll adjustment
     useEffect(() => {
