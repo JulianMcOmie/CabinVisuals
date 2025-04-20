@@ -33,7 +33,8 @@ const MAX_PIXELS_PER_SEMITONE = 50; // Example maximum height
 import {
   getCoordsFromEvent,
   findNoteAt,
-  generateNoteId
+  generateNoteId,
+  getCoordsAndDerived
 } from './utils/utils';
 
 import { drawMidiEditor } from './utils/canvas';
@@ -374,7 +375,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
 
           if (!isNaN(targetScrollX) && isFinite(targetScrollX)) {
               gridElement.scrollLeft = targetScrollX;
-              // setScrollX(targetScrollX); // REMOVED
           } else {
               console.warn("Calculated invalid targetScrollX", { proportionX, newContentWidth, mouseX, targetScrollX });
           }
@@ -410,47 +410,24 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   }, [pixelsPerBeat, pixelsPerSemitone, numMeasures]); // Added numMeasures as it's used in width calculation
   // -----------------------------------------------------------------
 
-  // Helper to get coords and derived values, adjusted for scroll
-  const getCoordsAndDerived = (e: MouseEvent | React.MouseEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-
-    const rect = canvas.getBoundingClientRect();
-    
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // Adjust for scroll
-    const scrolledX = mouseX + scrollX;
-    const scrolledY = mouseY + scrollY;
-
-    // Calculate beat and pitch based on SCROLLED coordinates
-    const beat = scrolledX / pixelsPerBeat;
-    // --- Use scrolledY for pitch calculation --- 
-    const pitch = KEY_COUNT - Math.floor(scrolledY / pixelsPerSemitone) - 1 + LOWEST_NOTE;
-    // -----------------------------------------
-
-    if (isNaN(beat) || isNaN(pitch)) {
-      // console.warn("NaN coordinate calculation", { mouseX, mouseY, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone });
-      return null;
+  // Wrap getCoordsAndDerived in useCallback to ensure stable reference for dependencies
+  const getCoordsAndDerivedCallback = useCallback((e: MouseEvent | React.MouseEvent) => {
+    // Add check for canvasRef.current
+    if (!canvasRef.current) {
+        console.warn("getCoordsAndDerivedCallback called before canvasRef is assigned.");
+        return null;
     }
-
-    return {
-      x: mouseX,       // Relative to element
-      y: mouseY,       // Relative to element
-      scrolledX,   // For content-space comparison
-      scrolledY,   // For content-space comparison
-      beat,        // Calculated from scrolled position
-      pitch        // Calculated from scrolled position
-    };
-  };
+    // Now it's safe to pass canvasRef as RefObject<HTMLCanvasElement>
+    return getCoordsAndDerived(e, canvasRef as React.RefObject<HTMLCanvasElement>, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone);
+  }, [canvasRef, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone]); // Add dependencies
 
   // Mouse event handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setSelectedWindow('midiEditor');
     setMouseDownButton(e.button);
 
-    const coords = getCoordsAndDerived(e);
+    // Use the memoized callback
+    const coords = getCoordsAndDerivedCallback(e);
     if (!coords) return;
     
     const { x, y, scrolledX, scrolledY, beat, pitch } = coords; 
@@ -623,7 +600,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     e.preventDefault();
     setSelectedWindow('midiEditor');
     
-    const coords = getCoordsAndDerived(e);
+    // Use the memoized callback
+    const coords = getCoordsAndDerivedCallback(e);
     if (!coords) return;
     
     const result = findNoteAt(
@@ -658,7 +636,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   
   // Modified canvasMouseMove to handle selection box updates
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCoordsAndDerived(e);
+    // Use the memoized callback
+    const coords = getCoordsAndDerivedCallback(e);
     if (!coords) {
       setHoverCursor('default');
       return;
@@ -728,7 +707,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     const handleMouseMove = (e: MouseEvent) => {
       // Handle selection box updates first
       if (dragOperation === 'select' && selectionBox) {
-        const coords = getCoordsAndDerived(e);
+        // Use the memoized callback
+        const coords = getCoordsAndDerivedCallback(e);
         if (!coords) return;
         
         // Update selection box using scrolled coordinates
@@ -748,7 +728,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       
       // --- ADDED: Handle Playhead Drag --- 
       else if (dragOperation === 'drag-playhead') {
-        const coords = getCoordsAndDerived(e);
+        // Use the memoized callback
+        const coords = getCoordsAndDerivedCallback(e);
         if (coords) {
           let newBeat = coords.scrolledX / pixelsPerBeat;
           // Clamp the beat value (adjust max limit if needed)
@@ -762,7 +743,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       
       // --- ADDED: Handle Block Resize Drag --- 
       else if ((dragOperation === 'resize-start' || dragOperation === 'resize-end') && initialBlockState) {
-        const derivedCoords = getCoordsAndDerived(e);
+        // Use the memoized callback
+        const derivedCoords = getCoordsAndDerivedCallback(e);
         if (!derivedCoords) return; 
 
         // Call the utility function to get the updated block
@@ -799,7 +781,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       }
       
       // Ensure coords use the *current* state after potential duplication
-      const derivedCoords = getCoordsAndDerived(e);
+      // Use the memoized callback
+      const derivedCoords = getCoordsAndDerivedCallback(e);
       if (!derivedCoords) return;
       
       // Use utility function to handle drag movement
@@ -828,7 +811,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       // Only process selection/creation if drag was 'select' AND it started with left button (0)
       if (dragOperation === 'select' && mouseDownButton === 0) { 
         if (selectionBox) {
-          const derivedCoords = getCoordsAndDerived(e);
+          // Use the memoized callback
+          const derivedCoords = getCoordsAndDerivedCallback(e);
 
           if (derivedCoords) { 
             const { action, newNote, selectedIds, selectedNotes } = handleSelectionBoxComplete(
@@ -928,7 +912,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     mouseDownButton,
     initialBlockState,
     currentBeat, // <-- Add dependency
-    seekTo // <-- Update dependency
+    seekTo, // <-- Update dependency
+    getCoordsAndDerivedCallback // <-- Add the memoized callback as dependency
   ]);
 
   const handleEditorClick = () => {
