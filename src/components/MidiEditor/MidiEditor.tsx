@@ -205,7 +205,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
             <PianoKeys 
               keyCount={KEY_COUNT} 
               keyHeight={pixelsPerSemitone} 
-              scrollY={scrollY}
+              scrollY={scrollY*2}
             />
           </div>
           <div
