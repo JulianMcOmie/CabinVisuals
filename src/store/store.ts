@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 
 // Import Slice types and creators
 import { TimeSlice, TimeState, createTimeSlice } from './timeSlice';
@@ -13,6 +13,21 @@ import { TrackSlice, TrackState, createTrackSlice } from './trackSlice';
 import { InstrumentSlice, InstrumentDefinition, InstrumentCategories, availableInstrumentsData, createInstrumentSlice } from './instrumentSlice';
 import { EffectSlice, EffectDefinition, EffectCategories, availableEffectsData, createEffectSlice } from './effectSlice';
 import { UISlice, UIState, createUISlice } from './uiSlice';
+
+// --- Debounce Utility --- 
+function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    return function executedFunction(...args: Parameters<T>) {
+        const later = () => {
+            timeout = null;
+            func(...args);
+        };
+        if (timeout !== null) {
+            clearTimeout(timeout);
+        }
+        timeout = setTimeout(later, wait);
+    };
+}
 
 // --- Constructor Mappings --- 
 
@@ -122,10 +137,28 @@ const applySettings = (instance: any, settings: Record<string, any>) => {
     // TODO: Add other setting application methods if needed
 };
 
+// --- Debounced Storage Adapter --- 
+const DEBOUNCE_WAIT_MS = 1000; // Save 1 second after the last change
+
+const debouncedStorage: StateStorage = {
+  getItem: (name) => {
+    // console.log('getItem', name); // For debugging
+    return localStorage.getItem(name);
+  },
+  setItem: debounce((name: string, value: string) => {
+    console.log(`Persisting state (${(value.length / 1024).toFixed(2)} KB) after debounce...`);
+    localStorage.setItem(name, value);
+  }, DEBOUNCE_WAIT_MS),
+  removeItem: (name) => {
+    // console.log('removeItem', name); // For debugging
+    localStorage.removeItem(name);
+  },
+};
+
 // --- Store Creator ---
 
 const useStore = create<AppState>()(
-  persist(
+  // persist( // Temporarily commented out for performance testing
     (...a) => ({
       ...createTimeSlice(...a),
       ...createAudioSlice(...a),
@@ -133,10 +166,13 @@ const useStore = create<AppState>()(
       ...createInstrumentSlice(...a),
       ...createEffectSlice(...a),
       ...createUISlice(...a),
-    }),
+    })
+    /* // Temporarily commented out for performance testing
+    ,
     {
       name: 'cabin-visuals-storage',
-      // storage: createJSONStorage(() => sessionStorage), // Optional: Use sessionStorage
+      // Use the debounced storage adapter via createJSONStorage
+      storage: createJSONStorage(() => debouncedStorage),
 
       // Define which parts of the state to save
       partialize: (state): Partial<AppState> => {
@@ -173,8 +209,8 @@ const useStore = create<AppState>()(
       merge: (persistedStateUnknown: unknown, currentState: AppState): AppState => {
         const persistedState = persistedStateUnknown as PersistentState;
         console.log("Merging persisted state...", persistedState);
-        
-        const newState = { ...currentState } as any; 
+
+        const newState = { ...currentState } as any;
 
         if (typeof persistedState !== 'object' || persistedState === null) {
              console.warn("Persisted state is not an object, returning current state.");
@@ -191,7 +227,7 @@ const useStore = create<AppState>()(
             const persistedValue = persistedState[typedKey];
 
             if (typedKey === 'tracks' && Array.isArray(persistedValue)) {
-                // --- Track Reconstruction --- 
+                // --- Track Reconstruction ---
                 newState.tracks = persistedValue.map((trackData: SerializableTrack): TrackType | null => {
                     let reconstructedSynth: SynthesizerInstance | undefined = undefined;
                     if (trackData.synth) {
@@ -217,29 +253,29 @@ const useStore = create<AppState>()(
                                 return newEffect;
                              } catch (e) {
                                  console.error(`Failed to reconstruct effect "${effectData.type}":`, e);
-                                 return null; 
+                                 return null;
                              }
                         } else {
                             console.warn(`Effect constructor not found for type "${effectData.type}".`);
-                            return null; 
+                            return null;
                         }
-                    }).filter((effect): effect is EffectInstance => effect !== null); 
+                    }).filter((effect): effect is EffectInstance => effect !== null);
 
                     return {
                         id: trackData.id,
                         name: trackData.name,
                         isMuted: trackData.isMuted,
                         isSoloed: trackData.isSoloed,
-                        midiBlocks: trackData.midiBlocks, 
-                        synthesizer: reconstructedSynth, 
-                        effects: reconstructedEffects,     
-                    } as TrackType; 
+                        midiBlocks: trackData.midiBlocks,
+                        synthesizer: reconstructedSynth,
+                        effects: reconstructedEffects,
+                    } as TrackType;
 
-                }).filter((track): track is TrackType => track !== null); 
+                }).filter((track): track is TrackType => track !== null);
 
             } else if (typedKey in newState) {
                 // Assign simple persisted value
-                newState[typedKey] = persistedValue as any; 
+                newState[typedKey] = persistedValue as any;
                 // Check if BPM is being updated
                 if (typedKey === 'bpm' && typeof persistedValue === 'number') {
                      bpmNeedsUpdate = persistedValue;
@@ -249,13 +285,10 @@ const useStore = create<AppState>()(
             }
         }
 
-        // --- Post-Merge Adjustments --- 
+        // --- Post-Merge Adjustments ---
         // Update TimeManager BPM if it was loaded from persisted state
         if (bpmNeedsUpdate !== undefined && newState.timeManager && typeof newState.timeManager.setBPM === 'function') {
              console.log(`Applying persisted BPM (${bpmNeedsUpdate}) to TimeManager.`);
-             // Directly call setBPM on the TimeManager instance within the merged state
-             // Note: This bypasses the store's setBPM action, directly modifying the instance.
-             // This is generally okay during initial hydration.
              try {
                 newState.timeManager.setBPM(bpmNeedsUpdate);
              } catch (e) {
@@ -266,10 +299,11 @@ const useStore = create<AppState>()(
         }
 
         console.log("Final merged state:", newState);
-        return newState as AppState; 
+        return newState as AppState;
       },
     }
-  )
+    */
+  // ) // Temporarily commented out for performance testing
 );
 
 export default useStore; 
