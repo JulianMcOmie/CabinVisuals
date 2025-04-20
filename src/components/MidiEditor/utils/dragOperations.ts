@@ -70,12 +70,13 @@ export const handleDragMove = (
   dragOperation: 'move' | 'start' | 'end',
   dragNoteId: string,
   selectedNoteIds: string[],
-  coords: { x: number, y: number },
+  coords: { x: number, y: number }, // Element-relative coords (needed for 'move')
   clickOffset: { x: number, y: number },
-  dragStart: { x: number, y: number },
-  initialDragStates: Map<string, { startBeat: number, duration: number }>,
+  dragStart: { clientX: number, clientY: number, elementX: number, elementY: number }, 
+  initialDragStates: Map<string, { startBeat: number, duration: number }>, 
   pixelsPerBeat: number,
-  pixelsPerSemitone: number
+  pixelsPerSemitone: number,
+  deltaClientX?: number // Optional delta based on client coords for resize
 ): MIDIBlock => {
   // Get the primary note being dragged
   const primaryNoteIndex = block.notes.findIndex(note => note.id === dragNoteId);
@@ -106,7 +107,9 @@ export const handleDragMove = (
     updatedBlock.notes = [...block.notes];
 
     // Resize note from its start edge
-    const dx = coords.x - dragStart.x;
+    // Use the provided deltaClientX instead of calculating dx internally
+    // const dx = coords.x - dragStart.x; // OLD calculation
+    const dx = deltaClientX ?? 0; // Use provided delta, default to 0 if not provided
     const deltaBeats = Math.round(dx / pixelsPerBeat / GRID_SNAP) * GRID_SNAP;
     
     return resizeNotesFromStart(block, selectedNoteIds, deltaBeats, initialDragStates);
@@ -115,7 +118,9 @@ export const handleDragMove = (
     updatedBlock.notes = [...block.notes];
 
     // Resize note from its end edge
-    const dx = coords.x - dragStart.x;
+    // Use the provided deltaClientX instead of calculating dx internally
+    // const dx = coords.x - dragStart.x; // OLD calculation
+    const dx = deltaClientX ?? 0; // Use provided delta, default to 0 if not provided
     let deltaBeats = Math.round(dx / pixelsPerBeat / GRID_SNAP) * GRID_SNAP;
     
     return resizeNotesFromEnd(block, selectedNoteIds, deltaBeats, initialDragStates);

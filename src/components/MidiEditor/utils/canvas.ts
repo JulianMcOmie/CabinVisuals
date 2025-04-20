@@ -42,7 +42,7 @@ export const drawMidiEditor = (
   drawNotes(ctx, notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat);
   
   // Draw playhead relative to context
-  drawPlayhead(ctx, currentBeat, blockStartBeat, pixelsPerBeat, editorHeight);
+  drawPlayhead(ctx, currentBeat, blockStartBeat, pixelsPerBeat, pixelsPerSemitone);
 
   // Draw selection box if active (relative to context)
   if (selectionBox && isDragging) {
@@ -200,12 +200,12 @@ const drawPlayhead = (
   currentBeat: number,
   blockStartBeat: number,
   pixelsPerBeat: number,
-  editorHeight: number
+  pixelsPerSemitone: number
 ): void => {
   const playheadX = currentBeat * pixelsPerBeat;
   ctx.beginPath();
   ctx.moveTo(playheadX, 0);
-  ctx.lineTo(playheadX, editorHeight);
+  ctx.lineTo(playheadX, KEY_COUNT * pixelsPerSemitone);
   ctx.strokeStyle = '#FF0000'; // Use a constant or default red
   ctx.lineWidth = 2;
   ctx.stroke();
