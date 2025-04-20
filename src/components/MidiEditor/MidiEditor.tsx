@@ -47,7 +47,8 @@ import {
 import {
   handleOptionDrag,
   handleDragMove,
-  isDragThresholdMet
+  isDragThresholdMet,
+  handleBlockResizeDrag
 } from './utils/dragOperations';
 
 import { handleKeyboardShortcuts } from './utils/keyboardHandlers';
@@ -764,45 +765,21 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         const derivedCoords = getCoordsAndDerived(e);
         if (!derivedCoords) return; 
 
-        const deltaX = derivedCoords.x - dragStart.x; 
-        const deltaBeat = Math.round(deltaX / pixelsPerBeat / GRID_SNAP) * GRID_SNAP;
+        // Call the utility function to get the updated block
+        const updatedBlock = handleBlockResizeDrag(
+          initialBlockState,      // The block state when drag started
+          block,                  // The current block state (might be needed for reference, though initial is key)
+          dragOperation,          // 'resize-start' or 'resize-end'
+          dragStart,              // Original mouse down coords (element-relative for delta)
+          derivedCoords,          // Current mouse coords (including element-relative x, y)
+          pixelsPerBeat,
+          GRID_SNAP               // Pass the constant
+        );
 
-        let tempBlock = { ...block }; 
-
-        if (dragOperation === 'resize-start') {
-          const originalEndBeat = initialBlockState.endBeat; 
-          let newStartBeat = Math.max(0, initialBlockState.startBeat + deltaBeat);
-
-          // Prevent start from crossing the end beat 
-          if (newStartBeat >= originalEndBeat - GRID_SNAP) { 
-            newStartBeat = originalEndBeat - GRID_SNAP; 
-          }
-          
-          tempBlock.startBeat = newStartBeat;
-
-          // --- Calculate note adjustments DURING drag --- 
-          const deltaBlockStartBeat = tempBlock.startBeat - initialBlockState.startBeat;
-          if (deltaBlockStartBeat !== 0) {
-            // Use notes from initial state to avoid cumulative errors
-            tempBlock.notes = initialBlockState.notes.map(note => ({
-              ...note,
-              startBeat: note.startBeat - deltaBlockStartBeat
-            }));
-          } else {
-            // If no change in start beat, keep original notes
-            tempBlock.notes = initialBlockState.notes;
-          }
-          // ---------------------------------------------
-
-        } else { // resize-end
-          const newEndBeat = Math.max(initialBlockState.startBeat + GRID_SNAP, initialBlockState.endBeat + deltaBeat);
-          tempBlock.endBeat = newEndBeat;
-          // Notes don't need adjusting for end resize
-          tempBlock.notes = initialBlockState.notes; // Ensure we use initial notes state
+        // Update the block in the store if it changed
+        if (updatedBlock !== block) { // Basic check, might need deeper comparison if issues arise
+            updateMidiBlock(track.id, updatedBlock);
         }
-        
-        // Update the block in the store (now includes adjusted notes if needed)
-        updateMidiBlock(track.id, tempBlock);
 
         return; 
       }
@@ -815,39 +792,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       if (!isDragging) {
         if (isDragThresholdMet(dragStart.x, dragStart.y, e.clientX, e.clientY)) {
           setIsDragging(true);
-          
-          // Handle Option/Alt key duplication HERE too - REMOVED as it's handled in MouseDown
-          /*
-          if (dragOperation === 'move' && (e.altKey || e.metaKey) && initialDragStates.size > 0) { // Ensure initial states exist
-            // Use initialDragStates.keys() as the IDs to duplicate
-            const idsToDuplicate = Array.from(initialDragStates.keys());
-            // Need the original primary drag note ID before duplication
-            const originalDragNoteId = dragNoteId; // Assume dragNoteId holds the original ID at this point
-            
-            const { 
-              updatedBlock, 
-              newSelectedIds, 
-              newDragNoteId, 
-              notesToSelect 
-            } = handleOptionDrag(block, idsToDuplicate, originalDragNoteId);
-            
-            // Apply state updates immediately
-            updateMidiBlock(track.id, updatedBlock);
-            setSelectedNoteIds(newSelectedIds);
-            storeSelectNotes(notesToSelect);
-            setDragNoteId(newDragNoteId);
 
-            // Update initialDragStates for the newly created notes
-            setInitialDragStates(prev => {
-                const newStates = new Map(); // Start fresh with only the new notes for this drag
-                notesToSelect.forEach(newNote => {
-                    newStates.set(newNote.id, { startBeat: newNote.startBeat, duration: newNote.duration });
-                });
-                return newStates;
-            });
-            // Proceed with the drag using the new notes
-          }
-          */
         } else {
           return; // Don't start dragging yet
         }
