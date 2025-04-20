@@ -33,7 +33,7 @@ function DetailView() {
           overflow: 'auto'
         }}
       >
-        {isMidiEditorVisible ? (
+        {/* {isMidiEditorVisible ? (
           <MidiEditor block={selectedBlock} track={selectedTrack} />
         ) : selectedTrack ? (
           <InstrumentDetailView track={selectedTrack} />
@@ -41,7 +41,7 @@ function DetailView() {
           <div style={{ padding: '20px', color: '#ddd' }}>
             <p>Select a track or MIDI block to edit</p>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );
