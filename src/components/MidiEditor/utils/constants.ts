@@ -16,8 +16,11 @@ export const MINIMUM_NOTE_DURATION = 0.1; // Minimum length of a note in beats
 
 // --- ADDED: Zoom Constants --- 
 export const MIN_PIXELS_PER_BEAT = 10;
-export const MAX_PIXELS_PER_BEAT = 500;
-export const ZOOM_SENSITIVITY = 1.1; // Multiplier for zoom step
+export const MAX_PIXELS_PER_BEAT = 200;
+export const ZOOM_SENSITIVITY = 1.2; // Higher value = faster zoom
+
+export const PLAYHEAD_COLOR = '#FF0000'; // Red color for the playhead
+export const PLAYHEAD_DRAG_WIDTH = 10; // Pixel width for detecting playhead hover/drag
 // -----------------------------
 
 // Common type definitions specific to MIDI Editor

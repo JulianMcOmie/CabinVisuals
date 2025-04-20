@@ -11,7 +11,8 @@ export const getKeyboardAction = (
   metaKey: boolean,
   block: MIDIBlock,
   selectedNoteIds: string[],
-  copiedNotes: MIDINote[]
+    copiedNotes: MIDINote[],
+  currentBeat: number
 ): {
   action: 'delete' | 'escape' | 'copy' | 'paste' | 'none',
   updatedBlock?: MIDIBlock,
@@ -45,7 +46,8 @@ export const getKeyboardAction = (
   
   // Paste with Ctrl+V / Cmd+V
   if ((ctrlKey || metaKey) && key === 'v' && copiedNotes.length > 0) {
-    const { updatedBlock, pastedNoteIds } = pasteNotes(block, copiedNotes);
+    
+    const { updatedBlock, pastedNoteIds } = pasteNotes(block, copiedNotes, 0, currentBeat);
     return { 
       action: 'paste', 
       updatedBlock,
@@ -70,7 +72,9 @@ export const handleKeyboardShortcuts = (
   updateMidiBlock: (trackId: string, block: MIDIBlock) => void,
   setSelectedNoteIds: (ids: string[]) => void,
   storeSelectNotes: (notes: MIDINote[]) => void,
-  setCopiedNotes: (notes: MIDINote[]) => void
+  setCopiedNotes: (notes: MIDINote[]) => void,
+  seekTo: (beat: number) => void,
+  currentBeat: number
 ): void => {
   // Skip if focus is on input element
   if (
@@ -86,7 +90,8 @@ export const handleKeyboardShortcuts = (
     e.metaKey,
     block,
     selectedNoteIds,
-    copiedNotes
+    copiedNotes,
+    currentBeat
   );
   
   switch (result.action) {
@@ -119,7 +124,19 @@ export const handleKeyboardShortcuts = (
         storeSelectNotes(result.updatedBlock.notes.filter(note => 
           result.pastedNoteIds!.includes(note.id)
         ));
+        
         if (result.message) console.log(result.message);
+      }
+      // Seek to end of pasted notes
+      if (result.pastedNoteIds) {
+        let maxEndBeat = 0;
+        for (const noteId of result.pastedNoteIds) {
+          const note = result.updatedBlock?.notes.find(note => note.id === noteId);
+          if (note) {
+            maxEndBeat = Math.max(maxEndBeat, note.startBeat + note.duration);
+          }
+        }
+        seekTo(maxEndBeat);
       }
       break;
   }

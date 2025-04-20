@@ -158,4 +158,63 @@ export const findNoteAt = (
   console.log(`[findNoteAt] No note found at x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
   // --- END DEBUG LOG --- 
   return null;
-}; 
+};
+
+/**
+ * Helper to get mouse coordinates relative to the canvas and calculate derived beat/pitch,
+ * adjusted for scroll position.
+ */
+export const getCoordsAndDerived = (
+    e: MouseEvent | React.MouseEvent, 
+    canvasRef: React.RefObject<HTMLCanvasElement>,
+    scrollX: number,
+    scrollY: number,
+    pixelsPerBeat: number,
+    pixelsPerSemitone: number
+) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Adjust for scroll
+    const scrolledX = mouseX + scrollX;
+    const scrolledY = mouseY + scrollY;
+
+    // Calculate beat and pitch based on SCROLLED coordinates
+    const beat = scrolledX / pixelsPerBeat;
+    const pitch = KEY_COUNT - Math.floor(scrolledY / pixelsPerSemitone) - 1 + LOWEST_NOTE;
+
+    if (isNaN(beat) || isNaN(pitch)) {
+        // console.warn("NaN coordinate calculation", { mouseX, mouseY, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone });
+        return null;
+    }
+
+    return {
+        x: mouseX,       // Relative to element
+        y: mouseY,       // Relative to element
+        scrolledX,   // For content-space comparison
+        scrolledY,   // For content-space comparison
+        beat,        // Calculated from scrolled position
+        pitch        // Calculated from scrolled position
+    };
+};
+
+/**
+ * Debounce function
+ * Delays invoking a function until after wait milliseconds have elapsed
+ * since the last time the debounced function was invoked.
+ */
+export function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  
+    return (...args: Parameters<F>): void => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => func(...args), waitFor);
+    };
+} 
