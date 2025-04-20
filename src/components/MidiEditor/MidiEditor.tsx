@@ -84,13 +84,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // --- Refs for animation frame drawing & state updates ---
-  const drawAnimationFrameIdRef = useRef<number | null>(null);
-  const isDrawPendingRef = useRef<boolean>(false);
-  const dragUpdateAnimationFrameIdRef = useRef<number | null>(null);
-  const dragUpdateScheduledRef = useRef<boolean>(false);
-  const latestDraggedBlockRef = useRef<MIDIBlock | null>(null);
-  // --------------------------------------------------------
 
   // --- NEW: State for reactive dimensions ---
   const [editorDimensions, setEditorDimensions] = useState({ width: 0, height: 0 });
@@ -287,111 +280,129 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const totalGridHeight = KEY_COUNT * pixelsPerSemitone;
   // ----------------------------------------------------------------
   
-  // --- Define drawCanvas function (accesses state directly) ---
-  const drawCanvas = useCallback(() => {
-    isDrawPendingRef.current = false; // Allow next request
-    drawAnimationFrameIdRef.current = null; // Clear the ID
-
+  // Draw canvas using our extracted drawing function
+  useEffect(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) {
-      // console.warn("Canvas or context not available for drawing.");
-      return;
-    }
-    // Use calculated total grid dimensions
-    if (!totalGridWidth || !totalGridHeight || totalGridWidth <= 0 || totalGridHeight <= 0) {
-      // console.warn("Grid dimensions not available or invalid for drawing.");
-      return; // Don't draw if dimensions aren't set or are invalid
-    }
+    if (!canvas) return;
+    if (!editorDimensions.width || !editorDimensions.height) return;
     
-    // Get current state values needed for drawing (read fresh values)
-    const currentBlock = block; // Use the latest block from state/props
-    const currentSelectedIds = selectedNoteIds;
-    const currentEditorWidth = editorDimensions.width; // Visible width
-    const currentEditorHeight = editorDimensions.height; // Visible height
-    const currentBlockDuration = currentBlock.endBeat - currentBlock.startBeat;
-    const currentBlockStartBeat = currentBlock.startBeat;
-    const currentSelectionBox = selectionBox;
-    const currentIsDragging = isDragging;
-    const currentPixelsPerBeat = pixelsPerBeat;
-    const currentPixelsPerSemitone = pixelsPerSemitone;
-    const currentScrollX = scrollX;
-    const currentScrollY = scrollY;
-
     const dpr = window.devicePixelRatio || 1;
-    // Set canvas bitmap size only if different
-    if (canvas.width !== totalGridWidth * dpr) {
-        canvas.width = totalGridWidth * dpr;
-    }
-    if (canvas.height !== totalGridHeight * dpr) {
-        canvas.height = totalGridHeight * dpr;
-    }
-    // Set canvas display size (important for correct scaling)
-    if (canvas.style.width !== `${totalGridWidth}px`) {
-        canvas.style.width = `${totalGridWidth}px`; 
-    }
-    if (canvas.style.height !== `${totalGridHeight}px`) {
-        canvas.style.height = `${totalGridHeight}px`;
-    }
-
+    // Set bitmap resolution based on visible dimensions
+    canvas.width = totalGridWidth * dpr; //editorDimensions.width * dpr;
+    canvas.height = totalGridHeight * dpr; //editorDimensions.height * dpr;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Context translation for scrolling
+    ctx.save();
+    // Context translation for scrolling
     ctx.save();
     ctx.scale(dpr, dpr);
-    // Clear canvas before redraw (only the visible part needed? Consider performance)
-    // ctx.clearRect(currentScrollX, currentScrollY, currentEditorWidth, currentEditorHeight); 
-    ctx.clearRect(0, 0, totalGridWidth, totalGridHeight); // Clear whole canvas for now
-
-    ctx.translate(-currentScrollX, -currentScrollY);
-
-    // Call the main drawing function from utils
+    // --- Apply both X and Y translation ---
+    ctx.translate(-scrollX, -scrollY);
+    // -------------------------------------
+    
+    // Call the main drawing function
     drawMidiEditor(
       ctx,
-      currentBlock.notes,
-      currentSelectedIds,
-      currentEditorWidth, // Pass visible dimensions
-      currentEditorHeight,
-      currentBlockDuration,
-      currentBlockStartBeat,
-      totalGridWidth, // Pass total dimensions
-      currentSelectionBox,
-      currentIsDragging,
-      currentPixelsPerBeat,
-      currentPixelsPerSemitone
+      block.notes,
+      selectedNoteIds,
+      editorDimensions.width, // Pass visible dimensions
+      editorDimensions.height,
+      blockDuration,
+      blockStartBeat,
+      totalGridWidth,
+      selectionBox,
+      isDragging,
+      pixelsPerBeat,
+      pixelsPerSemitone
     );
 
-    ctx.restore();
-  }, [block, selectedNoteIds, editorDimensions, selectionBox, isDragging, pixelsPerBeat, pixelsPerSemitone, scrollX, scrollY, numMeasures, totalGridWidth, totalGridHeight]); // Include all dependencies read inside
+    ctx.restore(); 
 
-  // --- Define requestDraw function ---
-  const requestDraw = useCallback(() => {
-    // Cancel any previously requested frame to avoid duplicate draws within the same event loop cycle
-    if (drawAnimationFrameIdRef.current) {
-        cancelAnimationFrame(drawAnimationFrameIdRef.current);
-    }
-    // Schedule the draw if one isn't already pending for the *next* frame
-    if (!isDrawPendingRef.current) {
-      isDrawPendingRef.current = true;
-      drawAnimationFrameIdRef.current = requestAnimationFrame(drawCanvas);
-    }
-  }, [drawCanvas]); // Depends on drawCanvas
+  }, [
+      block.notes, 
+      blockDuration, 
+      blockStartBeat, 
+      editorDimensions,
+      selectionBox, 
+      isDragging, 
+      selectedNoteIds,
+      pixelsPerBeat,
+      pixelsPerSemitone,
+      scrollX, 
+      scrollY,
+      numMeasures
+  ]);
 
-  // --- useEffect to trigger redraws on state changes --- 
+  // --- ADDED: useEffect to log scrollY and pixelsPerSemitone together ---
   useEffect(() => {
-    // Request a draw whenever relevant state changes
-    requestDraw();
-    // Dependencies are implicitly handled by the useCallback dependencies of requestDraw/drawCanvas
-  }, [requestDraw]);
+    console.log({ scrollY, pixelsPerSemitone });
+  }, [scrollY, pixelsPerSemitone]);
+  // ----------------------------------------------------------------------
 
-  // --- ADDED: useEffect for cleanup draw animation frame --- 
+  // --- ADDED: useEffect for smooth zoom scroll adjustment ---
   useEffect(() => {
-    // Cleanup function to cancel any pending draw animation frame on unmount
-    return () => {
-      if (drawAnimationFrameIdRef.current) {
-        cancelAnimationFrame(drawAnimationFrameIdRef.current);
+    const adjustmentRef = zoomScrollAdjustmentRef.current;
+
+    // Use a stable reference to the ref's current value
+    if (adjustmentRef.isAdjusting) {
+      const gridElement = editorRef.current?.querySelector('.piano-roll-grid');
+      if (gridElement) {
+        const { mouseX, proportionX, mouseY, proportionY, zoomDimension } = adjustmentRef;
+        const viewportHeight = gridElement.clientHeight;
+        const viewportWidth = gridElement.clientWidth;
+
+        // Set the flag immediately for the effect's duration
+        // Note: We are directly mutating the ref here which is generally okay for flags like this,
+        // but setting it true here ensures onScroll is blocked immediately.
+        // Re-set the flag true here to ensure it's true for the duration of this effect run
+        adjustmentRef.isAdjusting = true;
+
+        if (zoomDimension === 'x') {
+          // --- Horizontal Adjustment ---
+          const newContentWidth = numMeasures * BEATS_PER_MEASURE * pixelsPerBeat;
+          let targetScrollX = (proportionX * newContentWidth) - mouseX;
+          targetScrollX = Math.max(0, Math.min(targetScrollX, newContentWidth - viewportWidth));
+
+          if (!isNaN(targetScrollX) && isFinite(targetScrollX)) {
+              gridElement.scrollLeft = targetScrollX;
+              // setScrollX(targetScrollX); // REMOVED
+          } else {
+              console.warn("Calculated invalid targetScrollX", { proportionX, newContentWidth, mouseX, targetScrollX });
+          }
+          // ---------------------------
+        } else if (zoomDimension === 'y') {
+          // --- Vertical Adjustment ---
+          const newContentHeight = KEY_COUNT * pixelsPerSemitone;
+          let targetScrollY = (proportionY * newContentHeight) - mouseY;
+          targetScrollY = Math.max(0, Math.min(targetScrollY, newContentHeight - viewportHeight));
+
+          if (!isNaN(targetScrollY) && isFinite(targetScrollY)) {
+              gridElement.scrollTop = targetScrollY;
+              // setScrollY(targetScrollY); // REMOVED
+          } else {
+              console.warn("Calculated invalid targetScrollY", { proportionY, newContentHeight, mouseY, targetScrollY });
+          }
+          // -------------------------
+        }
       }
-      isDrawPendingRef.current = false; // Reset flag on unmount too
-    };
-  }, []); // Run only on mount and unmount
-  // ------------------------------------------------------
+
+      // Reset the flag *after* a short delay to allow the triggered onScroll to be ignored
+      const timeoutId = setTimeout(() => {
+        // Check if the ref still exists before accessing/mutating
+        if (zoomScrollAdjustmentRef.current) {
+            zoomScrollAdjustmentRef.current.isAdjusting = false;
+            zoomScrollAdjustmentRef.current.zoomDimension = 'none'; // Also reset dimension here
+        }
+      }, 0);
+
+      // Cleanup timeout if effect re-runs before timeout fires
+      return () => clearTimeout(timeoutId);
+    }
+  }, [pixelsPerBeat, pixelsPerSemitone, numMeasures]); // Added numMeasures as it's used in width calculation
+  // -----------------------------------------------------------------
 
   // Helper to get coords and derived values, adjusted for scroll
   const getCoordsAndDerived = (e: MouseEvent | React.MouseEvent) => {
@@ -702,7 +713,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         return;
       }
       
-      // --- ADDED: Handle Block Resize Drag (Throttle state update) --- 
+      // --- ADDED: Handle Block Resize Drag --- 
       if ((dragOperation === 'resize-start' || dragOperation === 'resize-end') && initialBlockState) {
         const derivedCoords = getCoordsAndDerived(e);
         if (!derivedCoords) return; 
@@ -710,118 +721,119 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         const deltaX = derivedCoords.x - dragStart.x; 
         const deltaBeat = Math.round(deltaX / pixelsPerBeat / GRID_SNAP) * GRID_SNAP;
 
-        let tempBlock = { ...initialBlockState }; // Always calculate from initial state
-  
+        let tempBlock = { ...block }; 
+
         if (dragOperation === 'resize-start') {
           const originalEndBeat = initialBlockState.endBeat; 
           let newStartBeat = Math.max(0, initialBlockState.startBeat + deltaBeat);
+
+          // Prevent start from crossing the end beat 
           if (newStartBeat >= originalEndBeat - GRID_SNAP) { 
-              newStartBeat = originalEndBeat - GRID_SNAP; 
+            newStartBeat = originalEndBeat - GRID_SNAP; 
           }
+          
           tempBlock.startBeat = newStartBeat;
+
+          // --- Calculate note adjustments DURING drag --- 
           const deltaBlockStartBeat = tempBlock.startBeat - initialBlockState.startBeat;
-          // Adjust notes relative to the initial state
-          tempBlock.notes = initialBlockState.notes.map(note => ({
+          if (deltaBlockStartBeat !== 0) {
+            // Use notes from initial state to avoid cumulative errors
+            tempBlock.notes = initialBlockState.notes.map(note => ({
               ...note,
               startBeat: note.startBeat - deltaBlockStartBeat
-          }));
+            }));
+          } else {
+            // If no change in start beat, keep original notes
+            tempBlock.notes = initialBlockState.notes;
+          }
+          // ---------------------------------------------
+
         } else { // resize-end
           const newEndBeat = Math.max(initialBlockState.startBeat + GRID_SNAP, initialBlockState.endBeat + deltaBeat);
           tempBlock.endBeat = newEndBeat;
-          tempBlock.notes = initialBlockState.notes; // Notes don't move relative to block start
+          // Notes don't need adjusting for end resize
+          tempBlock.notes = initialBlockState.notes; // Ensure we use initial notes state
         }
+        
+        // Update the block in the store (now includes adjusted notes if needed)
+        updateMidiBlock(track.id, tempBlock);
 
-        latestDraggedBlockRef.current = tempBlock; // Store the calculated state
-
-        // Schedule state update using rAF
-        if (!dragUpdateScheduledRef.current) {
-          dragUpdateScheduledRef.current = true;
-          dragUpdateAnimationFrameIdRef.current = requestAnimationFrame(() => {
-            if (latestDraggedBlockRef.current) {
-              updateMidiBlock(track.id, latestDraggedBlockRef.current);
-              // Don't clear latestDraggedBlockRef here, allow mouseup to use final state if needed?
-              // latestDraggedBlockRef.current = null; 
-            }
-            dragUpdateScheduledRef.current = false;
-            dragUpdateAnimationFrameIdRef.current = null;
-          });
-        }
-        return; // Handled block resize
+        return; 
       }
-      // ----------------------------------------------------
+      // -----------------------------------------
       
-      // Handle note modifications / block resize
-      if (dragOperation === 'none') return;
-
-      const derivedCoords = getCoordsAndDerived(e);
-      if (!derivedCoords) return;
+      // Handle note modifications
+      if (dragOperation === 'none' || !dragNoteId) return;
       
-      // Handle NOTE modifications (move, resize start/end)
-      if (!dragNoteId) return; // Only proceed if a note drag operation is active
-
       // Check if we've dragged enough to be considered a drag vs. click
       if (!isDragging) {
-        if (isDragThresholdMet(dragStart.x, dragStart.y, derivedCoords.x, derivedCoords.y)) {
+        if (isDragThresholdMet(dragStart.x, dragStart.y, e.clientX, e.clientY)) {
           setIsDragging(true);
-          // Duplication logic (on drag start) is handled in mouseDown
+          
+          // Handle Option/Alt key duplication HERE too - REMOVED as it's handled in MouseDown
+          /*
+          if (dragOperation === 'move' && (e.altKey || e.metaKey) && initialDragStates.size > 0) { // Ensure initial states exist
+            // Use initialDragStates.keys() as the IDs to duplicate
+            const idsToDuplicate = Array.from(initialDragStates.keys());
+            // Need the original primary drag note ID before duplication
+            const originalDragNoteId = dragNoteId; // Assume dragNoteId holds the original ID at this point
+            
+            const { 
+              updatedBlock, 
+              newSelectedIds, 
+              newDragNoteId, 
+              notesToSelect 
+            } = handleOptionDrag(block, idsToDuplicate, originalDragNoteId);
+            
+            // Apply state updates immediately
+            updateMidiBlock(track.id, updatedBlock);
+            setSelectedNoteIds(newSelectedIds);
+            storeSelectNotes(notesToSelect);
+            setDragNoteId(newDragNoteId);
+
+            // Update initialDragStates for the newly created notes
+            setInitialDragStates(prev => {
+                const newStates = new Map(); // Start fresh with only the new notes for this drag
+                notesToSelect.forEach(newNote => {
+                    newStates.set(newNote.id, { startBeat: newNote.startBeat, duration: newNote.duration });
+                });
+                return newStates;
+            });
+            // Proceed with the drag using the new notes
+          }
+          */
         } else {
           return; // Don't start dragging yet
         }
       }
       
-      // If dragging, calculate and schedule update
+      // Ensure coords use the *current* state after potential duplication
+      const derivedCoords = getCoordsAndDerived(e);
+      if (!derivedCoords) return;
+      
+      // Use utility function to handle drag movement
       if (dragOperation === 'move' || dragOperation === 'start' || dragOperation === 'end') {
-        // Calculate the potential new state using the *current* block state 
-        // This ensures calculations are based on the last *committed* state update, 
-        // preventing potential compounding errors if rAF updates lag slightly.
-        const potentialUpdatedBlock = handleDragMove(
-          block, // Use the current block from state/props
+        // Pass the CURRENT dragNoteId and selectedNoteIds (updated if duplication happened)
+        const updatedBlock = handleDragMove(
+          block,
           dragOperation,
-          dragNoteId,
-          selectedNoteIds,
-          derivedCoords,
+          dragNoteId, // Use current dragNoteId
+          selectedNoteIds, // Use current selectedNoteIds
+          derivedCoords, // Pass the whole coords object
           clickOffset,
-          dragStart,
-          initialDragStates,
+          dragStart, // Pass original dragStart (client coords)
+          initialDragStates, // Pass potentially updated initialDragStates
           pixelsPerBeat,
           pixelsPerSemitone
         );
         
-        // Store the potentially updated block for the throttled update
-        if (potentialUpdatedBlock !== block) { // Only update if changed
-          latestDraggedBlockRef.current = potentialUpdatedBlock; 
-
-          // Schedule state update only if one isn't already scheduled
-          if (!dragUpdateScheduledRef.current) {
-            dragUpdateScheduledRef.current = true;
-            dragUpdateAnimationFrameIdRef.current = requestAnimationFrame(() => {
-              if (latestDraggedBlockRef.current) {
-                // Update state with the *latest* calculated block state from the ref
-                updateMidiBlock(track.id, latestDraggedBlockRef.current);
-                // Clear the stored block state *after* the update is sent
-                // latestDraggedBlockRef.current = null; // Let mouseUp handle final clear?
-              }
-              dragUpdateScheduledRef.current = false; // Allow next update to be scheduled
-              dragUpdateAnimationFrameIdRef.current = null; // Clear ID
-            });
-          }
+        if (updatedBlock !== block) {
+          updateMidiBlock(track.id, updatedBlock);
         }
       }
     };
     
     const handleMouseUp = (e: MouseEvent) => {
-      // --- Cancel any pending drag update frame --- 
-      if (dragUpdateAnimationFrameIdRef.current) {
-        cancelAnimationFrame(dragUpdateAnimationFrameIdRef.current);
-        dragUpdateAnimationFrameIdRef.current = null;
-      }
-      // --- Apply the VERY LAST calculated drag state on mouse up --- 
-      // This ensures the final position is accurate, even if the last rAF didn't fire.
-      if (latestDraggedBlockRef.current && (dragOperation === 'move' || dragOperation === 'start' || dragOperation === 'end' || dragOperation === 'resize-start' || dragOperation === 'resize-end')) {
-        updateMidiBlock(track.id, latestDraggedBlockRef.current);
-      }
-      // -----------------------------------------------------------
-
       // Only process selection/creation if drag was 'select' AND it started with left button (0)
       if (dragOperation === 'select' && mouseDownButton === 0) { 
         if (selectionBox) {
@@ -869,9 +881,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       setMouseDownButton(null); 
       // --- ADDED: Also clear initial block state here just in case ---
       setInitialBlockState(null); 
-      // --- ADDED: Clear drag update flag and stored state on mouse up --- 
-      dragUpdateScheduledRef.current = false; 
-      latestDraggedBlockRef.current = null; // Clear stored block state
       // ------------------------------------------------------------
     };
     
@@ -981,10 +990,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                 display: 'block',
                 width: `${totalGridWidth}px`,   // Full content width
                 height: `${blockHeight}px`, // Full content height
-                cursor: hoverCursor,
-                willChange: 'transform' 
+                cursor: hoverCursor
               }}
-              // Width/Height attributes are set in drawCanvas
+              // Width/Height attributes still set by editorDimensions in useEffect
               onMouseDown={handleCanvasMouseDown}
               onMouseUp={handleCanvasMouseUp}
               onMouseMove={handleCanvasMouseMove}
