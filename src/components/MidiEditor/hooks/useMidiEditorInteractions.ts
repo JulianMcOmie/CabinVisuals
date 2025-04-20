@@ -95,7 +95,7 @@ export const useMidiEditorInteractions = ({
     const pixelsPerBeatRef = useRef(pixelsPerBeat);
     const pixelsPerSemitoneRef = useRef(pixelsPerSemitone);
     const currentBeatRef = useRef(currentBeat);
-
+    const numMeasuresRef = useRef(numMeasures);
     useEffect(() => { blockRef.current = block; }, [block]);
     useEffect(() => { selectedNoteIdsRef.current = selectedNoteIds; }, [selectedNoteIds]);
     useEffect(() => { dragOperationRef.current = dragOperation; }, [dragOperation]);
@@ -252,7 +252,8 @@ export const useMidiEditorInteractions = ({
                 storeSelectNotes,
                 setCopiedNotes,
                 seekTo,
-                currentBeatRef.current
+                currentBeatRef.current,
+                numMeasuresRef.current
             );
         };
 

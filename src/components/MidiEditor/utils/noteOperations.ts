@@ -3,6 +3,7 @@ import {
   GRID_SNAP, 
   MINIMUM_NOTE_DURATION, 
   PASTE_OFFSET,
+  BEATS_PER_MEASURE
 } from './constants';
 import { generateNoteId, isNoteInSelectionBox } from './utils';
 
@@ -85,7 +86,8 @@ export const pasteNotes = (
   block: MIDIBlock, 
   copiedNotes: MIDINote[], 
   offset: number = PASTE_OFFSET,
-  currentBeat: number
+  currentBeat: number,
+  numMeasures: number
 ): { updatedBlock: MIDIBlock, pastedNoteIds: string[] } => {
   if (copiedNotes.length === 0) {
     return { updatedBlock: block, pastedNoteIds: [] };
@@ -104,7 +106,7 @@ export const pasteNotes = (
     const newStartBeat = currentBeat + relativePosition;// + offset;
 
     // Ensure the note fits within the block
-    if (newStartBeat + note.duration > blockDuration) {
+    if (newStartBeat + note.duration > numMeasures * BEATS_PER_MEASURE) {
       return null; // Skip notes that would extend beyond the block
     }
     
