@@ -36,6 +36,7 @@ function TimelineView() {
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   const trackTimelineViewRef = useRef<TrackTimelineViewHandle>(null);
+  const instrumentsColumnRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [scrollLeft, setScrollLeft] = useState(0); // State for horizontal scroll position
   const [scrollTop, setScrollTop] = useState(0); // State for vertical scroll position
@@ -236,6 +237,12 @@ function TimelineView() {
   }, [selectedWindow, selectedTrackId, selectedBlockId, currentBeat, splitMidiBlock]);
 
   const handleContentMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    // Check if the click originated from the instruments column
+    if (instrumentsColumnRef.current && instrumentsColumnRef.current.contains(event.target as Node)) {
+      // If it did, let InstrumentsView handle its own mouse down and don't forward to TrackTimelineView
+      return;
+    }
+    // Otherwise, forward to TrackTimelineView as before
     if (trackTimelineViewRef.current?.handleMouseDown) {
       trackTimelineViewRef.current.handleMouseDown(event);
     }
@@ -414,7 +421,8 @@ function TimelineView() {
             height: `${totalTracksHeight}px`
           }}>
             {/* Instrument Views Column - sticky */}
-            <div 
+            <div
+              ref={instrumentsColumnRef}
               className="instruments-column"
               style={{
                 position: 'sticky',

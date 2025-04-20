@@ -154,7 +154,7 @@ function InstrumentsView({ tracks, effectiveTrackHeight }: InstrumentsViewProps)
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (selectedWindow === 'instrumentsView' && selectedTrackId) {
           const trackToDelete = tracks.find(t => t.id === selectedTrackId);
-
+          
           if (trackToDelete) {
             if (trackToDelete.midiBlocks && trackToDelete.midiBlocks.length > 0) {
               if (window.confirm(`Track "${trackToDelete.name}" contains MIDI blocks. Are you sure you want to delete it?`)) {
