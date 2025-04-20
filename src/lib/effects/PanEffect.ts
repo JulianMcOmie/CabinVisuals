@@ -10,7 +10,7 @@ class PanEffect extends Effect {
             ['directionY', new Property<number>('directionY', 0, { uiType: 'numberInput', label: 'Pan Direction Y', min: -1, max: 1, step: 0.1 })],
             ['directionZ', new Property<number>('directionZ', 0, { uiType: 'numberInput', label: 'Pan Direction Z', min: -1, max: 1, step: 0.1 })],
             ['amount', new Property<number>('amount', 2, { uiType: 'slider', label: 'Pan Amount', min: 0, max: 20, step: 0.1 })],
-            ['speedMultiplier', new Property<number>('speedMultiplier', 1, { uiType: 'slider', label: 'Pan Speed (x Tempo)', min: 0.1, max: 8, step: 0.1, info: "Multiplier for beat sync. 1 = 1 cycle per 4 beats." })],
+            ['speedMultiplier', new Property<number>('speedMultiplier', 1, { uiType: 'slider', label: 'Pan Speed (x Tempo)', min: 0.1, max: 8, step: 0.1, description: "Multiplier for beat sync. 1 = 1 cycle per 4 beats." })],
         ]);
     }
 
@@ -41,9 +41,9 @@ class PanEffect extends Effect {
             properties: {
                 ...obj.properties,
                 position: [
-                    obj.properties.position[0] + panOffsetX,
-                    obj.properties.position[1] + panOffsetY,
-                    obj.properties.position[2] + panOffsetZ,
+                    (obj.properties.position?.[0] ?? 0) + panOffsetX,
+                    (obj.properties.position?.[1] ?? 0) + panOffsetY,
+                    (obj.properties.position?.[2] ?? 0) + panOffsetZ,
                 ],
             },
         }));

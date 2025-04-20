@@ -46,7 +46,7 @@ class Rotate3DEffect extends Effect {
         const m33 = cosY * cosX;
 
         return objects.map(obj => {
-            const [x, y, z] = obj.properties.position;
+            const [x, y, z] = obj.properties.position ?? [0, 0, 0];
 
             // Apply rotation matrix
             const rotatedX = m11 * x + m12 * y + m13 * z;

@@ -22,9 +22,9 @@ class PositionOffsetEffect extends Effect {
             properties: {
                 ...obj.properties,
                 position: [
-                    obj.properties.position[0] + offsetX,
-                    obj.properties.position[1] + offsetY,
-                    obj.properties.position[2] + offsetZ,
+                    (obj.properties.position?.[0] ?? 0) + offsetX,
+                    (obj.properties.position?.[1] ?? 0) + offsetY,
+                    (obj.properties.position?.[2] ?? 0) + offsetZ,
                 ],
             },
         }));

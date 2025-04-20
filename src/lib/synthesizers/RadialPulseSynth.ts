@@ -27,7 +27,7 @@ class RadialPulseSynth extends Synthesizer {
             // ADSR for Pulse Fade/Expansion
             ['attack', new Property<number>('attack', 0.02, { uiType: 'slider', label: 'Pulse Attack (s)', min: 0.01, max: 0.5, step: 0.005 })],
             ['decay', new Property<number>('decay', 0.3, { uiType: 'slider', label: 'Pulse Decay (s)', min: 0.05, max: 2, step: 0.01 })],
-            ['sustain', new Property<number>('sustain', 0, { uiType: 'slider', label: 'Pulse Sustain', min: 0, max: 1, step: 0.01, readOnly: true })], // Sustain should be 0 for pulse
+            ['sustain', new Property<number>('sustain', 0, { uiType: 'slider', label: 'Pulse Sustain', min: 0, max: 1, step: 0.01 })], // Sustain should be 0 for pulse
             ['release', new Property<number>('release', 0.1, { uiType: 'slider', label: 'Pulse Release (s)', min: 0.01, max: 1, step: 0.01 })],
         ]);
     }
@@ -117,7 +117,7 @@ class RadialPulseSynth extends Synthesizer {
                 color: centerColor,
                 opacity: 1, 
             },
-            sourceNoteId: null // Not tied to a specific note
+            sourceNoteId: undefined // Not tied to a specific note
         };
 
         // Return the central sphere combined with the pulse spheres
