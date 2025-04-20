@@ -72,6 +72,8 @@ function TimelineView() {
   // Mouse move handler for dragging - needs to account for scroll and zoom
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!isDragging || !timelineContentRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
 
     const containerRect = timelineContentRef.current.getBoundingClientRect();
     const mouseXRelative = event.clientX - containerRect.left;

@@ -238,6 +238,10 @@ export function useTrackGestures({
         return;
       }
 
+      // Prevent text selection/other default browser actions during drag
+      e.preventDefault();
+      e.stopPropagation();
+
       // Get the initial block state directly from state
       const originalBlock = dragInitialBlockState;
 
