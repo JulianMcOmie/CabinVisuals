@@ -21,7 +21,8 @@ import {
   GRID_SNAP,
   MIN_PIXELS_PER_BEAT,
   MAX_PIXELS_PER_BEAT,
-  ZOOM_SENSITIVITY
+  ZOOM_SENSITIVITY,
+  PLAYHEAD_DRAG_WIDTH // <-- Add constant
 } from './utils/constants';
 
 // --- ADDED: Vertical Zoom constants ---
@@ -52,10 +53,10 @@ import {
 import { handleKeyboardShortcuts } from './utils/keyboardHandlers';
 
 // Define CursorType including ew-resize
-type CursorType = 'default' | 'move' | 'w-resize' | 'e-resize' | 'ew-resize';
+type CursorType = 'default' | 'move' | 'w-resize' | 'e-resize' | 'ew-resize' | 'col-resize'; // <-- Add col-resize
 
 // Define DragOperation type
-type DragOperation = 'none' | 'move' | 'start' | 'end' | 'select' | 'resize-start' | 'resize-end';
+type DragOperation = 'none' | 'move' | 'start' | 'end' | 'select' | 'resize-start' | 'resize-end' | 'drag-playhead'; // <-- Add drag-playhead
 
 interface MidiEditorProps {
   block: MIDIBlock;
@@ -81,7 +82,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     setSelectedWindow,
     selectedWindow,
     numMeasures,
-    currentBeat
+    currentBeat,
+    seekTo // <-- Use seekTo from timeSlice
   } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -452,6 +454,22 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     const { x, y, scrolledX, scrolledY, beat, pitch } = coords; 
 
+    // --- Check for Playhead Drag FIRST --- 
+    if (e.button === 0) {
+      const playheadX = currentBeat * pixelsPerBeat;
+      if (
+        scrolledX >= playheadX - PLAYHEAD_DRAG_WIDTH / 2 &&
+        scrolledX <= playheadX + PLAYHEAD_DRAG_WIDTH / 2
+      ) {
+        setDragOperation('drag-playhead');
+        setDragStart({ x, y });
+        // No need for initialPlayheadBeat state, can use currentBeat from store directly
+        e.stopPropagation();
+        return;
+      }
+    }
+    // ------------------------------------
+    
     // --- Check for Block Resize Click FIRST --- 
     if (e.button === 0) { // Only allow left-click resize
       const blockStartX_px = blockStartBeat * pixelsPerBeat;
@@ -649,6 +667,17 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     if (dragOperation !== 'none') return; // Skip hover checks if any drag is active
 
+    // --- Check for Playhead Hover --- 
+    const playheadX = currentBeat * pixelsPerBeat;
+    if (
+      scrolledX >= playheadX - PLAYHEAD_DRAG_WIDTH / 2 &&
+      scrolledX <= playheadX + PLAYHEAD_DRAG_WIDTH / 2
+    ) {
+      setHoverCursor('col-resize');
+      return; // Playhead hover takes priority
+    }
+    // --------------------------------
+
     // Check for Block Resize Hover 
     const blockStartX_px = blockStartBeat * pixelsPerBeat;
     const blockEndX_px = blockStartX_px + blockWidth; 
@@ -716,8 +745,22 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         return;
       }
       
+      // --- ADDED: Handle Playhead Drag --- 
+      else if (dragOperation === 'drag-playhead') {
+        const coords = getCoordsAndDerived(e);
+        if (coords) {
+          let newBeat = coords.scrolledX / pixelsPerBeat;
+          // Clamp the beat value (adjust max limit if needed)
+          const maxBeat = numMeasures * BEATS_PER_MEASURE;
+          newBeat = Math.max(0, Math.min(newBeat, maxBeat));
+          seekTo(newBeat); // <-- Call seekTo instead of setCurrentBeat
+        }
+        return;
+      }
+      // -------------------------------------
+      
       // --- ADDED: Handle Block Resize Drag --- 
-      if ((dragOperation === 'resize-start' || dragOperation === 'resize-end') && initialBlockState) {
+      else if ((dragOperation === 'resize-start' || dragOperation === 'resize-end') && initialBlockState) {
         const derivedCoords = getCoordsAndDerived(e);
         if (!derivedCoords) return; 
 
@@ -884,6 +927,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       setMouseDownButton(null); 
       // --- ADDED: Also clear initial block state here just in case ---
       setInitialBlockState(null); 
+      // No specific state for playhead drag start needed to clear
       // ------------------------------------------------------------
     };
     
@@ -937,7 +981,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     scrollX,
     scrollY,
     mouseDownButton,
-    initialBlockState
+    initialBlockState,
+    currentBeat, // <-- Add dependency
+    seekTo // <-- Update dependency
   ]);
 
   const handleEditorClick = () => {
