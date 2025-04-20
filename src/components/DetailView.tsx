@@ -30,7 +30,9 @@ function DetailView() {
           flex: 1, 
           padding: 0, 
           backgroundColor: '#222',
-          overflow: 'auto'
+          overflow: isMidiEditorVisible
+            ? 'hidden'
+            : 'auto'
         }}
       >
         {isMidiEditorVisible ? (
