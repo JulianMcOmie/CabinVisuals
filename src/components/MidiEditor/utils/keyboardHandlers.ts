@@ -73,6 +73,7 @@ export const handleKeyboardShortcuts = (
   setSelectedNoteIds: (ids: string[]) => void,
   storeSelectNotes: (notes: MIDINote[]) => void,
   setCopiedNotes: (notes: MIDINote[]) => void,
+  seekTo: (beat: number) => void,
   currentBeat: number
 ): void => {
   // Skip if focus is on input element
@@ -123,7 +124,19 @@ export const handleKeyboardShortcuts = (
         storeSelectNotes(result.updatedBlock.notes.filter(note => 
           result.pastedNoteIds!.includes(note.id)
         ));
+        
         if (result.message) console.log(result.message);
+      }
+      // Seek to end of pasted notes
+      if (result.pastedNoteIds) {
+        let maxEndBeat = 0;
+        for (const noteId of result.pastedNoteIds) {
+          const note = result.updatedBlock?.notes.find(note => note.id === noteId);
+          if (note) {
+            maxEndBeat = Math.max(maxEndBeat, note.startBeat + note.duration);
+          }
+        }
+        seekTo(maxEndBeat);
       }
       break;
   }

@@ -251,6 +251,7 @@ export const useMidiEditorInteractions = ({
                 setSelectedNoteIds,
                 storeSelectNotes,
                 setCopiedNotes,
+                seekTo,
                 currentBeatRef.current
             );
         };
