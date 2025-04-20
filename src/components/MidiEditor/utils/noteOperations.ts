@@ -84,7 +84,8 @@ export const duplicateNotes = (
 export const pasteNotes = (
   block: MIDIBlock, 
   copiedNotes: MIDINote[], 
-  offset: number = PASTE_OFFSET
+  offset: number = PASTE_OFFSET,
+  currentBeat: number
 ): { updatedBlock: MIDIBlock, pastedNoteIds: string[] } => {
   if (copiedNotes.length === 0) {
     return { updatedBlock: block, pastedNoteIds: [] };
@@ -99,8 +100,9 @@ export const pasteNotes = (
   const newNotes = copiedNotes.map(note => {
     // Calculate position relative to the leftmost note and add paste offset
     const relativePosition = note.startBeat - minBeat;
-    const newStartBeat = minBeat + relativePosition + offset;
-    
+    //const newStartBeat = minBeat + relativePosition + offset;
+    const newStartBeat = currentBeat + relativePosition + offset;
+
     // Ensure the note fits within the block
     if (newStartBeat + note.duration > blockDuration) {
       return null; // Skip notes that would extend beyond the block

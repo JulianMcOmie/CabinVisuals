@@ -250,7 +250,8 @@ export const useMidiEditorInteractions = ({
                 updateMidiBlock,
                 setSelectedNoteIds,
                 storeSelectNotes,
-                setCopiedNotes
+                setCopiedNotes,
+                currentBeatRef.current
             );
         };
 
