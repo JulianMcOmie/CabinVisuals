@@ -24,6 +24,12 @@ export interface UseTrackGesturesProps {
   pixelsPerBeatBase: number;
   trackHeightBase: number;
   selectedWindow: SelectedWindowType; // <-- Add selectedWindow prop
+  // Add scroll props
+  scrollLeft: number;
+  scrollTop: number;
+  // Add visible dimensions (already passed, ensure they are here)
+  timelineVisibleWidth: number;
+  timelineVisibleHeight: number;
 }
 
 export function useTrackGestures({
@@ -42,6 +48,12 @@ export function useTrackGestures({
   pixelsPerBeatBase,
   trackHeightBase,
   selectedWindow,
+  // Destructure scroll props
+  scrollLeft,
+  scrollTop,
+  // Destructure visible dimensions
+  timelineVisibleWidth,
+  timelineVisibleHeight,
 }: UseTrackGesturesProps) {
   // Calculate effective values based on zoom
   const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;
@@ -227,9 +239,13 @@ export function useTrackGestures({
       if (!timelineAreaRect) return;
 
       // Calculations based on current event and initial state
-      const currentX = e.clientX;
-      const currentY = e.clientY - timelineAreaRect.top;
-      const deltaX = currentX - dragStartX;
+      const currentX = e.clientX; // Screen coordinate
+      const currentY = e.clientY; // Screen coordinate
+
+      // Convert screen Y to position relative to the *full* scrollable track area
+      const absoluteY = currentY - timelineAreaRect.top + scrollTop; 
+
+      const deltaX = currentX - dragStartX; // Delta in screen coordinates is correct
       const deltaBeat = Math.round(deltaX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP;
 
       let tempBlock = { ...originalBlock };
@@ -249,7 +265,8 @@ export function useTrackGestures({
         tempBlock.startBeat = newStartBeat;
         tempBlock.endBeat = newStartBeat + duration;
 
-        const targetTrackIndex = Math.floor(Math.max(0, currentY) / effectiveTrackHeight);
+        // Determine target track based on absolute Y position
+        const targetTrackIndex = Math.floor(Math.max(0, absoluteY) / effectiveTrackHeight);
         const potentialTargetTrack = tracks[targetTrackIndex];
         if (potentialTargetTrack) {
           tempTargetTrackId = potentialTargetTrack.id;
@@ -280,7 +297,10 @@ export function useTrackGestures({
       timelineAreaRef,               
       effectivePixelsPerBeat, effectiveTrackHeight, 
       tracks,                        
-      setPendingUpdateBlock, setPendingTargetTrackId 
+      setPendingUpdateBlock, setPendingTargetTrackId, 
+      // Add scroll dependencies
+      scrollLeft,
+      scrollTop
   ]);
 
 
@@ -330,8 +350,9 @@ export function useTrackGestures({
     const beat = clickedBeat !== undefined 
         ? Math.floor(clickedBeat / GRID_SNAP) * GRID_SNAP
         : ( () => {
-            const clickX = e.clientX - timelineAreaRect.left;
-            return Math.floor(clickX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP;
+            const clickX = e.clientX - timelineAreaRect.left; // Relative to viewport
+            const absoluteX = clickX + scrollLeft; // Relative to full content
+            return Math.floor(absoluteX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP;
           })();
 
     const targetTrack = findTrackById(trackId);
@@ -346,7 +367,7 @@ export function useTrackGestures({
 
     addMidiBlock(targetTrack.id, newBlock);
     selectBlock(newBlock.id);
-  }, [addMidiBlock, selectBlock, findTrackById, timelineAreaRef, effectivePixelsPerBeat, GRID_SNAP, dragOperation]);
+  }, [addMidiBlock, selectBlock, findTrackById, timelineAreaRef, effectivePixelsPerBeat, GRID_SNAP, dragOperation, scrollLeft]);
 
 
   const handleContextMenu = useCallback((e: React.MouseEvent, blockId: string | null = null, trackId: string | null = null) => {
@@ -369,8 +390,9 @@ export function useTrackGestures({
     } else if (!targetTrackIdForMenu) {
         const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
         if (timelineAreaRect) {
-            const clickY = e.clientY - timelineAreaRect.top;
-            const trackIndex = Math.floor(clickY / effectiveTrackHeight);
+            const clickY = e.clientY - timelineAreaRect.top; // Relative to viewport
+            const absoluteY = clickY + scrollTop; // Relative to full content
+            const trackIndex = Math.floor(absoluteY / effectiveTrackHeight);
             if (tracks[trackIndex]) {
                 targetTrackIdForMenu = tracks[trackIndex].id;
             }
@@ -387,7 +409,7 @@ export function useTrackGestures({
     setContextMenuTrackId(targetTrackIdForMenu);
     setShowContextMenu(true);
 
-  }, [selectBlock, tracks, findTrackAndBlock, timelineAreaRef, effectiveTrackHeight, dragOperation]);
+  }, [selectBlock, tracks, findTrackAndBlock, timelineAreaRef, effectiveTrackHeight, dragOperation, scrollLeft, scrollTop]);
 
 
   const handleDeleteBlock = useCallback(() => {

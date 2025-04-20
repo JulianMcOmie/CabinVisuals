@@ -106,8 +106,8 @@ function TrackTimelineView({
       renderMeasures,
       selectedWindow,
       scrollLeft,
-      timelineVisibleWidth,
       scrollTop,
+      timelineVisibleWidth,
       timelineVisibleHeight
   } as UseTrackGesturesProps); // Cast to satisfy hook's expected props
 
@@ -365,9 +365,8 @@ function TrackTimelineView({
       isCopyDrag,
       // New dependencies for viewport culling
       scrollLeft, 
-      timelineVisibleWidth, 
-      // Add vertical scroll/size dependencies
       scrollTop,
+      timelineVisibleWidth, 
       timelineVisibleHeight
   ]); 
 
