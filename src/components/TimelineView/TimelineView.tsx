@@ -14,6 +14,7 @@ const PIXELS_PER_BEAT_BASE = 100; // Renamed base pixels per beat
 const SIDEBAR_WIDTH = 200; // Define sidebar width as a constant
 const MIN_VIEWPORT_MEASURES = 8; // Minimum measures to allow zooming out to see
 const EXTRA_RENDER_MEASURES = 8; // Render this many extra measures beyond content or min viewport
+const HEADER_HEIGHT = 40; // Define header height as a constant
 
 // Color constants
 const SIDEBAR_BG_COLOR = '#1a1a1a';
@@ -39,6 +40,8 @@ function TimelineView() {
   const [scrollTop, setScrollTop] = useState(0); // State for vertical scroll position
   const [horizontalZoom, setHorizontalZoom] = useState(1); // Initial horizontal zoom
   const [verticalZoom, setVerticalZoom] = useState(1); // Initial vertical zoom
+  const [timelineVisibleWidth, setTimelineVisibleWidth] = useState(0); // State for visible width
+  const [timelineVisibleHeight, setTimelineVisibleHeight] = useState(0); // State for visible height
 
   // Calculate effective values based on zoom
   const effectiveTrackHeight = TRACK_HEIGHT_BASE * verticalZoom;
@@ -115,6 +118,11 @@ function TimelineView() {
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     setScrollLeft(event.currentTarget.scrollLeft);
     setScrollTop(event.currentTarget.scrollTop);
+    // Update visible dimensions on scroll as well
+    if (timelineContentRef.current) {
+        setTimelineVisibleWidth(timelineContentRef.current.clientWidth - SIDEBAR_WIDTH);
+        setTimelineVisibleHeight(timelineContentRef.current.clientHeight - HEADER_HEIGHT);
+    }
   };
 
   // Handler for wheel events (zoom)
@@ -170,13 +178,38 @@ function TimelineView() {
   // Attach wheel listener to the timeline content area
   useEffect(() => {
     const timelineElement = timelineContentRef.current;
+    // Function to update width
+    const updateWidth = () => {
+        if (timelineElement) {
+            setTimelineVisibleWidth(timelineElement.clientWidth - SIDEBAR_WIDTH);
+        }
+    };
+    // Function to update height
+    const updateHeight = () => {
+        if (timelineElement) {
+            setTimelineVisibleHeight(timelineElement.clientHeight - HEADER_HEIGHT);
+        }
+    };
+    // Function to update both
+    const updateDimensions = () => {
+        updateWidth();
+        updateHeight();
+    };
+
     if (timelineElement) {
+      // Initial dimension calculation
+      updateDimensions();
       timelineElement.addEventListener('wheel', handleWheel, { passive: false });
+      // Use resize observer for both width and height
+      const resizeObserver = new ResizeObserver(updateDimensions);
+      resizeObserver.observe(timelineElement);
+
       return () => {
         timelineElement.removeEventListener('wheel', handleWheel);
+        resizeObserver.unobserve(timelineElement);
       };
     }
-  }, [handleWheel]);
+  }, [handleWheel]); // Dependency array includes handleWheel
 
   // Keyboard shortcut for splitting MIDI block
   useEffect(() => {
@@ -352,6 +385,10 @@ function TimelineView() {
                 trackHeightBase={TRACK_HEIGHT_BASE}
                 numMeasures={numMeasures}
                 renderMeasures={renderMeasures}
+                scrollLeft={scrollLeft}
+                timelineVisibleWidth={timelineVisibleWidth > 0 ? timelineVisibleWidth : 0}
+                scrollTop={scrollTop}
+                timelineVisibleHeight={timelineVisibleHeight > 0 ? timelineVisibleHeight : 0}
               />
             </div>
           </div>

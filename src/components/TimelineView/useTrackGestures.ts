@@ -320,22 +320,27 @@ export function useTrackGestures({
   }, [findTrackById, selectBlock]);
 
   // --- Other Handlers --- 
-  const handleDoubleClick = useCallback((e: React.MouseEvent, trackId: string) => {
+  const handleDoubleClick = useCallback((e: React.MouseEvent, trackId: string, clickedBeat?: number) => {
     if (dragOperation !== 'none') return; // Prevent during drag
 
     const timelineAreaRect = timelineAreaRef.current?.getBoundingClientRect();
     if (!timelineAreaRect) return;
 
-    const clickX = e.clientX - timelineAreaRect.left;
-    const clickBeat = Math.floor(clickX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP;
+    // Use passed clickedBeat if available, otherwise calculate based on event
+    const beat = clickedBeat !== undefined 
+        ? Math.floor(clickedBeat / GRID_SNAP) * GRID_SNAP
+        : ( () => {
+            const clickX = e.clientX - timelineAreaRect.left;
+            return Math.floor(clickX / effectivePixelsPerBeat / GRID_SNAP) * GRID_SNAP;
+          })();
 
     const targetTrack = findTrackById(trackId);
     if (!targetTrack) return;
 
     const newBlock: MIDIBlock = {
       id: `block-${Date.now()}`,
-      startBeat: clickBeat,
-      endBeat: clickBeat + 4,
+      startBeat: beat, // Use calculated/passed beat
+      endBeat: beat + 4, // Use calculated/passed beat
       notes: []
     };
 
