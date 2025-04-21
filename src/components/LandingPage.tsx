@@ -88,12 +88,12 @@ export default function LandingPage() {
           Cabin Visuals
         </Link>
         <nav className="flex items-center gap-6">
-          <Link href="/projects" className="text-sm font-medium">
+          {/* <Link href="/projects" className="text-sm font-medium">
             Projects
           </Link>
           <Link href="#" className="text-sm font-medium">
             About
-          </Link>
+          </Link> */}
           <Button
             onClick={focusEmailInput}
             className="btn-header-waitlist rounded-full bg-transparent border border-white text-white transition-colors"
