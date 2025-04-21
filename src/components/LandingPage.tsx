@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useRef } from "react"
 import Link from "next/link"
 import { ArrowDown, ArrowRight, AlertCircle, Twitter, Instagram, Youtube, Github } from "lucide-react"
-import { Button } from "@/components/ui/button" // Ensure path alias @/ is configured
+import { Button } from "../components/ui/button" // Ensure path alias @/ is configured
 
 export default function LandingPage() {
   const videoSectionRef = useRef<HTMLElement>(null)
@@ -170,7 +170,7 @@ export default function LandingPage() {
         <section
           ref={videoSectionRef}
           id="demo-video"
-          className="container py-24 flex flex-col items-center justify-center mx-auto px-4 sm:px-6 lg:px-8" {/* Added container padding */}
+          className="container py-24 flex flex-col items-center justify-center mx-auto px-4 sm:px-6 lg:px-8"
         >
           <div className="w-full max-w-5xl aspect-video rounded-xl overflow-hidden border border-gray-800 glow-subtle">
             <div className="relative w-full h-full bg-gray-900 flex items-center justify-center">
@@ -185,183 +185,11 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-
-        {/* 
-        Interface Section - Commented out as requested
-        <section className="container py-24 mx-auto px-4 sm:px-6 lg:px-8"> 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold">Make visuals the same way you make music.</h2>
-              <p className="text-xl text-gray-300">
-                Our DAW-like interface makes it easy to sync visuals with each instrument.
-              </p>
-            </div>
-            <div className="rounded-xl overflow-hidden border border-gray-800 glow-subtle">
-              <Image
-                src="/sonic-futura-interface.png" // Ensure this image exists in /public
-                width={800}
-                height={600}
-                alt="Cabin Visuals Interface"
-                className="w-full h-auto"
-                // Consider adding priority={true} if above the fold
-              />
-            </div>
-          </div>
-        </section>
-        */}
-
-        {/*
-        Presets Section - Commented out as requested
-        <section className="container py-24 bg-black/30 mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div className="order-2 md:order-1 rounded-xl overflow-hidden border border-gray-800 glow-subtle">
-              <Image
-                src="/sonic-spectrum.png" // Ensure this image exists in /public
-                width={800}
-                height={600}
-                alt="Stunning Visual Presets"
-                className="w-full h-auto"
-              />
-            </div>
-            <div className="order-1 md:order-2 space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold">Stunning presets</h2>
-              <p className="text-xl text-gray-300">
-                Beautiful stock synths make it effortless to create stunning visuals.
-              </p>
-            </div>
-          </div>
-        </section>
-        */}
-
-        {/*
-        Video Export Section - Commented out as requested
-        <section className="container py-24 mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold">Video Export</h2>
-              <p className="text-xl text-gray-300">
-                Easily share on social media with built-in video export to TikTok, Instagram, and YouTube.
-              </p>
-            </div>
-            <div className="rounded-xl overflow-hidden border border-gray-800 glow-subtle">
-              <Image
-                src="/social-export-panel.png" // Ensure this image exists in /public
-                width={800}
-                height={600}
-                alt="Video Export Interface"
-                className="w-full h-auto"
-              />
-            </div>
-          </div>
-        </section>
-        */}
       </main>
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-gray-800 mt-16">
         <div className="container py-12 mx-auto px-4 sm:px-6 lg:px-8"> {/* Added container padding */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="space-y-4">
-              <Link href="/" className="font-medium text-xl">
-                Cabin Visuals
-              </Link>
-              <p className="text-sm text-gray-400">
-                Turn your MIDI into stunning visuals that match your music perfectly.
-              </p>
-              <div className="flex space-x-4">
-                <a href="#" aria-label="Twitter" className="text-gray-400 hover:text-electric-blue transition-colors">
-                  <Twitter className="h-5 w-5" />
-                  <span className="sr-only">Twitter</span>
-                </a>
-                <a href="#" aria-label="Instagram" className="text-gray-400 hover:text-electric-blue transition-colors">
-                  <Instagram className="h-5 w-5" />
-                  <span className="sr-only">Instagram</span>
-                </a>
-                <a href="#" aria-label="YouTube" className="text-gray-400 hover:text-electric-blue transition-colors">
-                  <Youtube className="h-5 w-5" />
-                  <span className="sr-only">YouTube</span>
-                </a>
-                <a href="#" aria-label="GitHub" className="text-gray-400 hover:text-electric-blue transition-colors">
-                  <Github className="h-5 w-5" />
-                  <span className="sr-only">GitHub</span>
-                </a>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-medium mb-4">Product</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Features
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Pricing
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Tutorials
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Releases
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-medium mb-4">Company</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    About
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Careers
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Contact
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-medium mb-4">Legal</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Terms of Service
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-400 hover:text-electric-blue transition-colors">
-                    Cookie Policy
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-
           <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-sm text-gray-400">© {new Date().getFullYear()} Cabin Visuals. All rights reserved.</p>
             <p className="text-sm text-gray-400 mt-4 md:mt-0">Made with ♥ for musicians and visual artists</p>
