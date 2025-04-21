@@ -49,7 +49,7 @@ export default function LandingPage() {
 
   return (
     // Ensure custom CSS classes like electric-blue, glow-*, blob-*, success-*, checkmark* are defined elsewhere
-    <div className="flex min-h-screen flex-col bg-black text-white relative overflow-hidden">
+    <div className="flex min-h-screen flex-col bg-black text-white relative">
       {/* Animated background blobs */}
       <div className="blob-container">
         <div className="blob blob-1"></div>
