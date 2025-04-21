@@ -30,15 +30,6 @@
   }
 }
 
-/* @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-} */
-
 /* Blob animations */
 .blob-container {
   position: fixed;
@@ -222,4 +213,29 @@ html {
 .project-card:hover {
   box-shadow: 0 0 25px rgba(0, 168, 255, 0.3);
   transform: translateY(-2px);
+}
+
+/* Custom Button Hover Styles */
+.btn-header-waitlist:hover {
+  background-color: #00a8ff;
+  border-color: #00a8ff;
+}
+
+.btn-main-demo:hover {
+  border-color: #00a8ff;
+  background-color: rgba(0, 168, 255, 0.1); /* electric-blue with 10% opacity */
+}
+
+/* Apply hover only when not disabled for the email submit button */
+.btn-email-submit:not(:disabled):hover {
+  background-color: rgba(0, 168, 255, 0.2); /* electric-blue with 20% opacity */
+  color: #00a8ff;
+}
+
+/* Custom Input Hover Styles */
+.email-input-field:hover {
+  border-color: #00a8ff;
+  background-color: rgba(0, 0, 0, 0.5); /* Keep original background? Or match button? Let's match button */
+  background-color: rgba(0, 168, 255, 0.1);
+  box-shadow: 0 0 15px rgba(0, 168, 255, 0.5); /* Add glow effect */
 }

@@ -69,7 +69,7 @@ export default function LandingPage() {
           </Link>
           <Button
             onClick={focusEmailInput}
-            className="rounded-full bg-transparent border border-white text-white hover:bg-electric-blue hover:border-electric-blue transition-colors"
+            className="btn-header-waitlist rounded-full bg-transparent border border-white text-white transition-colors"
           >
             Join Waitlist
           </Button>
@@ -102,7 +102,7 @@ export default function LandingPage() {
                     }}
                     placeholder="Enter your email"
                     aria-label="Enter your email"
-                    className={`w-full rounded-full bg-black/50 border ${
+                    className={`email-input-field w-full rounded-full bg-black/50 border ${
                       emailState === "error" ? "border-red-500" : "border-gray-700"
                     } px-6 py-4 pr-12 text-white focus:border-electric-blue focus:ring-electric-blue focus:outline-none focus:glow-input transition-all`}
                   />
@@ -110,9 +110,9 @@ export default function LandingPage() {
                     type="submit"
                     disabled={!email.trim() || !validateEmail(email)} // Also disable if invalid format
                     aria-label="Submit email"
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full h-10 w-10 flex items-center justify-center transition-colors ${
+                    className={`btn-email-submit absolute right-2 top-1/2 -translate-y-1/2 rounded-full h-10 w-10 flex items-center justify-center transition-colors ${
                       email.trim() && validateEmail(email)
-                        ? "bg-transparent hover:bg-electric-blue/20 text-electric-blue"
+                        ? "bg-transparent text-electric-blue"
                         : "bg-transparent text-gray-500 cursor-not-allowed"
                     }`}
                   >
@@ -152,7 +152,7 @@ export default function LandingPage() {
               <Button
                 variant="outline"
                 onClick={scrollToVideo}
-                className="rounded-full px-8 border-gray-700 text-white hover:border-electric-blue hover:bg-electric-blue/10 transition-all"
+                className="btn-main-demo rounded-full px-8 border-gray-700 text-white transition-all"
               >
                 Watch Demo
               </Button>
@@ -184,17 +184,18 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+          {/* Footer */}
+      
+    <div className="container py-12 mx-auto px-4">
+        <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
+        <p className="text-sm text-gray-400">© {new Date().getFullYear()} Cabin Visuals. All rights reserved.</p>
+        <p className="text-sm text-gray-400 mt-4 md:mt-0">Made with ♥ for musicians and visual artists</p>
+        </div>
+    </div>
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-gray-800 mt-16">
-        <div className="container py-12 mx-auto px-4">
-          <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-sm text-gray-400">© {new Date().getFullYear()} Cabin Visuals. All rights reserved.</p>
-            <p className="text-sm text-gray-400 mt-4 md:mt-0">Made with ♥ for musicians and visual artists</p>
-          </div>
-        </div>
-      </footer>
+    
     </div>
   )
 } 
