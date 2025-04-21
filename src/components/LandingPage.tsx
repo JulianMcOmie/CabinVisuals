@@ -35,7 +35,6 @@ export default function LandingPage() {
     }
 
     // In a real app, you would submit to your API here
-    console.log("Email submitted (simulated):", email); // Added console log for simulation
     setEmailState("success")
   }
 
@@ -57,7 +56,7 @@ export default function LandingPage() {
         <div className="blob blob-3"></div>
       </div>
 
-      <header className="container flex h-20 items-center justify-between py-6 relative z-10 mx-auto px-4 sm:px-6 lg:px-8"> {/* Added container padding */}
+      <header className="container flex h-20 items-center justify-between py-6 relative z-10 mx-auto px-4">
         <Link href="/" className="font-medium text-xl">
           Cabin Visuals
         </Link>
@@ -78,7 +77,7 @@ export default function LandingPage() {
       </header>
 
       <main className="flex-1 relative z-10">
-        <section className="container flex flex-col items-center justify-center space-y-12 py-24 text-center md:py-32 mx-auto px-4 sm:px-6 lg:px-8"> {/* Added container padding */}
+        <section className="container flex flex-col items-center justify-center space-y-12 py-24 text-center md:py-32 mx-auto px-4">
           <div className="space-y-5">
             <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
               Turn your MIDI into
@@ -120,7 +119,7 @@ export default function LandingPage() {
                     <ArrowRight className="h-5 w-5" />
                   </button>
                   {emailState === "error" && (
-                    <div className="absolute -bottom-6 left-0 flex items-center text-red-500 text-sm mt-1"> {/* Added margin-top */}
+                    <div className="absolute -bottom-6 left-0 flex items-center text-red-500 text-sm">
                       <AlertCircle className="h-3 w-3 mr-1" />
                       {errorMessage}
                     </div>
@@ -149,7 +148,7 @@ export default function LandingPage() {
               )}
             </form>
              {/* Keep button group outside the form state */}
-            <div className="space-y-8 pt-4"> {/* Added padding top */}
+            <div className="space-y-8">
               <Button
                 variant="outline"
                 onClick={scrollToVideo}
@@ -189,7 +188,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-gray-800 mt-16">
-        <div className="container py-12 mx-auto px-4 sm:px-6 lg:px-8"> {/* Added container padding */}
+        <div className="container py-12 mx-auto px-4">
           <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-sm text-gray-400">© {new Date().getFullYear()} Cabin Visuals. All rights reserved.</p>
             <p className="text-sm text-gray-400 mt-4 md:mt-0">Made with ♥ for musicians and visual artists</p>
