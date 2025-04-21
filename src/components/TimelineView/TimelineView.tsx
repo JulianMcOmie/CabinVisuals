@@ -237,36 +237,59 @@ function TimelineView() {
   }, [selectedWindow, selectedTrackId, selectedBlockId, currentBeat, splitMidiBlock]);
 
   const handleContentMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    // Check if the click originated from the instruments column
-    if (instrumentsColumnRef.current && instrumentsColumnRef.current.contains(event.target as Node)) {
-      // If it did, let InstrumentsView handle its own mouse down and don't forward to TrackTimelineView
-      return;
-    }
-    // Otherwise, forward to TrackTimelineView as before
-    if (trackTimelineViewRef.current?.handleMouseDown) {
+    const container = event.currentTarget;
+    const rect = container.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left; // Relative X within container viewport
+    const mouseY = event.clientY - rect.top;  // Relative Y within container viewport
+
+    // Use relative coordinates for the check
+    if (mouseX > SIDEBAR_WIDTH && mouseY > HEADER_HEIGHT && trackTimelineViewRef.current?.handleMouseDown) {
       trackTimelineViewRef.current.handleMouseDown(event);
     }
   };
 
   const handleContentMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (trackTimelineViewRef.current?.handleMouseMove) {
+    const container = event.currentTarget;
+    const rect = container.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left; // Relative X
+    const mouseY = event.clientY - rect.top;  // Relative Y
+
+    // Use relative coordinates for the check
+    if (mouseX > SIDEBAR_WIDTH && mouseY > HEADER_HEIGHT && trackTimelineViewRef.current?.handleMouseMove) {
       trackTimelineViewRef.current.handleMouseMove(event);
     }
   };
 
   const handleContentDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (trackTimelineViewRef.current?.handleDoubleClick) {
+    const container = event.currentTarget;
+    const rect = container.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left; // Relative X
+    const mouseY = event.clientY - rect.top;  // Relative Y
+
+    // Use relative coordinates for the check
+    if (mouseX > SIDEBAR_WIDTH && mouseY > HEADER_HEIGHT && trackTimelineViewRef.current?.handleDoubleClick) {
       trackTimelineViewRef.current.handleDoubleClick(event);
     }
   };
 
   const handleContentContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (trackTimelineViewRef.current?.handleContextMenu) {
+    const container = event.currentTarget;
+    const rect = container.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left; // Relative X
+    const mouseY = event.clientY - rect.top;  // Relative Y
+
+    // Use relative coordinates for the check
+    if (mouseX > SIDEBAR_WIDTH && mouseY > HEADER_HEIGHT && trackTimelineViewRef.current?.handleContextMenu) {
       trackTimelineViewRef.current.handleContextMenu(event);
+    } else {
+      // Prevent default context menu in header/sidebar areas if not forwarded
+      event.preventDefault(); 
     }
   };
 
   const handleContentMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
+      // MouseLeave applies to the whole container, forward regardless of inner bounds
+      // (The internal component might need to know when the mouse leaves the scroll area)
       if (trackTimelineViewRef.current?.handleMouseLeave) {
           trackTimelineViewRef.current.handleMouseLeave(event);
       }
