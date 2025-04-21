@@ -11,7 +11,7 @@ export default function LandingPage() {
   const videoSectionRef = useRef<HTMLElement>(null)
   const emailInputRef = useRef<HTMLInputElement>(null)
   const [email, setEmail] = useState("")
-  const [emailState, setEmailState] = useState<"idle" | "error" | "success">("idle")
+  const [emailState, setEmailState] = useState<"idle" | "error" | "success" | "submitting">("idle")
   const [errorMessage, setErrorMessage] = useState("")
 
   const validateEmail = (email: string) => {
@@ -19,8 +19,12 @@ export default function LandingPage() {
     return re.test(email)
   }
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (emailState === "error") {
+        setErrorMessage("");
+        setEmailState("idle");
+    }
 
     if (!email.trim()) {
       setEmailState("error")
@@ -34,8 +38,31 @@ export default function LandingPage() {
       return
     }
 
-    // In a real app, you would submit to your API here
-    setEmailState("success")
+    setEmailState("submitting")
+    setErrorMessage("")
+
+    try {
+        const response = await fetch('/api/add-email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: email.trim() }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            setErrorMessage(data.error || `Error: ${response.statusText}`);
+            setEmailState("error");
+        } else {
+            setEmailState("success");
+        }
+    } catch (error) {
+        console.error("Failed to submit email:", error);
+        setErrorMessage("An unexpected error occurred. Please try again.");
+        setEmailState("error");
+    }
   }
 
   const scrollToVideo = () => {
@@ -105,18 +132,23 @@ export default function LandingPage() {
                     className={`email-input-field w-full rounded-full bg-black/50 border ${
                       emailState === "error" ? "border-red-500" : "border-gray-700"
                     } px-6 py-4 pr-12 text-white focus:border-electric-blue focus:ring-electric-blue focus:outline-none focus:glow-input transition-all`}
+                    disabled={emailState === "submitting" || emailState === "success"}
                   />
                   <button
                     type="submit"
-                    disabled={!email.trim() || !validateEmail(email)} // Also disable if invalid format
+                    disabled={!email.trim() || !validateEmail(email) || emailState === "submitting" || emailState === "success"}
                     aria-label="Submit email"
                     className={`btn-email-submit absolute right-2 top-1/2 -translate-y-1/2 rounded-full h-10 w-10 flex items-center justify-center transition-colors ${
-                      email.trim() && validateEmail(email)
-                        ? "bg-transparent text-electric-blue"
+                      email.trim() && validateEmail(email) && emailState !== "submitting" && emailState !== "success"
+                        ? "bg-transparent text-electric-blue hover:bg-electric-blue/10"
                         : "bg-transparent text-gray-500 cursor-not-allowed"
                     }`}
                   >
-                    <ArrowRight className="h-5 w-5" />
+                    {emailState === "submitting" ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    ) : (
+                        <ArrowRight className="h-5 w-5" />
+                    )}
                   </button>
                   {emailState === "error" && (
                     <div className="absolute -bottom-6 left-0 flex items-center text-red-500 text-sm">
