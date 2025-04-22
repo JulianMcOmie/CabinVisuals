@@ -158,7 +158,7 @@ class GlowSynth extends Synthesizer {
                 const lightness = 50;
                 return `hsl(${hue.toFixed(0)}, ${saturation}%, ${lightness}%)`;
             })
-            .withOpacity((ctx: MappingContext) => ctx.adsrAmplitude ?? 0)
+            .withOpacity((ctx: MappingContext) => (ctx.adsrAmplitude ?? 0) * (ctx.note.velocity * 2))
             .applyADSR((noteCtx: NoteContext) => ({ 
                 attack: this.getPropertyValue<number>('attack') ?? 0.01,
                 decay: this.getPropertyValue<number>('decay') ?? 0.5,

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -189,7 +190,7 @@ export const useZoomScroll = ({
 
             return () => clearTimeout(timeoutId);
         }
-    }, [pixelsPerBeat, pixelsPerSemitone, numMeasures, editorRef]); // Dependencies
+    }, [pixelsPerBeat, pixelsPerSemitone, numMeasures, editorRef]); // Dependencies // eslint-disable-line react-hooks/exhaustive-deps
 
     // Scroll handler for the grid element
     const handleGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -197,8 +198,8 @@ export const useZoomScroll = ({
         if (zoomScrollAdjustmentRef.current.isAdjusting) {
             return;
         }
-        setScrollX(e.currentTarget.scrollLeft);
-        setScrollY(e.currentTarget.scrollTop);
+        // setScrollX(e.currentTarget.scrollLeft);
+        // setScrollY(e.currentTarget.scrollTop);
     }, []); // No dependencies needed as it only uses the ref and setters
 
     return {

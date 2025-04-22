@@ -86,11 +86,11 @@ export const findNoteAt = (
   blockDuration: number
 ): { note: MIDINote, area: 'start' | 'end' | 'body' } | null => {
   // --- NEW DEBUG LOG --- 
-  console.log(`[findNoteAt] Received blockStartBeat: ${blockStartBeat}`);
+  //console.log(`[findNoteAt] Received blockStartBeat: ${blockStartBeat}`);
   // --- END NEW DEBUG LOG --- 
 
   // --- DEBUG LOG --- 
-  console.log(`[findNoteAt] Checking coords x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
+  //console.log(`[findNoteAt] Checking coords x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
   // --- END DEBUG LOG --- 
 
   // Helper function to check a single note (to avoid code duplication)
@@ -102,7 +102,7 @@ export const findNoteAt = (
     const noteEndX = noteX + noteWidth;
 
     // --- DEBUG LOG --- 
-    console.log(`[findNoteAt] Checking note ${note.id} (beat ${note.startBeat}) at drawing bounds: x[${noteX.toFixed(2)} - ${noteEndX.toFixed(2)}] (Using note.startBeat directly)`);
+    //console.log(`[findNoteAt] Checking note ${note.id} (beat ${note.startBeat}) at drawing bounds: x[${noteX.toFixed(2)} - ${noteEndX.toFixed(2)}] (Using note.startBeat directly)`);
     // --- END DEBUG LOG --- 
 
     if (
@@ -112,19 +112,19 @@ export const findNoteAt = (
       y <= noteY + noteHeight
     ) {
       // --- DEBUG LOG --- 
-      console.log(`[findNoteAt] HIT note ${note.id}! Checking area...`);
-      console.log(`           Handle width: ${RESIZE_HANDLE_WIDTH}`);
-      console.log(`           Start check: x (${x.toFixed(2)}) <= noteX (${noteX.toFixed(2)}) + handleWidth (${RESIZE_HANDLE_WIDTH}) => ${x <= noteX + RESIZE_HANDLE_WIDTH}`);
-      console.log(`           End check:   x (${x.toFixed(2)}) >= noteEndX (${noteEndX.toFixed(2)}) - handleWidth (${RESIZE_HANDLE_WIDTH}) => ${x >= noteEndX - RESIZE_HANDLE_WIDTH}`);
+      // console.log(`[findNoteAt] HIT note ${note.id}! Checking area...`);
+      // console.log(`           Handle width: ${RESIZE_HANDLE_WIDTH}`);
+      // console.log(`           Start check: x (${x.toFixed(2)}) <= noteX (${noteX.toFixed(2)}) + handleWidth (${RESIZE_HANDLE_WIDTH}) => ${x <= noteX + RESIZE_HANDLE_WIDTH}`);
+      // console.log(`           End check:   x (${x.toFixed(2)}) >= noteEndX (${noteEndX.toFixed(2)}) - handleWidth (${RESIZE_HANDLE_WIDTH}) => ${x >= noteEndX - RESIZE_HANDLE_WIDTH}`);
       // --- END DEBUG LOG --- 
       if (x <= noteX + RESIZE_HANDLE_WIDTH) {
-        console.log(`[findNoteAt] Area: START`); // Log final decision
+        //console.log(`[findNoteAt] Area: START`); // Log final decision
         return { note, area: 'start' as const };
       } else if (x >= noteEndX - RESIZE_HANDLE_WIDTH) {
-        console.log(`[findNoteAt] Area: END`); // Log final decision
+        //console.log(`[findNoteAt] Area: END`); // Log final decision
         return { note, area: 'end' as const };
       } else {
-        console.log(`[findNoteAt] Area: BODY`); // Log final decision
+        //console.log(`[findNoteAt] Area: BODY`); // Log final decision
         return { note, area: 'body' as const };
       }
     } else {
@@ -155,7 +155,7 @@ export const findNoteAt = (
   }
   
   // --- DEBUG LOG --- 
-  console.log(`[findNoteAt] No note found at x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
+  //console.log(`[findNoteAt] No note found at x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
   // --- END DEBUG LOG --- 
   return null;
 };
@@ -166,16 +166,16 @@ export const findNoteAt = (
  */
 export const getCoordsAndDerived = (
     e: MouseEvent | React.MouseEvent, 
-    canvasRef: React.RefObject<HTMLCanvasElement>,
+    invisibleSpacerRef: React.RefObject<HTMLDivElement>,
     scrollX: number,
     scrollY: number,
     pixelsPerBeat: number,
     pixelsPerSemitone: number
 ) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
+    const invisibleSpacer = invisibleSpacerRef.current;
+    if (!invisibleSpacer) return null;
 
-    const rect = canvas.getBoundingClientRect();
+    const rect = invisibleSpacer.getBoundingClientRect();
     
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
