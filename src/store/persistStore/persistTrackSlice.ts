@@ -197,13 +197,12 @@ export const persistRemoveEffectFromTrack = async (get: () => AppState, trackId:
         if (finalTrackState?.effects) {
             const updatePromises = finalTrackState.effects.map((effect, index) => {
                 const serialized = serializeEffect(effect, trackId, index);
-                 if (!serialized) throw new Error (`Failed to serialize effect during order update: ${(effect as EffectWithId).id}`);
                  if (!effect.id) throw new Error("Effect in list has no ID during order update");
-                
+                if (!serialized) throw new Error("Failed to serialize effect during order update");
+
+                // Reorder the effects
                 const effectData: P.EffectData = { 
-                    ...serialized, 
-                    id: effect.id, 
-                    trackId: trackId, 
+                    ...serialized,
                     order: index 
                  };
                 return P.saveEffect(effectData);
