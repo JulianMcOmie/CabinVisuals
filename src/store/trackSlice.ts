@@ -3,6 +3,8 @@ import { Track, MIDIBlock, MIDINote } from '../lib/types';
 import { AppState } from './store'; // Import the combined AppState
 import Effect from '../lib/Effect'; // Import Effect class
 
+import * as Persist from '../Persistence/persistence-service';
+
 // Track Slice
 export interface TrackState {
   tracks: Track[];

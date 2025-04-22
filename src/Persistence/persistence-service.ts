@@ -59,6 +59,17 @@ export interface MidiNoteData {
     pitch: number;
 }
 
+export interface PersistedAppState {
+    projectSettings: ProjectSettings;
+    tracks: Array<TrackData & {
+        synth: SynthData | null;
+        effects: EffectData[];
+        midiBlocks: Array<MidiBlockData & {
+            notes: MidiNoteData[];
+        }>;
+    }>;
+}
+
 
 
 // --- IndexedDB Configuration ---
@@ -322,15 +333,85 @@ export async function setCurrentProjectId(projectId: string | null): Promise<voi
 
 // --- Loading ---
 
-export async function loadFullProject(projectId: string): Promise<any | null> {
-    // This needs to load data from:
-    // projectSettings, tracks (filtered by projectId), trackSynths,
-    // trackEffects (filtered by trackId), midiBlocks (filtered by trackId),
-    // midiNotes (filtered by blockId)
-    // Then assemble into an object suitable for hydrating Zustand state
-    console.warn("loadFullProject not implemented");
-    // Placeholder:
-    return null;
+
+
+export async function loadFullProject(projectId: string): Promise<PersistedAppState | null> {
+    const storesToRead = [
+        STORE_PROJECT_SETTINGS,
+        STORE_TRACKS,
+        STORE_TRACK_SYNTHS,
+        STORE_TRACK_EFFECTS,
+        STORE_MIDI_BLOCKS,
+        STORE_MIDI_NOTES
+    ];
+
+    try {
+        return await performMultiStoreDbOperation(storesToRead, 'readonly', async (transaction) => {
+            const settingsStore = transaction.objectStore(STORE_PROJECT_SETTINGS);
+            const tracksStore = transaction.objectStore(STORE_TRACKS);
+            const synthsStore = transaction.objectStore(STORE_TRACK_SYNTHS);
+            const effectsStore = transaction.objectStore(STORE_TRACK_EFFECTS);
+            const blocksStore = transaction.objectStore(STORE_MIDI_BLOCKS);
+            const notesStore = transaction.objectStore(STORE_MIDI_NOTES);
+
+            const tracksIndex = tracksStore.index(IDX_PROJECT_ID);
+            const effectsIndex = effectsStore.index(IDX_TRACK_ID);
+            const blocksIndex = blocksStore.index(IDX_TRACK_ID);
+            const notesIndex = notesStore.index(IDX_BLOCK_ID);
+
+            // 1. Load Project Settings
+            const projectSettings = await promisifyRequest<ProjectSettings | undefined>(settingsStore.get(projectId));
+            if (!projectSettings) {
+                console.error(`No project settings found for projectId: ${projectId}`);
+                return null; // Or throw an error
+            }
+
+            // 2. Load Tracks for the project
+            const tracksData = await promisifyRequest<TrackData[]>(tracksIndex.getAll(projectId));
+            tracksData.sort((a, b) => a.order - b.order); // Ensure tracks are ordered
+
+            const hydratedTracks = [];
+
+            // 3. For each track, load its related data
+            for (const track of tracksData) {
+                const trackId = track.id;
+
+                // Load Synth
+                const synthData = await promisifyRequest<SynthData | undefined>(synthsStore.get(trackId));
+
+                // Load Effects
+                const effectsData = await promisifyRequest<EffectData[]>(effectsIndex.getAll(trackId));
+                effectsData.sort((a, b) => a.order - b.order); // Ensure effects are ordered
+
+                // Load MIDI Blocks
+                const blocksData = await promisifyRequest<MidiBlockData[]>(blocksIndex.getAll(trackId));
+                const hydratedBlocks = [];
+
+                // For each block, load its notes
+                for (const block of blocksData) {
+                    const blockId = block.id;
+                    const notesData = await promisifyRequest<MidiNoteData[]>(notesIndex.getAll(blockId));
+                    hydratedBlocks.push({ ...block, notes: notesData });
+                }
+                hydratedBlocks.sort((a, b) => a.startBeat - b.startBeat); // Ensure blocks are ordered by start beat
+
+                hydratedTracks.push({
+                    ...track,
+                    synth: synthData ?? null,
+                    effects: effectsData,
+                    midiBlocks: hydratedBlocks
+                });
+            }
+
+            return {
+                projectSettings,
+                tracks: hydratedTracks
+            };
+        });
+    } catch (error) {
+        console.error(`Error loading full project ${projectId}:`, error);
+        return null;
+    }
 }
 
 // --- Saving/Updating ---
