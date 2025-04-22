@@ -48,11 +48,11 @@ export interface MidiBlockData {
     trackId: string;
     startBeat: number;
     endBeat: number;
+    notes: MidiNoteData[];
 }
 
 export interface MidiNoteData {
     id: string;
-    blockId: string;
     startBeat: number;
     duration: number;
     velocity: number;
@@ -64,9 +64,7 @@ export interface PersistedAppState {
     tracks: Array<TrackData & {
         synth: SynthData | null;
         effects: EffectData[];
-        midiBlocks: Array<MidiBlockData & {
-            notes: MidiNoteData[];
-        }>;
+        midiBlocks: Array<MidiBlockData>;
     }>;
 }
 
@@ -84,11 +82,9 @@ const STORE_TRACKS = 'tracks';
 const STORE_TRACK_SYNTHS = 'trackSynths';
 const STORE_TRACK_EFFECTS = 'trackEffects';
 const STORE_MIDI_BLOCKS = 'midiBlocks';
-const STORE_MIDI_NOTES = 'midiNotes';
 
 const IDX_PROJECT_ID = 'projectId';
 const IDX_TRACK_ID = 'trackId';
-const IDX_BLOCK_ID = 'blockId';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -135,10 +131,6 @@ function getDb(): Promise<IDBDatabase> {
             if (!db.objectStoreNames.contains(STORE_MIDI_BLOCKS)) {
                 const blockStore = db.createObjectStore(STORE_MIDI_BLOCKS, { keyPath: 'id' });
                 blockStore.createIndex(IDX_TRACK_ID, 'trackId', { unique: false });
-            }
-            if (!db.objectStoreNames.contains(STORE_MIDI_NOTES)) {
-                const noteStore = db.createObjectStore(STORE_MIDI_NOTES, { keyPath: 'id' });
-                noteStore.createIndex(IDX_BLOCK_ID, 'blockId', { unique: false });
             }
         };
     });
@@ -225,8 +217,7 @@ export async function deleteProject(projectId: string): Promise<void> {
          STORE_TRACK_SYNTHS,
          STORE_TRACK_EFFECTS,
          STORE_MIDI_BLOCKS,
-         STORE_MIDI_NOTES,
-         STORE_APP_CONFIG // Include app config to check current project ID
+         STORE_APP_CONFIG
      ];
 
      await performMultiStoreDbOperation(allStores, 'readwrite', async (transaction) => {
@@ -236,13 +227,11 @@ export async function deleteProject(projectId: string): Promise<void> {
          const synthsStore = transaction.objectStore(STORE_TRACK_SYNTHS);
          const effectsStore = transaction.objectStore(STORE_TRACK_EFFECTS);
          const blocksStore = transaction.objectStore(STORE_MIDI_BLOCKS);
-         const notesStore = transaction.objectStore(STORE_MIDI_NOTES);
          const appConfigStore = transaction.objectStore(STORE_APP_CONFIG);
 
          const tracksIndex = tracksStore.index(IDX_PROJECT_ID);
          const blocksIndex = blocksStore.index(IDX_TRACK_ID);
          const effectsIndex = effectsStore.index(IDX_TRACK_ID);
-         const notesIndex = notesStore.index(IDX_BLOCK_ID);
 
          const deletePromises: Promise<any>[] = [];
 
@@ -251,16 +240,12 @@ export async function deleteProject(projectId: string): Promise<void> {
 
          // 2. For each track, cascade delete its related data
          for (const trackId of trackIds) {
-             // Delete notes within blocks
+             // Find blocks to delete
              const blockIds = await promisifyRequest(blocksIndex.getAllKeys(trackId));
-             for (const blockId of blockIds) {
-                 const noteIds = await promisifyRequest(notesIndex.getAllKeys(blockId));
-                 noteIds.forEach(noteId => {
-                     deletePromises.push(promisifyRequestSimple(notesStore.delete(noteId)));
-                 });
-                 // Delete the block
+             // Delete the blocks (implicitly deletes notes)
+             blockIds.forEach(blockId => {
                  deletePromises.push(promisifyRequestSimple(blocksStore.delete(blockId)));
-             }
+             });
 
              // Delete effects
              const effectIds = await promisifyRequest(effectsIndex.getAllKeys(trackId));
@@ -333,8 +318,6 @@ export async function setCurrentProjectId(projectId: string | null): Promise<voi
 
 // --- Loading ---
 
-
-
 export async function loadFullProject(projectId: string): Promise<PersistedAppState | null> {
     const storesToRead = [
         STORE_PROJECT_SETTINGS,
@@ -342,7 +325,6 @@ export async function loadFullProject(projectId: string): Promise<PersistedAppSt
         STORE_TRACK_SYNTHS,
         STORE_TRACK_EFFECTS,
         STORE_MIDI_BLOCKS,
-        STORE_MIDI_NOTES
     ];
 
     try {
@@ -352,12 +334,10 @@ export async function loadFullProject(projectId: string): Promise<PersistedAppSt
             const synthsStore = transaction.objectStore(STORE_TRACK_SYNTHS);
             const effectsStore = transaction.objectStore(STORE_TRACK_EFFECTS);
             const blocksStore = transaction.objectStore(STORE_MIDI_BLOCKS);
-            const notesStore = transaction.objectStore(STORE_MIDI_NOTES);
 
             const tracksIndex = tracksStore.index(IDX_PROJECT_ID);
             const effectsIndex = effectsStore.index(IDX_TRACK_ID);
             const blocksIndex = blocksStore.index(IDX_TRACK_ID);
-            const notesIndex = notesStore.index(IDX_BLOCK_ID);
 
             // 1. Load Project Settings
             const projectSettings = await promisifyRequest<ProjectSettings | undefined>(settingsStore.get(projectId));
@@ -383,23 +363,15 @@ export async function loadFullProject(projectId: string): Promise<PersistedAppSt
                 const effectsData = await promisifyRequest<EffectData[]>(effectsIndex.getAll(trackId));
                 effectsData.sort((a, b) => a.order - b.order); // Ensure effects are ordered
 
-                // Load MIDI Blocks
+                // Load MIDI Blocks (which now include notes)
                 const blocksData = await promisifyRequest<MidiBlockData[]>(blocksIndex.getAll(trackId));
-                const hydratedBlocks = [];
-
-                // For each block, load its notes
-                for (const block of blocksData) {
-                    const blockId = block.id;
-                    const notesData = await promisifyRequest<MidiNoteData[]>(notesIndex.getAll(blockId));
-                    hydratedBlocks.push({ ...block, notes: notesData });
-                }
-                hydratedBlocks.sort((a, b) => a.startBeat - b.startBeat); // Ensure blocks are ordered by start beat
+                blocksData.sort((a, b) => a.startBeat - b.startBeat); // Ensure blocks are ordered
 
                 hydratedTracks.push({
                     ...track,
                     synth: synthData ?? null,
                     effects: effectsData,
-                    midiBlocks: hydratedBlocks
+                    midiBlocks: blocksData
                 });
             }
 
@@ -425,7 +397,6 @@ export async function saveProjectSettings(projectSettingsData: ProjectSettings):
          });
      });
 }
-
 
 export async function saveTrack(trackData: TrackData): Promise<void> {
      await performDbOperation(STORE_TRACKS, 'readwrite', store => {
@@ -467,17 +438,6 @@ export async function saveMidiBlock(blockData: MidiBlockData): Promise<void> {
      });
 }
 
-export async function saveMidiNote(noteData: MidiNoteData): Promise<void> {
-     await performDbOperation(STORE_MIDI_NOTES, 'readwrite', store => {
-         return new Promise((resolve, reject) => {
-             const request = store.put(noteData);
-             request.onsuccess = () => resolve(request.result);
-             request.onerror = () => reject(request.error);
-         });
-     });
-}
-
-
 // --- Deleting Granular Data ---
 
 export async function deleteTrack(trackId: string): Promise<void> {
@@ -486,7 +446,6 @@ export async function deleteTrack(trackId: string): Promise<void> {
         STORE_TRACK_SYNTHS,
         STORE_TRACK_EFFECTS,
         STORE_MIDI_BLOCKS,
-        STORE_MIDI_NOTES
     ];
 
     await performMultiStoreDbOperation(storesToModify, 'readwrite', async (transaction) => {
@@ -494,38 +453,30 @@ export async function deleteTrack(trackId: string): Promise<void> {
         const synthsStore = transaction.objectStore(STORE_TRACK_SYNTHS);
         const effectsStore = transaction.objectStore(STORE_TRACK_EFFECTS);
         const blocksStore = transaction.objectStore(STORE_MIDI_BLOCKS);
-        const notesStore = transaction.objectStore(STORE_MIDI_NOTES);
 
         const blocksIndex = blocksStore.index(IDX_TRACK_ID);
         const effectsIndex = effectsStore.index(IDX_TRACK_ID);
-        const notesIndex = notesStore.index(IDX_BLOCK_ID);
 
         const deletePromises: Promise<any>[] = [];
 
-        // 1. Find and delete notes within blocks of this track
-        const blockIds = await promisifyRequest(blocksIndex.getAllKeys(trackId));
-        for (const blockId of blockIds) {
-            const noteIds = await promisifyRequest(notesIndex.getAllKeys(blockId));
-            noteIds.forEach(noteId => {
-                deletePromises.push(promisifyRequestSimple(notesStore.delete(noteId)));
-            });
-            // 2. Delete the block itself
+        // 1. Find and delete blocks (implicitly deletes notes)
+        const blockIds = await promisifyRequest<IDBValidKey[]>(blocksIndex.getAllKeys(trackId));
+        blockIds.forEach(blockId => {
             deletePromises.push(promisifyRequestSimple(blocksStore.delete(blockId)));
-        }
+        });
 
-        // 3. Find and delete effects associated with this track
+        // 2. Find and delete effects
         const effectIds = await promisifyRequest(effectsIndex.getAllKeys(trackId));
         effectIds.forEach(effectId => {
             deletePromises.push(promisifyRequestSimple(effectsStore.delete(effectId)));
         });
 
-        // 4. Delete the synth associated with this track
+        // 3. Delete the synth
         deletePromises.push(promisifyRequestSimple(synthsStore.delete(trackId)));
 
-        // 5. Delete the track metadata itself
+        // 4. Delete the track metadata
         deletePromises.push(promisifyRequestSimple(tracksStore.delete(trackId)));
 
-        // Wait for all delete operations in this transaction to complete
         await Promise.all(deletePromises);
     });
     console.log(`Cascading delete complete for track: ${trackId}`);
@@ -538,32 +489,10 @@ export async function deleteEffect(effectId: string): Promise<void> {
 }
 
 export async function deleteMidiBlock(blockId: string): Promise<void> {
-    const storesToModify = [STORE_MIDI_BLOCKS, STORE_MIDI_NOTES];
-    await performMultiStoreDbOperation(storesToModify, 'readwrite', async (transaction) => {
-        const blocksStore = transaction.objectStore(STORE_MIDI_BLOCKS);
-        const notesStore = transaction.objectStore(STORE_MIDI_NOTES);
-        const notesIndex = notesStore.index(IDX_BLOCK_ID);
-
-        const deletePromises: Promise<any>[] = [];
-
-        // 1. Find and delete notes within this block
-        const noteIds = await promisifyRequest(notesIndex.getAllKeys(blockId));
-        noteIds.forEach(noteId => {
-            deletePromises.push(promisifyRequestSimple(notesStore.delete(noteId)));
-        });
-
-        // 2. Delete the block itself
-        deletePromises.push(promisifyRequestSimple(blocksStore.delete(blockId)));
-
-        // Wait for all delete operations in this transaction to complete
-        await Promise.all(deletePromises);
+    await performDbOperation(STORE_MIDI_BLOCKS, 'readwrite', store => {
+         return promisifyRequestSimple(store.delete(blockId));
     });
-}
-
-export async function deleteMidiNote(noteId: string): Promise<void> {
-     await performDbOperation(STORE_MIDI_NOTES, 'readwrite', store => {
-         return promisifyRequestSimple(store.delete(noteId));
-     });
+     console.log(`Cascading delete complete for block: ${blockId}`);
 }
 
 // --- Helper Functions ---

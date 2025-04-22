@@ -4,10 +4,11 @@ import * as P from '../../Persistence/persistence-service';
 import {
     trackToTrackData,
     midiBlockToData,
-    midiNoteToData,
     serializeSynth,
     serializeEffect
 } from '../../utils/persistenceUtils';
+
+
 
 const logError = (action: string, error: any) => {
     console.error(`Persistence Error [${action}]:`, error);
@@ -61,12 +62,6 @@ export const persistAddMidiBlock = async (get: () => AppState, trackId: string, 
     try {
         const blockData = midiBlockToData(block, trackId);
         await P.saveMidiBlock(blockData);
-
-        const notePromises = block.notes.map(note => {
-            const noteData = midiNoteToData(note, block.id);
-            return P.saveMidiNote(noteData);
-        });
-        await Promise.all(notePromises);
     } catch (error) {
         logError('addMidiBlock', error);
     }
@@ -76,12 +71,6 @@ export const persistUpdateMidiBlock = async (get: () => AppState, trackId: strin
     try {
         const blockData = midiBlockToData(updatedBlock, trackId);
         await P.saveMidiBlock(blockData);
-
-        const notePromises = updatedBlock.notes.map(note => {
-             const noteData = midiNoteToData(note, updatedBlock.id);
-             return P.saveMidiNote(noteData);
-        });
-        await Promise.all(notePromises);
     } catch (error) {
         logError('updateMidiBlock', error);
     }
@@ -265,17 +254,11 @@ export const persistSplitMidiBlock = async (get: () => AppState, trackId: string
 
         const savePromises = [];
 
-        // Save block 1 and its notes
+        // Save block 1 (includes its notes)
         savePromises.push(P.saveMidiBlock(midiBlockToData(block1, trackId)));
-        block1.notes.forEach(note => {
-             savePromises.push(P.saveMidiNote(midiNoteToData(note, block1.id)));
-        });
 
-        // Save block 2 and its notes
+        // Save block 2 (includes its notes)
         savePromises.push(P.saveMidiBlock(midiBlockToData(block2, trackId)));
-        block2.notes.forEach(note => {
-            savePromises.push(P.saveMidiNote(midiNoteToData(note, block2.id)));
-        });
 
         await Promise.all(savePromises);
 
