@@ -1,28 +1,35 @@
 import { v4 as uuidv4 } from 'uuid';
+import Synthesizer from '../lib/Synthesizer';
+import Effect from '../lib/Effect';
+import { applySettings } from './persistenceUtils';
 
-// --- Placeholder Interfaces (Replace with actual imports) ---
+import { synthesizerConstructors, effectConstructors } from '../store/store';
 
-interface SynthesizerInstance {
-    getSettings(): Record<string, any>;
-    applySettings(settings: Record<string, any>): void;
-    // Assuming a constructor signature like: new (options?: any) => SynthesizerInstance;
-    constructor: { new(settings?: any): SynthesizerInstance };
+// --- Define Interfaces ---
+
+export interface ProjectMetadata {
+    id: string;
+    name: string;
 }
 
-interface EffectInstance {
-    getSettings(): Record<string, any>;
-    applySettings(settings: Record<string, any>): void;
-    // Assuming a constructor signature like: new (options?: any) => EffectInstance;
-    constructor: { new(settings?: any): EffectInstance };
+export interface ProjectSettings {
+    bpm: number;
+    isPlaying: boolean;
+    loopEnabled: boolean;
+    loopStartBeat: number | null;
+    loopEndBeat: number | null;
+    numMeasures: number;
+    isInstrumentSidebarVisible: boolean;
+    selectedWindow: string | null;
 }
 
-// TODO: Import actual Synthesizer/Effect classes and constructor maps
-const synthesizerConstructors: Record<string, { new(settings?: any): SynthesizerInstance }> = {
-    // Example: 'SimpleSynth': SimpleSynth
-};
-const effectConstructors: Record<string, { new(settings?: any): EffectInstance }> = {
-    // Example: 'Reverb': Reverb
-};
+export interface TrackData {
+    id: string;
+    projectId: string;
+    name: string;
+    isMuted: boolean;
+    isSolo: boolean;
+}
 
 
 // --- IndexedDB Configuration ---
@@ -151,7 +158,6 @@ async function performMultiStoreDbOperation<T>(
 // --- Project Level ---
 
 export async function getProjectMetadataList(): Promise<Array<{ id: string; name: string }>> {
-    console.warn("getProjectMetadataList not fully implemented");
     return performDbOperation(STORE_PROJECT_METADATA, 'readonly', store => {
         return new Promise((resolve, reject) => {
             const request = store.getAll();
@@ -162,7 +168,6 @@ export async function getProjectMetadataList(): Promise<Array<{ id: string; name
 }
 
 export async function createNewProject(name: string): Promise<string> {
-    console.warn("createNewProject not fully implemented");
     const projectId = uuidv4();
     const metadata = { id: projectId, name: name || "Untitled Project" };
 
@@ -220,7 +225,6 @@ export async function deleteProject(projectId: string): Promise<void> {
 
 
 export async function renameProject(projectId: string, newName: string): Promise<void> {
-    console.warn("renameProject not fully implemented");
      await performDbOperation(STORE_PROJECT_METADATA, 'readwrite', store => {
          return new Promise((resolve, reject) => {
              const getRequest = store.get(projectId);
@@ -275,7 +279,7 @@ export async function loadFullProject(projectId: string): Promise<any | null> {
 
 // --- Saving/Updating ---
 
-export async function saveProjectSettings(projectId: string, settings: any): Promise<void> {
+export async function saveProjectSettings(projectId: string, settings: ProjectSettings): Promise<void> {
      await performDbOperation(STORE_PROJECT_SETTINGS, 'readwrite', store => {
          return new Promise((resolve, reject) => {
             const dataToSave = { ...settings, projectId };
@@ -287,9 +291,7 @@ export async function saveProjectSettings(projectId: string, settings: any): Pro
 }
 
 
-export async function saveTrack(trackData: any): Promise<void> {
-    console.warn("saveTrack not fully implemented");
-    // trackData should match the structure in STORE_TRACKS, including id, projectId, etc.
+export async function saveTrack(trackData: TrackData): Promise<void> {
      await performDbOperation(STORE_TRACKS, 'readwrite', store => {
          return new Promise((resolve, reject) => {
              const request = store.put(trackData); // Assumes trackData has 'id' property
@@ -300,12 +302,10 @@ export async function saveTrack(trackData: any): Promise<void> {
 }
 
 export async function saveSynth(trackId: string, synthData: { type: string; settings: Record<string, any> }): Promise<void> {
-    console.warn("saveSynth not fully implemented");
-    // synthData should match the structure in STORE_TRACK_SYNTHS
      const dataToSave = { ...synthData, trackId };
      await performDbOperation(STORE_TRACK_SYNTHS, 'readwrite', store => {
          return new Promise((resolve, reject) => {
-             const request = store.put(dataToSave); // Assumes trackId is the key
+             const request = store.put(dataToSave);
              request.onsuccess = () => resolve(request.result);
              request.onerror = () => reject(request.error);
          });
@@ -402,7 +402,6 @@ export async function deleteMidiBlock(blockId: string): Promise<void> {
 }
 
 export async function deleteMidiNote(noteId: string): Promise<void> {
-    console.warn("deleteMidiNote not fully implemented");
      await performDbOperation(STORE_MIDI_NOTES, 'readwrite', store => {
          return new Promise((resolve, reject) => {
              const request = store.delete(noteId);
@@ -411,83 +410,3 @@ export async function deleteMidiNote(noteId: string): Promise<void> {
          });
      });
 }
-
-
-// --- Serialization Helpers ---
-
-export function serializeSynth(instance: SynthesizerInstance): { type: string; settings: any } | null {
-    if (!instance || typeof instance.getSettings !== 'function') {
-        console.error("Invalid synth instance provided for serialization", instance);
-        return null;
-    }
-     const constructorName = Object.keys(synthesizerConstructors).find(
-         name => instance instanceof synthesizerConstructors[name]
-     );
-    if (!constructorName) {
-        console.error("Could not find constructor name for synth instance", instance);
-        return null;
-    }
-    return {
-        type: constructorName,
-        settings: instance.getSettings(),
-    };
-}
-
-export function deserializeSynth(data: { type: string; settings: any }): SynthesizerInstance | null {
-    const Constructor = synthesizerConstructors[data.type];
-    if (!Constructor) {
-        console.error(`No synthesizer constructor found for type: ${data.type}`);
-        return null;
-    }
-    try {
-        const instance = new Constructor(); // Pass settings to constructor if needed/supported
-        if (typeof instance.applySettings === 'function') {
-            instance.applySettings(data.settings);
-        } else {
-             console.warn(`Synth type ${data.type} does not have an applySettings method.`);
-             // Potentially directly assign properties if that's the pattern
-        }
-        return instance;
-    } catch (error) {
-        console.error(`Error deserializing synthesizer type ${data.type}:`, error);
-        return null;
-    }
-}
-
-export function serializeEffect(instance: EffectInstance): { type: string; settings: any } | null {
-     if (!instance || typeof instance.getSettings !== 'function') {
-         console.error("Invalid effect instance provided for serialization", instance);
-         return null;
-     }
-      const constructorName = Object.keys(effectConstructors).find(
-          name => instance instanceof effectConstructors[name]
-      );
-     if (!constructorName) {
-         console.error("Could not find constructor name for effect instance", instance);
-         return null;
-     }
-     return {
-         type: constructorName,
-         settings: instance.getSettings(),
-     };
-}
-
-export function deserializeEffect(data: { type: string; settings: any }): EffectInstance | null {
-     const Constructor = effectConstructors[data.type];
-     if (!Constructor) {
-         console.error(`No effect constructor found for type: ${data.type}`);
-         return null;
-     }
-     try {
-         const instance = new Constructor(); // Pass settings to constructor if needed/supported
-         if (typeof instance.applySettings === 'function') {
-             instance.applySettings(data.settings);
-         } else {
-              console.warn(`Effect type ${data.type} does not have an applySettings method.`);
-         }
-         return instance;
-     } catch (error) {
-         console.error(`Error deserializing effect type ${data.type}:`, error);
-         return null;
-     }
-} 

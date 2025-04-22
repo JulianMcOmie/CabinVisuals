@@ -16,14 +16,14 @@ import { ProjectSlice, createProjectSlice, ProjectMetadata } from './projectSlic
 
 // --- Constructor Mappings --- 
 
-const synthesizerConstructors = new Map<string, new (...args: any[]) => SynthesizerInstance>();
+export const synthesizerConstructors = new Map<string, new (...args: any[]) => SynthesizerInstance>();
 Object.values(availableInstrumentsData).flat().forEach((inst: InstrumentDefinition) => {
     if (inst.constructor) { // Check if constructor exists
         synthesizerConstructors.set(inst.constructor.name, inst.constructor);
     }
 });
 
-const effectConstructors = new Map<string, new (...args: any[]) => EffectInstance>();
+export const effectConstructors = new Map<string, new (...args: any[]) => EffectInstance>();
 Object.values(availableEffectsData).flat().forEach((effect: EffectDefinition) => {
     if (effect.constructor) { // Check if constructor exists
         effectConstructors.set(effect.constructor.name, effect.constructor);
