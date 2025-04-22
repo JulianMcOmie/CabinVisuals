@@ -13,7 +13,7 @@ export interface ProjectSlice {
     currentLoadedProjectId: string | null;
     // Actions that involve persistence:
     loadProjectList: () => Promise<void>;
-    switchProject: (projectId: string) => Promise<void>; // Renamed for clarity
+    switchProject: (projectId: string) => void; // Action is now synchronous
     createNewProject: (name: string) => Promise<string | null>; // Renamed for clarity, returns ID
     renameProject: (projectId: string, newName: string) => Promise<void>; // Added
     deleteProject: (projectId: string) => Promise<void>; // Added
@@ -38,11 +38,16 @@ export const createProjectSlice: StateCreator<
              set({ projectList: [] }); // Set to empty on error
         }
     },
-    switchProject: async (projectId: string) => {
-        // Persist the change first (as this triggers reload)
-        await PersistProjectFns.persistSwitchProject(get, projectId);
-        window.location.reload(); 
-        // State update (currentLoadedProjectId) happens on reload/init
+    switchProject: (projectId: string) => {
+        // 1. Persist the change asynchronously (fire-and-forget)
+        PersistProjectFns.persistSwitchProject(get, projectId).catch(err => {
+             console.error("Failed to persist switched project ID:", err);
+        });
+
+        // 2. Update the state synchronously
+        set({ currentLoadedProjectId: projectId });
+        console.log(`Switched currentLoadedProjectId in state to: ${projectId}`);
+        // Navigation is now handled by the calling component (page.tsx)
     },
     createNewProject: async (name: string): Promise<string | null> => {
         // Create in DB first to get the ID

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Panel,
   PanelGroup,
@@ -14,37 +14,55 @@ import AudioLoader from '../../src/components/AudioLoader'; // Adjusted import p
 import InstrumentSidebar from '../../src/components/InstrumentSidebar/InstrumentSidebar'; // Adjusted import path
 import useStore from '../../src/store/store'; // Adjusted import path
 import { loadAudioFile } from '../../src/lib/idbHelper'; // Adjusted import path
+import { initializeStore } from '../../src/store/store'; // Import the store initializer
 
 // Renamed component to reflect the route
 export default function AlphaPage() { 
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
+
+  // Fetch necessary state and actions from store
   const isInstrumentSidebarVisible = useStore((state) => state.isInstrumentSidebarVisible);
   const loadAudioAction = useStore((state) => state.loadAudio);
 
+  // Initialization Effect
   useEffect(() => {
-    const attemptLoadPersistedAudio = async () => {
-      console.log('Attempting to load persisted audio from IndexedDB...');
+    const loadInitialData = async () => {
+      console.log('AlphaPage: Initializing store and loading data...');
+      setIsLoading(true); // Ensure loading state is true initially
       try {
+        // Initialize the store (loads project based on last ID)
+        await initializeStore(); 
+        
+        // Attempt to load any persisted audio file *after* store init
+        console.log('Attempting to load persisted audio from IndexedDB...');
         const persistedFile = await loadAudioFile();
         if (persistedFile) {
           console.log('Found persisted audio file, attempting to load...');
-          try {
-            const arrayBuffer = await persistedFile.arrayBuffer();
-            await loadAudioAction(arrayBuffer);
-            console.log('Successfully loaded persisted audio file into store.');
-          } catch (loadError) {
-            console.error('Error processing or loading persisted audio file:', loadError);
-          }
+          const arrayBuffer = await persistedFile.arrayBuffer();
+          // Use the action fetched via useStore
+          await loadAudioAction(arrayBuffer);
+          console.log('Successfully loaded persisted audio file into store.');
         } else {
           console.log('No persisted audio file found.');
         }
-      } catch (idbError) {
-        console.error('Error accessing IndexedDB for persisted audio:', idbError);
+      } catch (error) {
+        console.error('Initialization or audio loading failed:', error);
+        // Handle critical initialization error if needed
+      } finally {
+        setIsLoading(false); // Set loading to false when done
       }
     };
 
-    attemptLoadPersistedAudio();
-  }, [loadAudioAction]);
+    loadInitialData();
+  }, [loadAudioAction]); // Include loadAudioAction in dependency array
 
+  // Loading State Render
+  if (isLoading) {
+      // TODO: Implement a more sophisticated loading screen
+      return <div style={{ padding: '20px', textAlign: 'center', fontSize: '1.2em' }}>Loading Project...</div>;
+  }
+
+  // Main Content Render (only when not loading)
   return (
     <main className="main-container">
       <div className="playbar-container">
