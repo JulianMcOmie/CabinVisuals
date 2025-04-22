@@ -1,5 +1,5 @@
-import { Track } from '../lib/types';
-import { TrackData } from '../Persistence/persistence-service';
+import { Track, MIDIBlock, MIDINote } from '../lib/types';
+import { TrackData, MidiBlockData, MidiNoteData } from '../Persistence/persistence-service';
 import Synthesizer from '../lib/Synthesizer';
 import Effect from '../lib/Effect';
 
@@ -37,6 +37,54 @@ export const trackToTrackData = (track: Track, projectId: string, order: number)
         isMuted: track.isMuted,
         isSoloed: track.isSoloed,
         order: order, 
+    };
+};
+
+/**
+ * Converts a live MIDIBlock object from the Zustand state into the
+ * plain MidiBlockData format needed for persistence.
+ * 
+ * @param block The live MIDIBlock object.
+ * @param trackId The ID of the track the block belongs to.
+ * @returns A MidiBlockData object suitable for saving to IndexedDB.
+ */
+export const midiBlockToData = (block: MIDIBlock, trackId: string): MidiBlockData => {
+    if (!block.id || typeof block.startBeat !== 'number' || typeof block.endBeat !== 'number') {
+         throw new Error("Invalid MIDIBlock object provided for persistence conversion.");
+    }
+    if (typeof trackId !== 'string' || trackId === '') {
+         throw new Error("Invalid trackId provided for MIDIBlock persistence conversion.");
+    }
+    return {
+        id: block.id,
+        trackId: trackId,
+        startBeat: block.startBeat,
+        endBeat: block.endBeat,
+    };
+};
+
+/**
+ * Converts a live MIDINote object from the Zustand state into the
+ * plain MidiNoteData format needed for persistence.
+ * 
+ * @param note The live MIDINote object.
+ * @param blockId The ID of the block the note belongs to.
+ * @returns A MidiNoteData object suitable for saving to IndexedDB.
+ */
+export const midiNoteToData = (note: MIDINote, blockId: string): MidiNoteData => {
+     if (!note.id || typeof note.pitch !== 'number' || typeof note.velocity !== 'number' || typeof note.startBeat !== 'number' || typeof note.duration !== 'number') {
+          throw new Error("Invalid MIDINote object provided for persistence conversion.");
+     }
+      if (typeof blockId !== 'string' || blockId === '') {
+           throw new Error("Invalid blockId provided for MIDINote persistence conversion.");
+      }
+    return {
+        id: note.id,
+        blockId: blockId,
+        pitch: note.pitch,
+        velocity: note.velocity,
+        startBeat: note.startBeat,
+        duration: note.duration,
     };
 };
 
