@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
+import { persist, StateStorage } from 'zustand/middleware';
 
 // Import Slice types and creators
 import { TimeSlice, TimeState, createTimeSlice } from './timeSlice';
@@ -13,6 +13,16 @@ import { TrackSlice, TrackState, createTrackSlice } from './trackSlice';
 import { InstrumentSlice, InstrumentDefinition, InstrumentCategories, availableInstrumentsData, createInstrumentSlice } from './instrumentSlice';
 import { EffectSlice, EffectDefinition, EffectCategories, availableEffectsData, createEffectSlice } from './effectSlice';
 import { UISlice, UIState, createUISlice } from './uiSlice';
+
+// Import IndexedDB storage and project management functions
+import {
+    indexedDBStorage,
+    initializeProjects,
+    createNewProject as createNewProjectDB,
+    getProjectList as getProjectListDB,
+    switchProject as switchProjectDB,
+    getCurrentProjectId as getCurrentProjectIdDB
+} from '../Persistence/indexeddb-storage';
 
 // --- Constructor Mappings --- 
 
@@ -135,9 +145,8 @@ const useStore = create<AppState>()(
       ...createUISlice(...a),
     }),
     {
-      name: 'cabin-visuals-storage',
-      // Use the default localStorage via createJSONStorage
-      storage: createJSONStorage(() => localStorage),
+      name: 'cabin-visuals-store',
+      storage: indexedDBStorage,
 
       // Define which parts of the state to save
       partialize: (state): Partial<AppState> => {
