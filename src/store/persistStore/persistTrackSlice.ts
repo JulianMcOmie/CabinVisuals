@@ -205,6 +205,7 @@ export const persistRemoveEffectFromTrack = async (get: () => AppState, trackId:
                     ...serialized,
                     order: index 
                  };
+                 console.log(`Saving effect: ${effectData.id} with order: ${effectData.order}`);
                 return P.saveEffect(effectData);
             });
             await Promise.all(updatePromises);
