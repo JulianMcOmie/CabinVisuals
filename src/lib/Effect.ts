@@ -1,6 +1,6 @@
 import { VisualObject } from './types';
 import { Property } from './properties/Property';
-
+import { v4 as uuidv4 } from 'uuid';
 /**
  * Abstract base class for all visual effects.
  * Effects take a stream of VisualObjects and modify them based on their properties and the current time/bpm.
@@ -8,6 +8,7 @@ import { Property } from './properties/Property';
 abstract class Effect {
   // Map to store configurable properties for the effect
   public properties: Map<string, Property<any>> = new Map();
+  public id: string = uuidv4();
 
   /**
    * Abstract method that subclasses must implement to apply the effect logic.

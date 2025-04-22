@@ -2,8 +2,8 @@ import { StateCreator } from 'zustand';
 import { Track, MIDIBlock, MIDINote } from '../lib/types';
 import { AppState } from './store'; // Import the combined AppState
 import Effect from '../lib/Effect'; // Import Effect class
-
-import * as Persist from '../Persistence/persistence-service';
+import { v4 as uuidv4 } from 'uuid';
+import * as PersistFns from './persistStore/persistTrackSlice'; // Import persistence functions
 
 // Track Slice
 export interface TrackState {
@@ -130,6 +130,8 @@ export const createTrackSlice: StateCreator<
           selectedNotes: null
         };
       });
+      // Call persistence function after state update
+      PersistFns.persistAddTrack(get, track);
     },
     removeTrack: (trackId: string) => {
        set((state: TrackState & { tracks: Track[] }) => {
@@ -153,6 +155,8 @@ export const createTrackSlice: StateCreator<
             selectedNotes: selections.selectedTrack ? state.selectedNotes : null
           };
        });
+       // Call persistence function after state update
+       PersistFns.persistRemoveTrack(get, trackId);
     },
     addMidiBlock: (trackId: string, block: MIDIBlock) => {
        set((state: TrackState & { tracks: Track[] }) => {
@@ -175,6 +179,8 @@ export const createTrackSlice: StateCreator<
                 selectedBlock: selections.selectedBlock,
             };
        });
+       // Call persistence function after state update
+       PersistFns.persistAddMidiBlock(get, trackId, block);
     },
     updateMidiBlock: (trackId: string, updatedBlockData: MIDIBlock) => {
         set((state) => {
@@ -218,6 +224,8 @@ export const createTrackSlice: StateCreator<
                 selectedBlock: updatedSelections.selectedBlock 
             };
         });
+        // Call persistence function after state update
+        PersistFns.persistUpdateMidiBlock(get, trackId, updatedBlockData);
     },
     removeMidiBlock: (trackId: string, blockId: string) => {
         set((state: TrackState & { tracks: Track[] }) => {
@@ -253,6 +261,8 @@ export const createTrackSlice: StateCreator<
                  selectedBlock: selections.selectedBlock,
              };
         });
+        // Call persistence function after state update
+        PersistFns.persistRemoveMidiBlock(get, blockId);
     },
     moveMidiBlock: (blockId: string, oldTrackId: string, newTrackId: string, newStartBeat: number, newEndBeat: number) => {
       set((state) => {
@@ -303,6 +313,8 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
+      // Call persistence function after state update
+      PersistFns.persistMoveMidiBlock(get, blockId, oldTrackId, newTrackId);
     },
     selectNotes: (notes: MIDINote[]) => {
       set({ selectedNotes: notes });
@@ -328,6 +340,8 @@ export const createTrackSlice: StateCreator<
                  selectedBlock: selections.selectedBlock 
              };
        });
+       // Call persistence function after state update
+       PersistFns.persistUpdateTrack(get, trackId, updatedProperties);
     },
     reorderTracks: (draggedTrackId: string, targetTrackId: string | null) => {
       set((state: TrackState & { tracks: Track[] }) => {
@@ -366,6 +380,8 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
+      // Call persistence function after state update
+      PersistFns.persistReorderTracks(get);
     },
     setClipboardBlock: (block: MIDIBlock | null) => {
         set({ clipboardBlock: block });
@@ -388,8 +404,18 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
+      // Call persistence function after state update
+      // We pass trackId, the effect instance isn't needed by the persist fn
+      PersistFns.persistAddEffectToTrack(get, trackId);
     },
     removeEffectFromTrack: (trackId: string, effectIndex: number) => {
+      let deletedEffectId: string | null = null;
+      // Get ID *before* state update
+      const track = get().tracks.find(t => t.id === trackId);
+      if (track && track.effects && effectIndex >= 0 && effectIndex < track.effects.length) {
+          deletedEffectId = track.effects[effectIndex].id;
+      }
+
       set((state) => {
         const newTracks = state.tracks.map(track => {
           if (track.id === trackId) {
@@ -411,6 +437,12 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
+      // Call persistence function after state update
+      if (deletedEffectId) {
+          PersistFns.persistRemoveEffectFromTrack(get, trackId, deletedEffectId);
+      } else {
+           console.warn("Could not determine effect ID to delete for persistence in removeEffectFromTrack action.");
+      }
     },
     updateEffectPropertyOnTrack: (trackId: string, effectIndex: number, propertyName: string, value: any) => {
       set((state) => {
@@ -439,8 +471,11 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
+      // Call persistence function after state update
+      PersistFns.persistUpdateEffectPropertyOnTrack(get, trackId, effectIndex);
     },
     splitMidiBlock: (trackId: string, blockId: string, splitBeat: number) => {
+      let newBlockId2: string | null = null; // Need to capture the ID of the second block generated
       set((state) => {
         const tracks = state.tracks;
         const trackIndex = tracks.findIndex(t => t.id === trackId);
@@ -458,7 +493,7 @@ export const createTrackSlice: StateCreator<
         }
 
         const newBlockId1 = blockToSplit.id; // Keep original ID for the first part
-        const newBlockId2 = `block-${Date.now()}-${Math.random().toString(16).slice(2)}`; // Unique ID for the second part
+        const newBlockId2 = uuidv4(); // Unique ID for the second part
 
         const notes1: MIDINote[] = [];
         const notes2: MIDINote[] = [];
@@ -516,6 +551,12 @@ export const createTrackSlice: StateCreator<
           selectedNotes: null, // Clear note selection after split
         };
       });
+      // Call persistence function after state update
+      if (newBlockId2) {
+          PersistFns.persistSplitMidiBlock(get, trackId, blockId, newBlockId2);
+      } else {
+           console.error("Could not determine ID of second block after split for persistence.");
+      }
     },
   };
 } 

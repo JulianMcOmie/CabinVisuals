@@ -1,10 +1,9 @@
 import { Track, MIDIBlock, MIDINote } from '../lib/types';
-import { TrackData, MidiBlockData, MidiNoteData } from '../Persistence/persistence-service';
+import { TrackData, MidiBlockData, MidiNoteData, SynthData, EffectData } from '../Persistence/persistence-service';
 import Synthesizer from '../lib/Synthesizer';
 import Effect from '../lib/Effect';
 
 import { synthesizerConstructors, effectConstructors } from '../store/store';
-
 
 /**
  * Converts a live Track object from the Zustand state into the
@@ -90,7 +89,13 @@ export const midiNoteToData = (note: MIDINote, blockId: string): MidiNoteData =>
 
 // --- Serialization Helpers ---
 
-export function serializeSynth(instance: Synthesizer): { type: string; settings: any } | null {
+/**
+ * Serializes a live Synthesizer instance into SynthData format.
+ * @param instance The Synthesizer instance.
+ * @param trackId The ID of the track this synth belongs to.
+ * @returns A SynthData object or null if serialization fails.
+ */
+export function serializeSynth(instance: Synthesizer, trackId: string): SynthData | null {
     if (!instance) {
         console.error("Invalid synth instance provided for serialization", instance);
         return null;
@@ -100,6 +105,10 @@ export function serializeSynth(instance: Synthesizer): { type: string; settings:
         console.error("Could not find constructor name for synth instance", instance);
         return null;
     }
+     if (typeof trackId !== 'string' || trackId === '') {
+          console.error("Invalid trackId provided for synth serialization");
+          return null;
+     }
 
     // Serialize properties
     const settings: Record<string, any> = {};
@@ -108,6 +117,7 @@ export function serializeSynth(instance: Synthesizer): { type: string; settings:
     });
 
     return {
+        trackId: trackId,
         type: constructorName,
         settings: settings,
     };
@@ -129,12 +139,31 @@ export function deserializeSynth(data: { type: string; settings: any }): Synthes
     }
 }
 
-export function serializeEffect(instance: Effect): { type: string; settings: any } | null {
+/**
+ * Serializes a live Effect instance into EffectData format.
+ * @param instance The Effect instance (must have an 'id' property).
+ * @param trackId The ID of the track this effect belongs to.
+ * @param order The order of this effect in the track's chain.
+ * @returns An EffectData object or null if serialization fails.
+ */
+export function serializeEffect(instance: Effect, trackId: string, order: number): EffectData | null {
+     if (!instance) {
+         console.error("Invalid effect instance provided for serialization", instance);
+         return null;
+     }
     const constructorName = instance.constructor.name;
     if (!constructorName) {
         console.error("Could not find constructor name for effect instance", instance);
         return null;
     }
+     if (typeof trackId !== 'string' || trackId === '') {
+          console.error("Invalid trackId provided for effect serialization");
+          return null;
+     }
+      if (typeof order !== 'number' || !Number.isInteger(order) || order < 0) {
+           console.error("Invalid order provided for effect serialization");
+           return null;
+      }
 
      const settings: Record<string, any> = {};
      instance.properties.forEach((property, key) => {
@@ -142,6 +171,9 @@ export function serializeEffect(instance: Effect): { type: string; settings: any
      });
 
      return {
+         id: instance.id,
+         trackId: trackId,
+         order: order,
          type: constructorName,
          settings: settings,
      };
