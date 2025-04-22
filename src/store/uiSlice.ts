@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from './store';
+import { persistProjectSettings } from './persistStore/persistProjectSettings';
 
 export type SelectedWindowType = 'midiEditor' | 'timelineView' | 'instrumentsView' |null;
 export interface UIState {
@@ -22,8 +23,14 @@ export const createUISlice: StateCreator<
 > = (set, get) => ({
   isInstrumentSidebarVisible: true,
   selectedWindow: null,
-  toggleInstrumentSidebar: () => set((state) => ({ 
-    isInstrumentSidebarVisible: !state.isInstrumentSidebarVisible 
-  })),
-  setSelectedWindow: (window: SelectedWindowType) => set({ selectedWindow: window }),
+  toggleInstrumentSidebar: () => {
+    set((state) => ({ 
+      isInstrumentSidebarVisible: !state.isInstrumentSidebarVisible 
+    }));
+    persistProjectSettings(get);
+  },
+  setSelectedWindow: (window: SelectedWindowType) => {
+    set({ selectedWindow: window });
+    persistProjectSettings(get);
+  },
 }); 
