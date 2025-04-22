@@ -1,7 +1,6 @@
 "use client"
 import Image from "next/image"
 import { LogOut, ExternalLink, Plus, FileText } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,20 +42,18 @@ export default function ProjectsPage() {
   return (
     <div className={styles.pageContainer}>
       {/* Animated background blobs */}
-      <div className="blob-container">
-        <div className="blob blob-1"></div>
-        <div className="blob blob-2"></div>
-        <div className="blob blob-3"></div>
+      <div className={styles.blobContainer}>
+        <div className={styles.blob1}></div>
+        <div className={styles.blob2}></div>
+        <div className={styles.blob3}></div>
       </div>
 
-      <header className="container flex h-20 items-center justify-between py-6 relative z-10">
-        <h1 className="font-medium text-xl">Projects</h1>
-        <nav className="flex items-center gap-6">
+      <header className={styles.header}>
+        <h1 className={styles.headerTitle}>Projects</h1>
+        <nav className={styles.headerNav}>
           <DropdownMenu>
-            <DropdownMenuTrigger className="focus:outline-none">
-              <div className="h-10 w-10 rounded-full bg-electric-blue/20 flex items-center justify-center cursor-pointer hover:bg-electric-blue/30 transition-colors">
-                <span className="text-sm font-medium">JS</span>
-              </div>
+            <DropdownMenuTrigger className={styles.dropdownTriggerPlaceholder}>
+              <span className={styles.dropdownTriggerText}>JS</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800">
               <div className="px-3 py-2 text-sm">
@@ -78,11 +75,11 @@ export default function ProjectsPage() {
         </nav>
       </header>
 
-      <div className="container flex justify-end mt-4 mb-8 relative z-10">
-        <Button className="rounded-full bg-electric-blue hover:bg-electric-blue/80 text-white">
-          <Plus className="h-4 w-4 mr-2" />
+      <div className={styles.buttonContainer}>
+        <button className={styles.createProjectButton}>
+          <Plus height={16} width={16} style={{ marginRight: '0.5rem' }} />
           Create Project
-        </Button>
+        </button>
       </div>
 
       <main className={styles.mainContent}>
