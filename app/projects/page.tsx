@@ -1,6 +1,6 @@
 "use client"
 import Image from "next/image"
-import { LogOut, ExternalLink, Plus, FileText } from "lucide-react"
+import { LogOut, ExternalLink, Plus, FileText, MessageSquare } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,21 +49,20 @@ export default function ProjectsPage() {
       </div>
 
       <header className={styles.header}>
-        <h1 className={styles.headerTitle}>Projects</h1>
+        <h1 className={`${styles.headerTitle} font-extrabold`}>Projects</h1>
         <nav className={styles.headerNav}>
           <DropdownMenu>
             <DropdownMenuTrigger className={styles.dropdownTriggerPlaceholder}>
               <span className={styles.dropdownTriggerText}>JS</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800">
-              <div className="px-3 py-2 text-sm">
-                <p className="font-medium">John Smith</p>
-                <p className="text-gray-400">john@example.com</p>
+              <div className="px-3 py-2 text-sm text-white">
+                <p className="text-gray-300">john@example.com</p>
               </div>
               <DropdownMenuSeparator className="bg-gray-800" />
-              <DropdownMenuItem className="flex items-center cursor-pointer">
+              <DropdownMenuItem className="flex items-center cursor-pointer text-white hover:bg-gray-700">
                 <ExternalLink className="h-4 w-4 mr-2" />
-                <span>Discord</span>
+                <span>Discord Community</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-gray-800" />
               <DropdownMenuItem className="flex items-center text-red-400 cursor-pointer">

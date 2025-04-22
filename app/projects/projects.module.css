@@ -147,6 +147,7 @@
   font-size: 0.875rem; /* text-sm */
   font-weight: 500; /* font-medium */
   line-height: 1.25rem;
+  /* Added box-shadow transition, made faster */
   transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
   cursor: pointer;
   /* Your specific styles */
@@ -157,8 +158,10 @@
 }
 
 .createProjectButton:hover {
-  background-color: #00a8ff; /* Ensure base color */
-  opacity: 0.8; /* hover:bg-electric-blue/80 */
+  /* Changed to a lighter blue on hover and removed opacity */
+  background-color: #33bfff; /* Lighter blue */
+  /* Added glow effect */
+  box-shadow: 0 0 15px 5px rgba(0, 168, 255, 0.4); /* Adjust color, spread, blur as needed */
 }
 
 .createProjectButton svg { /* Style the Plus icon */
