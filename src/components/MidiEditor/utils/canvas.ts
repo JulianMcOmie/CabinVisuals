@@ -27,6 +27,8 @@ export const drawMidiEditor = (
   isDragging: boolean,
   pixelsPerBeat: number,
   pixelsPerSemitone: number,
+  scrollX: number,
+  scrollY: number,
   currentBeat: number
 ): void => {
   // Calculate total beats for grid drawing
@@ -131,7 +133,19 @@ const drawNotes = (
   blockStartBeat: number
 ): void => {
   notes.forEach(note => {
-    const noteX = (note.startBeat + blockStartBeat) * pixelsPerBeat;
+    drawNote(ctx, note, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, blockStartBeat);
+  });
+};
+
+const drawNote = (  
+  ctx: CanvasRenderingContext2D,
+  note: MIDINote,
+  selectedNoteIds: string[],
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number,
+  blockStartBeat: number
+) => {
+  const noteX = (note.startBeat + blockStartBeat) * pixelsPerBeat;
     const noteY = (KEY_COUNT - (note.pitch - LOWEST_NOTE) - 1) * pixelsPerSemitone;
     const noteWidth = note.duration * pixelsPerBeat;
     const noteHeight = pixelsPerSemitone;
@@ -166,9 +180,7 @@ const drawNotes = (
     ctx.strokeStyle = 'rgba(0,0,0,0.2)';
     ctx.lineWidth = 1;
     ctx.stroke();
-  });
 };
-
 /**
  * Draws the selection box
  */
