@@ -9,36 +9,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import styles from '@/app/projects/projects.module.css' // Assuming styles are specific to this display
+import { ProjectMetadata } from '../store/projectSlice'; // Import the type
 
-// Mock project data
-const mockProjects = [
-  {
-    id: 1,
-    title: "Neon Dreams",
-    thumbnail: "/project-thumbnail-1.png",
-    duration: "3:24",
-  },
-  {
-    id: 2,
-    title: "Synthwave Sunset",
-    thumbnail: "/project-thumbnail-2.png",
-    duration: "4:15",
-  },
-  {
-    id: 3,
-    title: "Ambient Flow",
-    thumbnail: "/project-thumbnail-3.png",
-    duration: "2:58",
-  },
-  {
-    id: 4,
-    title: "Electric Pulse",
-    thumbnail: "/project-thumbnail-4.png",
-    duration: "5:12",
-  },
-]
+// Define props interface
+interface ProjectsDisplayProps {
+  projects: ProjectMetadata[];
+  onCreateProject: () => void; // Add callback for creating new project
+  onSelectProject: (projectId: string) => void; // Add callback for selecting a project
+}
 
-export default function ProjectsDisplay() {
+export default function ProjectsDisplay({ projects, onCreateProject, onSelectProject }: ProjectsDisplayProps) {
   // Note: The CSS module import might need adjustment if the CSS file isn't moved
   // or if it's intended to be used by the page container.
   // For now, assuming styles are relevant here.
@@ -80,7 +60,7 @@ export default function ProjectsDisplay() {
       </header>
 
       <div className={styles.buttonContainer}>
-        <button className={styles.createProjectButton}>
+        <button className={styles.createProjectButton} onClick={onCreateProject}>
           <Plus height={16} width={16} style={{ marginRight: '0.5rem' }} />
           Create Project
         </button>
@@ -88,19 +68,31 @@ export default function ProjectsDisplay() {
 
       <main className={styles.mainContent}>
         <div className={styles.projectsGrid}>
-          {mockProjects.map((project) => (
-            <div key={project.id} className={styles.projectCard}>
-              <div className={styles.cardImageWrapper}>
-                <div className={styles.cardIconPlaceholder}>
-                  <FileText className={styles.cardIcon} />
+          {/* Map over the projects prop */}
+          {projects.length === 0 ? (
+             <p className={styles.noProjectsText}>No projects found. Create one to get started!</p>
+          ) : (
+            projects.map((project) => (
+                <div 
+                    key={project.id} 
+                    className={styles.projectCard} 
+                    onClick={() => onSelectProject(project.id)} // Make card clickable
+                    style={{ cursor: 'pointer' }} // Add pointer cursor
+                >
+                <div className={styles.cardImageWrapper}>
+                    <div className={styles.cardIconPlaceholder}>
+                    <FileText className={styles.cardIcon} />
+                    </div>
                 </div>
-              </div>
-              <div className={styles.cardContent}>
-                <h3 className={styles.cardTitle}>{project.title}</h3>
-                <span className={styles.cardDuration}>{project.duration}</span>
-              </div>
-            </div>
-          ))}
+                <div className={styles.cardContent}>
+                    {/* Use project name from props */}
+                    <h3 className={styles.cardTitle}>{project.name}</h3> 
+                    {/* Remove hardcoded duration */}
+                    {/* <span className={styles.cardDuration}>{project.duration}</span> */}
+                </div>
+                </div>
+            ))
+          )}
         </div>
       </main>
     </div>
