@@ -219,19 +219,25 @@ export const createNewProject = async (name: string): Promise<string> => {
     return projectId;
 };
 
-export const deleteProject = async (projectId: string): Promise<void> => {
-     console.log(`deleteProject called for ${projectId} (stub)`);
-    // TODO: Implement cascading delete:
-    // 1. Delete from projectMetadata
-    // 2. Delete from projectSettings
-    // 3. Find all tracks by projectId index
-    // 4. For each track, call deleteTrack (which handles cascades)
-    // 5. Check if deleted project was the current one, if so, set currentProjectId to null
-};
-
 export const renameProject = async (projectId: string, newName: string): Promise<void> => {
-     console.log(`renameProject called for ${projectId} to ${newName} (stub)`);
-    // TODO: Implement IndexedDB update in 'projectMetadata' store
+     console.log(`renameProject called for ${projectId} to ${newName}`);
+     const db = await getDb();
+     const tx = db.transaction('projectMetadata', 'readwrite');
+     const store = tx.objectStore('projectMetadata');
+     try {
+         const metadata = await store.get(projectId);
+         if (!metadata) {
+             throw new Error(`Project metadata not found for ID: ${projectId}`);
+         }
+         const updatedMetadata = { ...metadata, name: newName };
+         await store.put(updatedMetadata);
+         await tx.done;
+         console.log(`Renamed project ${projectId} to "${newName}"`);
+     } catch (error) {
+         console.error(`Failed to rename project ${projectId}:`, error);
+         if (!tx.done) { try { await tx.done; } catch {} }
+         throw error;
+     }
 };
 
 // == Loading ==
@@ -367,70 +373,305 @@ export const loadFullProject = async (projectId: string): Promise<Partial<Loaded
 
 // == Saving / Updating (Triggered by Actions) ==
 
-// Example: Save project-level settings (like BPM, loop points etc.)
+// Save project-level settings (like BPM, loop points etc.)
 export const saveProjectSettings = async (projectId: string, settings: Partial<ProjectSettingsValue>): Promise<void> => {
-     console.log(`saveProjectSettings called for ${projectId} (stub)`, settings);
-     // TODO: Implement IndexedDB put/update in 'projectSettings' store
+     console.log(`saveProjectSettings called for ${projectId}`, settings);
+     const db = await getDb();
+     const tx = db.transaction('projectSettings', 'readwrite');
+     const store = tx.objectStore('projectSettings');
+     try {
+        const existingSettings = await store.get(projectId);
+        if (!existingSettings) {
+             console.error(`Cannot save settings for non-existent project: ${projectId}`);
+             // Optionally create default settings if needed? For now, just error.
+             throw new Error(`Project settings not found for ID: ${projectId}`);
+        }
+        // Merge partial settings onto existing settings
+        const updatedSettings = { ...existingSettings, ...settings, projectId }; // Ensure projectId is preserved
+        await store.put(updatedSettings);
+        await tx.done;
+        console.log(`Saved project settings for ${projectId}`);
+     } catch (error) {
+         console.error(`Failed to save project settings for ${projectId}:`, error);
+         if (!tx.done) { try { await tx.done; } catch {} } // Ensure transaction closes on error
+         throw error; // Re-throw to allow action to handle it
+     }
 };
 
-// Example: Save a complete track's metadata (called when track added or props like name/mute/solo change)
+// Save a complete track's metadata (called when track added or props like name/mute/solo change)
 export const saveTrackMetadata = async (trackData: TrackValue): Promise<void> => {
-     console.log(`saveTrackMetadata called (stub)`, trackData);
-     // TODO: Implement IndexedDB put in 'tracks' store (add or update)
+     console.log(`saveTrackMetadata called`, trackData);
+     const db = await getDb();
+     try {
+        await db.put('tracks', trackData);
+        console.log(`Saved track metadata for ${trackData.id}`);
+     } catch (error) {
+          console.error(`Failed to save track metadata for ${trackData.id}:`, error);
+          throw error;
+     }
 };
 
 // Save JUST the synth for a track (called when synth added or settings change)
 export const saveSynth = async (trackId: string, synthInstance: SynthesizerInstance | undefined): Promise<void> => {
-     console.log(`saveSynth called for track ${trackId} (stub)`);
+     console.log(`saveSynth called for track ${trackId}`);
      const serializableData = serializeSynth(synthInstance);
-     // TODO: Implement IndexedDB put in 'trackSynths' store
-     // If serializableData is undefined, maybe delete the entry?
+     const db = await getDb();
+     try {
+        if (serializableData) {
+            // Map SerializableSynthData to TrackSynthValue
+            const synthValue: TrackSynthValue = { trackId, ...serializableData };
+            await db.put('trackSynths', synthValue);
+             console.log(`Saved synth for track ${trackId}`);
+        } else {
+            // If synthInstance is undefined, delete the entry
+            await db.delete('trackSynths', trackId);
+            console.log(`Deleted synth for track ${trackId}`);
+        }
+     } catch (error) {
+          console.error(`Failed to save/delete synth for track ${trackId}:`, error);
+          throw error;
+     }
 };
 
 // Save JUST an effect (called when effect added, order changed, or settings change)
+// Note: Caller must provide the *full* TrackEffectValue including serialized settings and order
 export const saveEffect = async (effectData: TrackEffectValue): Promise<void> => {
-     console.log(`saveEffect called (stub)`, effectData);
-     // Note: effectData needs *serialized* settings. The caller (store action) should handle this.
-     // TODO: Implement IndexedDB put in 'trackEffects' store
+     console.log(`saveEffect called for effect ${effectData.id}`, effectData);
+     const db = await getDb();
+     try {
+         // The effectData should already contain the serialized settings
+         // as built by the calling action (using serializeEffect if needed)
+        await db.put('trackEffects', effectData);
+        console.log(`Saved effect ${effectData.id} for track ${effectData.trackId}`);
+     } catch (error) {
+         console.error(`Failed to save effect ${effectData.id}:`, error);
+         throw error;
+     }
 };
 
 // Save JUST a block (called when block added or start/end beats change)
 export const saveMidiBlock = async (blockData: MidiBlockValue): Promise<void> => {
-     console.log(`saveMidiBlock called (stub)`, blockData);
-     // TODO: Implement IndexedDB put in 'midiBlocks' store
+     console.log(`saveMidiBlock called for block ${blockData.id}`, blockData);
+     const db = await getDb();
+     try {
+        await db.put('midiBlocks', blockData);
+        console.log(`Saved MIDI block ${blockData.id} for track ${blockData.trackId}`);
+     } catch (error) {
+         console.error(`Failed to save MIDI block ${blockData.id}:`, error);
+         throw error;
+     }
 };
 
 // Save JUST a note (called when note added or properties change)
 export const saveMidiNote = async (noteData: MidiNoteValue): Promise<void> => {
-     console.log(`saveMidiNote called (stub)`, noteData);
-     // TODO: Implement IndexedDB put in 'midiNotes' store
+     console.log(`saveMidiNote called for note ${noteData.id}`, noteData);
+     const db = await getDb();
+     try {
+        await db.put('midiNotes', noteData);
+        console.log(`Saved MIDI note ${noteData.id} for block ${noteData.blockId}`);
+     } catch (error) {
+          console.error(`Failed to save MIDI note ${noteData.id}:`, error);
+          throw error;
+     }
 };
 
 // == Deleting Granular Data ==
 
-export const deleteTrack = async (trackId: string): Promise<void> => {
-     console.log(`deleteTrack called for ${trackId} (stub)`);
-    // TODO: Implement cascading delete:
-    // 1. Delete synth from 'trackSynths'
-    // 2. Find and delete all effects using 'by-trackId' index
-    // 3. Find all blocks using 'by-trackId' index
-    // 4. For each block, call deleteMidiBlock (which deletes notes)
-    // 5. Delete track from 'tracks' store
-};
-
-export const deleteEffect = async (effectId: string): Promise<void> => {
-     console.log(`deleteEffect called for ${effectId} (stub)`);
-     // TODO: Implement IndexedDB delete from 'trackEffects' store
+export const deleteMidiNote = async (noteId: string): Promise<void> => {
+     console.log(`deleteMidiNote called for ${noteId}`);
+     const db = await getDb();
+     try {
+        await db.delete('midiNotes', noteId);
+        console.log(`Deleted MIDI note ${noteId}`);
+     } catch (error) {
+          console.error(`Failed to delete MIDI note ${noteId}:`, error);
+          throw error;
+     }
 };
 
 export const deleteMidiBlock = async (blockId: string): Promise<void> => {
-     console.log(`deleteMidiBlock called for ${blockId} (stub)`);
-    // TODO: Implement cascading delete:
-    // 1. Find and delete all notes using 'by-blockId' index
-    // 2. Delete block from 'midiBlocks' store
+     console.log(`deleteMidiBlock called for ${blockId}`);
+     const db = await getDb();
+     const tx = db.transaction(['midiBlocks', 'midiNotes'], 'readwrite');
+     const blockStore = tx.objectStore('midiBlocks');
+     const noteStore = tx.objectStore('midiNotes');
+     const noteIndex = noteStore.index('by-blockId');
+
+     try {
+         // 1. Find and delete all associated notes
+         let noteCursor = await noteIndex.openKeyCursor(blockId);
+         while (noteCursor) {
+             await noteStore.delete(noteCursor.primaryKey);
+             console.log(`  > Deleted note ${noteCursor.primaryKey} for block ${blockId}`);
+             noteCursor = await noteCursor.continue();
+         }
+
+         // 2. Delete the block itself
+         await blockStore.delete(blockId);
+
+         await tx.done;
+         console.log(`Deleted MIDI block ${blockId} and its notes`);
+     } catch (error) {
+         console.error(`Failed to delete MIDI block ${blockId}:`, error);
+         if (!tx.done) { try { await tx.done; } catch {} }
+         throw error;
+     }
 };
 
-export const deleteMidiNote = async (noteId: string): Promise<void> => {
-     console.log(`deleteMidiNote called for ${noteId} (stub)`);
-     // TODO: Implement IndexedDB delete from 'midiNotes' store
+export const deleteEffect = async (effectId: string): Promise<void> => {
+     console.log(`deleteEffect called for ${effectId}`);
+     const db = await getDb();
+     try {
+        await db.delete('trackEffects', effectId);
+        console.log(`Deleted effect ${effectId}`);
+     } catch (error) {
+         console.error(`Failed to delete effect ${effectId}:`, error);
+         throw error;
+     }
+};
+
+export const deleteTrack = async (trackId: string): Promise<void> => {
+     console.log(`deleteTrack called for ${trackId}`);
+     const db = await getDb();
+     // Need to transact over all stores involved in the cascade
+     const tx = db.transaction([
+         'tracks',
+         'trackSynths',
+         'trackEffects',
+         'midiBlocks',
+         'midiNotes' // Include midiNotes for block deletion cascade
+        ], 'readwrite');
+
+     const trackStore = tx.objectStore('tracks');
+     const synthStore = tx.objectStore('trackSynths');
+     const effectStore = tx.objectStore('trackEffects');
+     const blockStore = tx.objectStore('midiBlocks');
+     // Note store access is handled within deleteMidiBlock implicitly via transaction
+
+     const effectIndex = effectStore.index('by-trackId');
+     const blockIndex = blockStore.index('by-trackId');
+
+     try {
+         // 1. Delete synth
+         // Use delete, ignore error if not found (idempotent)
+         await synthStore.delete(trackId).catch(() => {}); 
+         console.log(`  > Deleted synth for track ${trackId}`);
+
+         // 2. Find and delete all effects
+         let effectCursor = await effectIndex.openKeyCursor(trackId);
+         while(effectCursor) {
+             await effectStore.delete(effectCursor.primaryKey);
+             console.log(`  > Deleted effect ${effectCursor.primaryKey} for track ${trackId}`);
+             effectCursor = await effectCursor.continue();
+         }
+
+         // 3. Find all blocks
+         const blockKeys = await blockIndex.getAllKeys(trackId);
+         
+         // 4. For each block, call deleteMidiBlock (within the same transaction)
+         // Note: deleteMidiBlock needs to be adapted to accept the transaction stores
+         // Let's re-implement block/note deletion inline here for simplicity within one transaction
+         const noteStoreForBlock = tx.objectStore('midiNotes');
+         const noteIndexForBlock = noteStoreForBlock.index('by-blockId');
+         for (const blockId of blockKeys) {
+             console.log(`  > Deleting block ${blockId} and its notes...`);
+             let noteCursor = await noteIndexForBlock.openKeyCursor(blockId);
+             while (noteCursor) {
+                 await noteStoreForBlock.delete(noteCursor.primaryKey);
+                 console.log(`    >> Deleted note ${noteCursor.primaryKey}`);
+                 noteCursor = await noteCursor.continue();
+             }
+             await blockStore.delete(blockId);
+             console.log(`  > Deleted block ${blockId}`);
+         }
+
+         // 5. Delete track metadata itself
+         await trackStore.delete(trackId);
+
+         await tx.done;
+         console.log(`Deleted track ${trackId} and all associated data`);
+     } catch (error) {
+         console.error(`Failed to delete track ${trackId}:`, error);
+         if (!tx.done) { try { await tx.done; } catch {} }
+         throw error;
+     }
+};
+
+export const deleteProject = async (projectId: string): Promise<void> => {
+     console.log(`deleteProject called for ${projectId}`);
+     const db = await getDb();
+     // Transaction needs to cover all potentially affected stores
+      const tx = db.transaction([
+         'projectMetadata',
+         'projectSettings',
+         'tracks', // Needed for track index query
+         // Include stores needed by deleteTrack cascade:
+         'trackSynths',
+         'trackEffects',
+         'midiBlocks',
+         'midiNotes'
+        ], 'readwrite');
+
+     const metadataStore = tx.objectStore('projectMetadata');
+     const settingsStore = tx.objectStore('projectSettings');
+     const trackStore = tx.objectStore('tracks'); // Only need index access here
+     // References to other stores are implicitly handled by deleteTrack within the transaction
+
+     try {
+         // 3. Find all tracks by projectId index
+         const trackIndex = trackStore.index('by-projectId');
+         const trackKeys = await trackIndex.getAllKeys(projectId);
+
+         // 4. For each track key, call deleteTrack (adapted to run within current tx)
+         // Re-implement deleteTrack logic inline here to stay within one transaction
+         const synthStoreDel = tx.objectStore('trackSynths');
+         const effectStoreDel = tx.objectStore('trackEffects');
+         const blockStoreDel = tx.objectStore('midiBlocks');
+         const noteStoreDel = tx.objectStore('midiNotes');
+         const trackStoreDel = tx.objectStore('tracks'); // Actual track store for delete
+         const effectIndexDel = effectStoreDel.index('by-trackId');
+         const blockIndexDel = blockStoreDel.index('by-trackId');
+         const noteIndexDel = noteStoreDel.index('by-blockId');
+
+         for (const trackId of trackKeys) {
+            console.log(`  Deleting track ${trackId} as part of project delete...`);
+            // Delete synth
+            await synthStoreDel.delete(trackId).catch(() => {});
+            // Delete effects
+            let effectCursor = await effectIndexDel.openKeyCursor(trackId);
+            while(effectCursor) {
+                await effectStoreDel.delete(effectCursor.primaryKey);
+                effectCursor = await effectCursor.continue();
+            }
+            // Delete blocks and notes
+            const blockKeysForTrack = await blockIndexDel.getAllKeys(trackId);
+            for (const blockId of blockKeysForTrack) {
+                 let noteCursor = await noteIndexDel.openKeyCursor(blockId);
+                 while (noteCursor) {
+                     await noteStoreDel.delete(noteCursor.primaryKey);
+                     noteCursor = await noteCursor.continue();
+                 }
+                 await blockStoreDel.delete(blockId);
+            }
+            // Delete track metadata
+            await trackStoreDel.delete(trackId);
+            console.log(`  Deleted track ${trackId} data.`);
+         }
+
+         // 1. Delete from projectSettings
+         await settingsStore.delete(projectId).catch(() => {}); // Ignore if not found
+
+         // 2. Delete from projectMetadata
+         await metadataStore.delete(projectId);
+         
+         // 5. Check if deleted project was the current one (handled in ProjectSlice action)
+
+         await tx.done;
+         console.log(`Deleted project ${projectId} and all associated data`);
+
+     } catch (error) {
+          console.error(`Failed to delete project ${projectId}:`, error);
+         if (!tx.done) { try { await tx.done; } catch {} }
+         throw error;
+     }
 }; 

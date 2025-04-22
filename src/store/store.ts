@@ -183,70 +183,69 @@ export const initializeStore = (): Promise<typeof useStore> => {
 
     storeReadyPromise = (async () => {
         console.log("Initializing store...");
+        const storeInstance = useStore; // Get the hook function
+        let loadedState: Partial<AppState> = {}; // Define loadedState here
+
         try {
             const currentProjectId = await persistenceService.getCurrentProjectId();
-            let initialState: Partial<AppState> = {}; // Start with empty initial state
+            // let initialState: Partial<AppState> = {}; // Moved declaration up
 
             if (currentProjectId) {
                 console.log(`Attempting to load project: ${currentProjectId}`);
                 const loadedProjectData = await persistenceService.loadFullProject(currentProjectId);
                 if (loadedProjectData) {
-                    initialState = loadedProjectData;
-                     // Set the loaded project ID in the initial state for the project slice
-                     initialState.currentLoadedProjectId = currentProjectId;
+                    loadedState = loadedProjectData; // Assign loaded data
+                    // Set the loaded project ID for the project slice
+                    loadedState.currentLoadedProjectId = currentProjectId;
                      console.log("Project loaded successfully.");
                 } else {
                     console.warn(`Failed to load project data for ${currentProjectId}. Starting fresh.`);
-                    // Couldn't load, ensure currentProjectId is cleared
                     await persistenceService.setCurrentProjectId(null);
+                    loadedState.currentLoadedProjectId = null; // Ensure it's null in the state to set
                 }
             } else {
                 console.log("No current project ID found. Starting fresh.");
+                 loadedState.currentLoadedProjectId = null; // Ensure it's null
             }
             
-            // Set initial state including project list and initialized flag
-            initialState.isStoreInitialized = true; // Mark as initialized *before* creating store? Or after? Let's do it after hydration.
-            initialState.projectList = await persistenceService.getProjectMetadataList(); // Load project list initially
-
-            // Get the store instance *after* potentially loading initial data
-            const store = useStore; // Reference to the create function's return
-            
-            // Apply the initial state (this overwrites defaults set by slice creators)
-            // Note: Zustand doesn't have a built-in hydrate function without middleware.
-            // We might need to set the state *after* creation.
-            // Or pass initial state directly if `create` supports it (it doesn't directly for combined slices like this).
-            
-            // --> Let's modify the approach: Create store first, then set initial state.
-
-            // Initialize the store with default values from slices
-            const storeInstance = useStore; // This gets the hook function
+            // Fetch project list regardless of whether a project was loaded
+            const projectList = await persistenceService.getProjectMetadataList(); 
+            loadedState.projectList = projectList;
 
             // Manually set the loaded/initial state
             storeInstance.setState({
-                ...initialState, // Apply loaded data (if any)
-                currentLoadedProjectId: initialState.currentLoadedProjectId ?? null, // Ensure it's set
-                projectList: initialState.projectList ?? [], // Ensure it's set
-                isStoreInitialized: true, // NOW mark as initialized
+                ...loadedState, // Apply loaded data (if any) or defaults
+                isStoreInitialized: true, // Mark as initialized AFTER setting state
              });
             
-            console.log("Store initialized.");
+            console.log("Store initialized and hydrated.");
 
-            // TODO: Handle post-load adjustments if needed (like setting TimeManager BPM)
-            // The old `merge` function did this. We need to replicate it here or in loadFullProject.
-            // Example:
-            // const state = storeInstance.getState();
-            // if (state.bpm && state.timeManager) {
-            //     state.timeManager.setBPM(state.bpm);
-            // }
+            // --- Post-Load Adjustments --- 
+            const finalState = storeInstance.getState(); // Get the state *after* hydration
+            if (finalState.bpm && finalState.timeManager && typeof finalState.timeManager.setBPM === 'function') {
+                console.log(`Applying loaded BPM (${finalState.bpm}) to TimeManager.`);
+                 try {
+                    finalState.timeManager.setBPM(finalState.bpm);
+                 } catch (e) {
+                    console.error("Failed to apply loaded BPM to TimeManager:", e);
+                 }
+            } else if (finalState.bpm) {
+                 console.warn("Loaded BPM found, but TimeManager or setBPM method is missing.");
+            }
+            // Add any other necessary post-load adjustments here
 
             return storeInstance; // Return the hook
 
         } catch (error) {
             console.error("Failed to initialize store:", error);
-            // Fallback: return the uninitialized store? Or throw?
-            // Let's return the store hook anyway, but it won't be marked 'initialized'
-             useStore.setState({ isStoreInitialized: false }); // Ensure it's marked as not initialized on error
-            return useStore;
+            // Set defaults even on error, but mark as not initialized
+            const projectListOnError = await persistenceService.getProjectMetadataList().catch(() => []); // Attempt to get list even on error
+            storeInstance.setState({
+                 ...initialProjectState, // Use initial defaults from slice
+                 projectList: projectListOnError,
+                 isStoreInitialized: false, // Mark as not initialized
+            });
+            return storeInstance; // Return hook, but state indicates failure
         }
     })();
 
