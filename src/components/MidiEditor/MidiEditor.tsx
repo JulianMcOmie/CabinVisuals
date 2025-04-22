@@ -40,16 +40,12 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     seekTo
   } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const invisibleSpacerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [editorDimensions, setEditorDimensions] = useState({ width: 0, height: 0 });
   // -------------------------------------------
-
-  // Use state dimensions, fallback if needed
-  // Use original constants for initial calculation before state/hook values are ready
-  const editorWidth = editorDimensions.width || numMeasures * BEATS_PER_MEASURE * PIXELS_PER_BEAT; 
-  const editorHeight = editorDimensions.height || KEY_COUNT * PIXELS_PER_SEMITONE;
   
   useEffect(() => {
     const editorElement = editorRef.current;
@@ -81,7 +77,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     scrollX, 
     scrollY, 
     handleGridScroll 
-  } = useZoomScroll({ editorRef, numMeasures });
+  } = useZoomScroll({ editorRef:scrollContainerRef, numMeasures });
 
   const blockStartBeat = block.startBeat;
   const blockDuration = block.endBeat - block.startBeat;
@@ -221,6 +217,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
               backgroundColor: 'transparent' // Allows canvas to show through
             }}
             onScroll={handleGridScroll}
+            ref={scrollContainerRef}
           >
             {/* Sizer & Interaction Div (Inside Scrollable Grid) - MUST NOT be absolute */}
             <div className="invisible-spacer"

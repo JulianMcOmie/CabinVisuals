@@ -97,6 +97,8 @@ const drawGrid = (
   scrollX: number,
   scrollY: number
 ): void => {
+  console.log('scrollX', scrollX);
+  console.log('scrollY', scrollY);
   const totalBeats = numMeasures * BEATS_PER_MEASURE;
   const totalHeight = (KEY_COUNT ?? 128) * pixelsPerSemitone; // Use effective key count
 
