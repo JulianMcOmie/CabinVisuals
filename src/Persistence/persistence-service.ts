@@ -1,9 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import Synthesizer from '../lib/Synthesizer';
-import Effect from '../lib/Effect';
-import { applySettings } from './persistenceUtils';
 
-import { synthesizerConstructors, effectConstructors } from '../store/store';
 
 // --- Define Interfaces ---
 
@@ -13,6 +9,7 @@ export interface ProjectMetadata {
 }
 
 export interface ProjectSettings {
+    projectId: string;
     bpm: number;
     isPlaying: boolean;
     loopEnabled: boolean;
@@ -28,8 +25,40 @@ export interface TrackData {
     projectId: string;
     name: string;
     isMuted: boolean;
-    isSolo: boolean;
+    isSoloed: boolean;
+    order: number;
 }
+
+export interface SynthData {
+    trackId: string;
+    type: string;
+    settings: Record<string, any>;
+}
+
+export interface EffectData {
+    id: string;
+    trackId: string;
+    type: string;
+    settings: Record<string, any>;
+    order: number;
+}
+
+export interface MidiBlockData {
+    id: string;
+    trackId: string;
+    startBeat: number;
+    endBeat: number;
+}
+
+export interface MidiNoteData {
+    id: string;
+    blockId: string;
+    startBeat: number;
+    duration: number;
+    velocity: number;
+    pitch: number;
+}
+
 
 
 // --- IndexedDB Configuration ---
@@ -73,7 +102,7 @@ function getDb(): Promise<IDBDatabase> {
             console.log(`Upgrading database from version ${event.oldVersion} to ${event.newVersion}`);
 
             if (!db.objectStoreNames.contains(STORE_APP_CONFIG)) {
-                db.createObjectStore(STORE_APP_CONFIG); // Key is config key string
+                db.createObjectStore(STORE_APP_CONFIG);
             }
             if (!db.objectStoreNames.contains(STORE_PROJECT_METADATA)) {
                 db.createObjectStore(STORE_PROJECT_METADATA, { keyPath: 'id' });
@@ -118,14 +147,6 @@ async function performDbOperation<T>(
         operation(store)
             .then(resolve)
             .catch(reject);
-
-        transaction.oncomplete = () => {
-            console.log(`Transaction complete on ${storeName}`);
-        };
-        transaction.onerror = () => {
-            console.error(`Transaction error on ${storeName}:`, transaction.error);
-            reject(transaction.error);
-        };
     });
 }
 
@@ -141,14 +162,6 @@ async function performMultiStoreDbOperation<T>(
         operation(transaction)
             .then(resolve)
             .catch(reject);
-
-        transaction.oncomplete = () => {
-            console.log(`Multi-store transaction complete on ${storeNames.join(', ')}`);
-        };
-        transaction.onerror = () => {
-            console.error(`Multi-store transaction error on ${storeNames.join(', ')}:`, transaction.error);
-            reject(transaction.error);
-        };
     });
 }
 
@@ -179,7 +192,8 @@ export async function createNewProject(name: string): Promise<string> {
         });
     });
      
-     await saveProjectSettings(projectId, {
+     await saveProjectSettings({
+        projectId: projectId,
         bpm: 120,
         isPlaying: false,
         loopEnabled: false,
@@ -193,36 +207,78 @@ export async function createNewProject(name: string): Promise<string> {
 }
 
 export async function deleteProject(projectId: string): Promise<void> {
-    console.warn("deleteProject not fully implemented - cascading deletes needed");
-     // TODO: Implement cascading deletes:
-     // 1. Get all tracks for the project
-     // 2. For each track, call deleteTrack (which cascades further)
-     // 3. Delete project settings
-     // 4. Delete project metadata
-     // 5. If it was the current project, clear current project ID in appConfig
-     await performMultiStoreDbOperation(
-        [STORE_PROJECT_METADATA, STORE_PROJECT_SETTINGS /*, add other stores */],
-        'readwrite',
-        async (transaction) => {
-            const metaStore = transaction.objectStore(STORE_PROJECT_METADATA);
-            const settingsStore = transaction.objectStore(STORE_PROJECT_SETTINGS);
-            // ... get other stores ...
+     const allStores = [
+         STORE_PROJECT_METADATA,
+         STORE_PROJECT_SETTINGS,
+         STORE_TRACKS,
+         STORE_TRACK_SYNTHS,
+         STORE_TRACK_EFFECTS,
+         STORE_MIDI_BLOCKS,
+         STORE_MIDI_NOTES,
+         STORE_APP_CONFIG // Include app config to check current project ID
+     ];
 
-            // Example delete - needs cascading logic added
-             await new Promise<void>((resolve, reject) => {
-                 const req1 = metaStore.delete(projectId);
-                 req1.onsuccess = () => resolve();
-                 req1.onerror = () => reject(req1.error);
+     await performMultiStoreDbOperation(allStores, 'readwrite', async (transaction) => {
+         const metaStore = transaction.objectStore(STORE_PROJECT_METADATA);
+         const settingsStore = transaction.objectStore(STORE_PROJECT_SETTINGS);
+         const tracksStore = transaction.objectStore(STORE_TRACKS);
+         const synthsStore = transaction.objectStore(STORE_TRACK_SYNTHS);
+         const effectsStore = transaction.objectStore(STORE_TRACK_EFFECTS);
+         const blocksStore = transaction.objectStore(STORE_MIDI_BLOCKS);
+         const notesStore = transaction.objectStore(STORE_MIDI_NOTES);
+         const appConfigStore = transaction.objectStore(STORE_APP_CONFIG);
+
+         const tracksIndex = tracksStore.index(IDX_PROJECT_ID);
+         const blocksIndex = blocksStore.index(IDX_TRACK_ID);
+         const effectsIndex = effectsStore.index(IDX_TRACK_ID);
+         const notesIndex = notesStore.index(IDX_BLOCK_ID);
+
+         const deletePromises: Promise<any>[] = [];
+
+         // 1. Find all tracks for the project
+         const trackIds = await promisifyRequest(tracksIndex.getAllKeys(projectId));
+
+         // 2. For each track, cascade delete its related data
+         for (const trackId of trackIds) {
+             // Delete notes within blocks
+             const blockIds = await promisifyRequest(blocksIndex.getAllKeys(trackId));
+             for (const blockId of blockIds) {
+                 const noteIds = await promisifyRequest(notesIndex.getAllKeys(blockId));
+                 noteIds.forEach(noteId => {
+                     deletePromises.push(promisifyRequestSimple(notesStore.delete(noteId)));
+                 });
+                 // Delete the block
+                 deletePromises.push(promisifyRequestSimple(blocksStore.delete(blockId)));
+             }
+
+             // Delete effects
+             const effectIds = await promisifyRequest(effectsIndex.getAllKeys(trackId));
+             effectIds.forEach(effectId => {
+                 deletePromises.push(promisifyRequestSimple(effectsStore.delete(effectId)));
              });
-             await new Promise<void>((resolve, reject) => {
-                 const req2 = settingsStore.delete(projectId);
-                 req2.onsuccess = () => resolve(req2.result);
-                 req2.onerror = () => reject(req2.error);
-             });
-        }
-     );
+             // Delete synths
+             deletePromises.push(promisifyRequestSimple(synthsStore.delete(trackId)));
+
+             // Finally, delete tracks
+             deletePromises.push(promisifyRequestSimple(tracksStore.delete(trackId)));
+         }
+
+         // Delete project settings
+         deletePromises.push(promisifyRequestSimple(settingsStore.delete(projectId)));
+
+         // Delete project metadata
+         deletePromises.push(promisifyRequestSimple(metaStore.delete(projectId)));
+
+         // 5. Check and clear current project ID if it matches the deleted project
+         const currentProjectId = await promisifyRequest(appConfigStore.get('currentProjectId'));
+         if (currentProjectId === projectId) {
+             deletePromises.push(promisifyRequestSimple(appConfigStore.put(null, 'currentProjectId')));
+         }
+
+         await Promise.all(deletePromises);
+     });
+
 }
-
 
 export async function renameProject(projectId: string, newName: string): Promise<void> {
      await performDbOperation(STORE_PROJECT_METADATA, 'readwrite', store => {
@@ -279,11 +335,10 @@ export async function loadFullProject(projectId: string): Promise<any | null> {
 
 // --- Saving/Updating ---
 
-export async function saveProjectSettings(projectId: string, settings: ProjectSettings): Promise<void> {
+export async function saveProjectSettings(projectSettingsData: ProjectSettings): Promise<void> {
      await performDbOperation(STORE_PROJECT_SETTINGS, 'readwrite', store => {
          return new Promise((resolve, reject) => {
-            const dataToSave = { ...settings, projectId };
-             const request = store.put(dataToSave);
+             const request = store.put(projectSettingsData);
              request.onsuccess = () => resolve(request.result);
              request.onerror = () => reject(request.error);
          });
@@ -294,54 +349,47 @@ export async function saveProjectSettings(projectId: string, settings: ProjectSe
 export async function saveTrack(trackData: TrackData): Promise<void> {
      await performDbOperation(STORE_TRACKS, 'readwrite', store => {
          return new Promise((resolve, reject) => {
-             const request = store.put(trackData); // Assumes trackData has 'id' property
+             const request = store.put(trackData);
              request.onsuccess = () => resolve(request.result);
              request.onerror = () => reject(request.error);
          });
      });
 }
 
-export async function saveSynth(trackId: string, synthData: { type: string; settings: Record<string, any> }): Promise<void> {
-     const dataToSave = { ...synthData, trackId };
+export async function saveSynth(synthData: SynthData): Promise<void> {
      await performDbOperation(STORE_TRACK_SYNTHS, 'readwrite', store => {
          return new Promise((resolve, reject) => {
-             const request = store.put(dataToSave);
+             const request = store.put(synthData);
              request.onsuccess = () => resolve(request.result);
              request.onerror = () => reject(request.error);
          });
      });
 }
 
-export async function saveEffect(effectData: any): Promise<void> {
-    console.warn("saveEffect not fully implemented");
-    // effectData should match the structure in STORE_TRACK_EFFECTS, including id, trackId, etc.
+export async function saveEffect(effectData: EffectData): Promise<void> {
      await performDbOperation(STORE_TRACK_EFFECTS, 'readwrite', store => {
          return new Promise((resolve, reject) => {
-             const request = store.put(effectData); // Assumes effectData has 'id' property
+             const request = store.put(effectData);
              request.onsuccess = () => resolve(request.result);
              request.onerror = () => reject(request.error);
          });
      });
 }
 
-export async function saveMidiBlock(blockData: any): Promise<void> {
-    console.warn("saveMidiBlock not fully implemented");
-    // blockData should match the structure in STORE_MIDI_BLOCKS, including id, trackId, etc.
+export async function saveMidiBlock(blockData: MidiBlockData): Promise<void> {
      await performDbOperation(STORE_MIDI_BLOCKS, 'readwrite', store => {
          return new Promise((resolve, reject) => {
-             const request = store.put(blockData); // Assumes blockData has 'id' property
+             const request = store.put(blockData);
              request.onsuccess = () => resolve(request.result);
              request.onerror = () => reject(request.error);
          });
      });
 }
 
-export async function saveMidiNote(noteData: any): Promise<void> {
-    console.warn("saveMidiNote not fully implemented");
-    // noteData should match the structure in STORE_MIDI_NOTES, including id, blockId, etc.
+export async function saveMidiNote(noteData: MidiNoteData): Promise<void> {
      await performDbOperation(STORE_MIDI_NOTES, 'readwrite', store => {
          return new Promise((resolve, reject) => {
-             const request = store.put(noteData); // Assumes noteData has 'id' property
+             const request = store.put(noteData);
              request.onsuccess = () => resolve(request.result);
              request.onerror = () => reject(request.error);
          });
@@ -352,61 +400,105 @@ export async function saveMidiNote(noteData: any): Promise<void> {
 // --- Deleting Granular Data ---
 
 export async function deleteTrack(trackId: string): Promise<void> {
-    console.warn("deleteTrack not fully implemented - cascading deletes needed");
-    // TODO: Cascade delete: synth, effects, blocks (which cascades to notes)
-    await performMultiStoreDbOperation(
-        [STORE_TRACKS, STORE_TRACK_SYNTHS /*, add others */],
-        'readwrite',
-        async (transaction) => {
-            // Example delete - needs cascading logic
-            await new Promise<void>((resolve, reject) => {
-                const req = transaction.objectStore(STORE_TRACKS).delete(trackId);
-                req.onsuccess = () => resolve();
-                req.onerror = () => reject(req.error);
+    const storesToModify = [
+        STORE_TRACKS,
+        STORE_TRACK_SYNTHS,
+        STORE_TRACK_EFFECTS,
+        STORE_MIDI_BLOCKS,
+        STORE_MIDI_NOTES
+    ];
+
+    await performMultiStoreDbOperation(storesToModify, 'readwrite', async (transaction) => {
+        const tracksStore = transaction.objectStore(STORE_TRACKS);
+        const synthsStore = transaction.objectStore(STORE_TRACK_SYNTHS);
+        const effectsStore = transaction.objectStore(STORE_TRACK_EFFECTS);
+        const blocksStore = transaction.objectStore(STORE_MIDI_BLOCKS);
+        const notesStore = transaction.objectStore(STORE_MIDI_NOTES);
+
+        const blocksIndex = blocksStore.index(IDX_TRACK_ID);
+        const effectsIndex = effectsStore.index(IDX_TRACK_ID);
+        const notesIndex = notesStore.index(IDX_BLOCK_ID);
+
+        const deletePromises: Promise<any>[] = [];
+
+        // 1. Find and delete notes within blocks of this track
+        const blockIds = await promisifyRequest(blocksIndex.getAllKeys(trackId));
+        for (const blockId of blockIds) {
+            const noteIds = await promisifyRequest(notesIndex.getAllKeys(blockId));
+            noteIds.forEach(noteId => {
+                deletePromises.push(promisifyRequestSimple(notesStore.delete(noteId)));
             });
-            await new Promise<void>((resolve, reject) => {
-                 const req = transaction.objectStore(STORE_TRACK_SYNTHS).delete(trackId);
-                 req.onsuccess = () => resolve();
-                 req.onerror = () => reject(req.error);
-             });
+            // 2. Delete the block itself
+            deletePromises.push(promisifyRequestSimple(blocksStore.delete(blockId)));
         }
-    );
+
+        // 3. Find and delete effects associated with this track
+        const effectIds = await promisifyRequest(effectsIndex.getAllKeys(trackId));
+        effectIds.forEach(effectId => {
+            deletePromises.push(promisifyRequestSimple(effectsStore.delete(effectId)));
+        });
+
+        // 4. Delete the synth associated with this track
+        deletePromises.push(promisifyRequestSimple(synthsStore.delete(trackId)));
+
+        // 5. Delete the track metadata itself
+        deletePromises.push(promisifyRequestSimple(tracksStore.delete(trackId)));
+
+        // Wait for all delete operations in this transaction to complete
+        await Promise.all(deletePromises);
+    });
+    console.log(`Cascading delete complete for track: ${trackId}`);
 }
 
 export async function deleteEffect(effectId: string): Promise<void> {
-    console.warn("deleteEffect not fully implemented");
      await performDbOperation(STORE_TRACK_EFFECTS, 'readwrite', store => {
-         return new Promise((resolve, reject) => {
-             const request = store.delete(effectId);
-             request.onsuccess = () => resolve(request.result);
-             request.onerror = () => reject(request.error);
-         });
+         return promisifyRequestSimple(store.delete(effectId));
      });
 }
 
 export async function deleteMidiBlock(blockId: string): Promise<void> {
-    console.warn("deleteMidiBlock not fully implemented - cascading deletes needed");
-    // TODO: Cascade delete notes within the block first
-     await performMultiStoreDbOperation(
-        [STORE_MIDI_BLOCKS /*, STORE_MIDI_NOTES */],
-        'readwrite',
-        async (transaction) => {
-            // Example delete - needs cascading logic
-            await new Promise<void>((resolve, reject) => {
-                 const req = transaction.objectStore(STORE_MIDI_BLOCKS).delete(blockId);
-                 req.onsuccess = () => resolve(req.result);
-                 req.onerror = () => reject(req.error);
-             });
-        }
-     );
+    const storesToModify = [STORE_MIDI_BLOCKS, STORE_MIDI_NOTES];
+    await performMultiStoreDbOperation(storesToModify, 'readwrite', async (transaction) => {
+        const blocksStore = transaction.objectStore(STORE_MIDI_BLOCKS);
+        const notesStore = transaction.objectStore(STORE_MIDI_NOTES);
+        const notesIndex = notesStore.index(IDX_BLOCK_ID);
+
+        const deletePromises: Promise<any>[] = [];
+
+        // 1. Find and delete notes within this block
+        const noteIds = await promisifyRequest(notesIndex.getAllKeys(blockId));
+        noteIds.forEach(noteId => {
+            deletePromises.push(promisifyRequestSimple(notesStore.delete(noteId)));
+        });
+
+        // 2. Delete the block itself
+        deletePromises.push(promisifyRequestSimple(blocksStore.delete(blockId)));
+
+        // Wait for all delete operations in this transaction to complete
+        await Promise.all(deletePromises);
+    });
 }
 
 export async function deleteMidiNote(noteId: string): Promise<void> {
      await performDbOperation(STORE_MIDI_NOTES, 'readwrite', store => {
-         return new Promise((resolve, reject) => {
-             const request = store.delete(noteId);
-             request.onsuccess = () => resolve(request.result);
-             request.onerror = () => reject(request.error);
-         });
+         return promisifyRequestSimple(store.delete(noteId));
      });
+}
+
+// --- Helper Functions ---
+
+// Helper to promisify IDBRequest returning a value
+function promisifyRequest<T>(request: IDBRequest<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Helper to promisify IDBRequest for operations that don't return a value
+function promisifyRequestSimple(request: IDBRequest): Promise<void> {
+    return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
 }
