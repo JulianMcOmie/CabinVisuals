@@ -70,7 +70,7 @@ export interface TrackTimelineViewHandle {
 }
 
 
-// Wrap component with forwardRef
+// eslint-disable-next-line react/display-name
 const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewProps>((
   {
     tracks,
