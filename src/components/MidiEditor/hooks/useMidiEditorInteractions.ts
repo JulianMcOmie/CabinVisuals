@@ -375,11 +375,13 @@ export const useMidiEditorInteractions = ({
             console.log("newClickOffset", newClickOffset);
             console.log("selectedIds", selectedIds);
             console.log("selectedNotes", selectedNotes);
+            console.log("cursorType", cursorType);
 
             setSelectedNoteIds(selectedIds);
             storeSelectNotes(selectedNotes);
             setDragNoteId(note.id);
             setDragOperation(newDragOperation);
+            console.log("setting hoverCursor to", cursorType);
             setHoverCursor(cursorType);
             setClickOffset(newClickOffset);
 
@@ -414,6 +416,7 @@ export const useMidiEditorInteractions = ({
                     storeSelectNotes([]);
                 }
                 setDragNoteId(null);
+                console.log("setting hoverCursor to default");
                 setHoverCursor('default');
             }
         }
@@ -435,6 +438,7 @@ export const useMidiEditorInteractions = ({
         const coords = getCoordsAndDerivedCallback(e);
         if (!coords) {
             console.log("!coords");
+            console.log("setting hoverCursor to default");
             setHoverCursor('default');
             return;
         }
@@ -474,9 +478,11 @@ export const useMidiEditorInteractions = ({
 
         if (cursorResult) {
             console.log("cursorResult");
+            console.log("cursorResult.area", cursorResult.area);
             setHoverCursor(cursorResult.area === 'start' ? 'w-resize' : cursorResult.area === 'end' ? 'e-resize' : 'move');
         } else {
             console.log("!cursorResult");
+            console.log("setting hoverCursor to default");
             setHoverCursor('default');
         }
     }, [

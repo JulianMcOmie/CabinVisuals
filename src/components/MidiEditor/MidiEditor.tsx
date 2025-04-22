@@ -230,7 +230,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                 left: 0,
                 width: `${totalGridWidth}px`,
                 height: `${blockHeight}px`,
-                backgroundColor: 'transparent'
+                backgroundColor: 'transparent',
+                cursor: hoverCursor
               }}
             />
             <canvas
@@ -239,7 +240,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                 display: 'block',
                 width: `${totalGridWidth}px`,   // Full content width
                 height: `${blockHeight}px`, // Full content height
-                cursor: hoverCursor
+                //cursor: hoverCursor
               }}
               // Width/Height attributes still set by editorDimensions in useEffect
               // onMouseDown={handleCanvasMouseDown}
