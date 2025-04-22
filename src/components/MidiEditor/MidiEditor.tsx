@@ -40,6 +40,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     seekTo
   } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
+  const invisibleSpacerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [editorDimensions, setEditorDimensions] = useState({ width: 0, height: 0 });
@@ -93,12 +94,12 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   // Wrap getCoordsAndDerived in useCallback to ensure stable reference for dependencies
   // Must be defined before useMidiEditorInteractions which uses it
   const getCoordsAndDerivedCallback = useCallback((e: MouseEvent | React.MouseEvent) => {
-    if (!canvasRef.current) {
-        console.warn("getCoordsAndDerivedCallback called before canvasRef is assigned.");
+    if (!invisibleSpacerRef.current) {
+        console.warn("getCoordsAndDerivedCallback called before invisibleSpacerRef is assigned.");
         return null;
     }
-    return getCoordsAndDerived(e, canvasRef as React.RefObject<HTMLCanvasElement>, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone);
-  }, [canvasRef, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone]); // Dependencies now include values from useZoomScroll
+    return getCoordsAndDerived(e, invisibleSpacerRef as React.RefObject<HTMLDivElement>, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone);
+  }, [invisibleSpacerRef, scrollX, scrollY, pixelsPerBeat, pixelsPerSemitone]); // Dependencies now include values from useZoomScroll
 
   const { 
     handleCanvasMouseDown, 
@@ -189,7 +190,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         style={{ overflow: 'hidden', height: '100%', }}
         onClick={handleEditorClick}
     >
-      <div className="piano-roll flex flex-col h-full">
+      {/* <div className="piano-roll flex flex-col h-full">
         <div className="flex">
           <div className="piano-roll-header" style={{ overflow: 'hidden' }}>
             <PianoRollHeader 
@@ -199,24 +200,39 @@ function MidiEditor({ block, track }: MidiEditorProps) {
               scrollX={scrollX}
             />
           </div>
-        </div>
-        <div className="flex" style={{ flex: 1, minHeight: 0 }}>
+        </div> */}
+        {/* <div className="flex" style={{ flex: 1, minHeight: 0 }}>
           <div className="piano-keys" style={{ overflow: 'hidden', flexShrink: 0 }}>
             <PianoKeys 
               keyCount={KEY_COUNT} 
               keyHeight={pixelsPerSemitone} 
               scrollY={scrollY}
             />
-          </div>
+          </div> */}
           <div
             className="piano-roll-grid relative"
             style={{
-              width: `${totalGridWidth}px`,
+              width: `100%`,
               overflow: 'scroll',
               height: '100%'
             }}
             onScroll={handleGridScroll}
           >
+            <div className="invisible-spacer"
+              ref={invisibleSpacerRef}
+              onMouseDown={handleCanvasMouseDown}
+              onMouseUp={handleCanvasMouseUp}
+              onMouseMove={handleCanvasMouseMove}
+              onContextMenu={handleCanvasContextMenu}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: `${totalGridWidth}px`,
+                height: `${blockHeight}px`,
+                backgroundColor: 'transparent'
+              }}
+            />
             <canvas
               ref={canvasRef} 
               style={{
@@ -226,15 +242,15 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                 cursor: hoverCursor
               }}
               // Width/Height attributes still set by editorDimensions in useEffect
-              onMouseDown={handleCanvasMouseDown}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseMove={handleCanvasMouseMove}
-              onContextMenu={handleCanvasContextMenu}
+              // onMouseDown={handleCanvasMouseDown}
+              // onMouseUp={handleCanvasMouseUp}
+              // onMouseMove={handleCanvasMouseMove}
+              // onContextMenu={handleCanvasContextMenu}
             />
           </div>
         </div>
-      </div>
-    </div>
+    //   </div>
+    // </div>
   );
 }
 
