@@ -135,8 +135,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     const dpr = window.devicePixelRatio || 1;
     // Set bitmap resolution based on visible dimensions
-    canvas.width = totalGridWidth * dpr;
-    canvas.height = totalGridHeight * dpr;
+    canvas.width = editorDimensions.width * dpr;
+    canvas.height = editorDimensions.height * dpr;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -151,9 +151,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       selectedNoteIds,
       editorDimensions.width,
       editorDimensions.height,
-      blockDuration,
-      blockStartBeat,
-      totalGridWidth,
+      numMeasures,
       selectionBox,
       isDragging,
       pixelsPerBeat,
