@@ -49,7 +49,7 @@ export interface Track {
   isSoloed: boolean;
   isMuted: boolean;
   midiBlocks: MIDIBlock[];
-  synthesizer: Synthesizer; // Now uses the imported class type
+  synthesizer: Synthesizer;
   effects: Effect[];
 }
 

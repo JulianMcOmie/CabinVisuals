@@ -62,7 +62,7 @@ export const midiBlockToData = (block: MIDIBlock, trackId: string): MidiBlockDat
         trackId: trackId,
         startBeat: block.startBeat,
         endBeat: block.endBeat,
-        notes: notesArray.map(note => midiNoteToData(note, block.id)),
+        notes: notesArray.map(note => note as MidiNoteData),
     };
 };
 
