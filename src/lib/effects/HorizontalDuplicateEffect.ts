@@ -2,9 +2,12 @@ import Effect from '../Effect';
 import { VisualObject } from '../types';
 import { Property } from '../properties/Property';
 
+/**
+ * An effect that creates horizontal duplicates of incoming objects.
+ */
 class HorizontalDuplicateEffect extends Effect {
-    constructor() {
-        super();
+    constructor(id?: string) {
+        super(id);
         this.initializeProperties();
     }
 
@@ -69,15 +72,18 @@ class HorizontalDuplicateEffect extends Effect {
         return outputObjects;
     }
 
+    /**
+     * @returns A new HorizontalDuplicateEffect instance with the same property values.
+     */
     clone(): this {
-        const cloned = new HorizontalDuplicateEffect() as this;
+        const newInstance = new HorizontalDuplicateEffect(this.id) as this;
         this.properties.forEach((prop, key) => {
-            const clonedProp = cloned.properties.get(key);
+            const clonedProp = newInstance.properties.get(key);
             if (clonedProp) {
                 clonedProp.value = prop.value;
             }
         });
-        return cloned;
+        return newInstance;
     }
 }
 

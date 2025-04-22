@@ -8,8 +8,12 @@ import { Property, NumericMetadata } from '../properties/Property';
  * An effect that scales visual objects uniformly.
  */
 class ScaleEffect extends Effect {
-  constructor() {
-    super();
+  constructor(id?: string) {
+    super(id);
+    this.initializeProperties();
+  }
+
+  initializeProperties() {
     // Initialize the 'scale' property
     this.properties.set('scale', new Property<number>(
       'scale', // name
@@ -68,7 +72,7 @@ class ScaleEffect extends Effect {
    * @returns A new ScaleEffect instance with the same property values.
    */
   clone(): this {
-    const newInstance = new ScaleEffect() as this;
+    const newInstance = new ScaleEffect(this.id) as this;
     // Copy property values (cloning properties ensures isolation)
     this.properties.forEach((prop, key) => {
       newInstance.properties.set(key, prop.clone());

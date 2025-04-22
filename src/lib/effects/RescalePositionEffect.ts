@@ -2,9 +2,12 @@ import Effect from '../Effect';
 import { VisualObject } from '../types';
 import { Property } from '../properties/Property';
 
+/**
+ * An effect that rescales the positions of visual objects relative to a center point.
+ */
 class RescalePositionEffect extends Effect {
-    constructor() {
-        super();
+    constructor(id?: string) {
+        super(id);
         this.properties = new Map<string, Property<any>>([
             ['scaleX', new Property<number>('scaleX', 1, { uiType: 'slider', label: 'Scale X', min: 0, max: 5, step: 0.05 })],
             ['scaleY', new Property<number>('scaleY', 1, { uiType: 'slider', label: 'Scale Y', min: 0, max: 5, step: 0.05 })],
@@ -30,15 +33,18 @@ class RescalePositionEffect extends Effect {
         }));
     }
 
+    /**
+     * Creates a clone of the RescalePositionEffect instance.
+     */
     clone(): this {
-        const cloned = new RescalePositionEffect() as this;
-        this.properties.forEach((prop, name) => {
-            const clonedProp = cloned.properties.get(name);
+        const newInstance = new RescalePositionEffect(this.id) as this;
+        this.properties.forEach((prop, key) => {
+            const clonedProp = newInstance.properties.get(key);
             if (clonedProp) {
                 clonedProp.value = prop.value;
             }
         });
-        return cloned;
+        return newInstance;
     }
 }
 

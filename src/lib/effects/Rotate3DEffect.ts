@@ -3,8 +3,8 @@ import { VisualObject } from '../types';
 import { Property } from '../properties/Property';
 
 class Rotate3DEffect extends Effect {
-    constructor() {
-        super();
+    constructor(id?: string) {
+        super(id);
         this.properties = new Map<string, Property<any>>([
             ['rotationX', new Property<number>('rotationX', 0, { uiType: 'slider', label: 'Rotation X (°)', min: -360, max: 360, step: 1 })],
             ['rotationY', new Property<number>('rotationY', 0, { uiType: 'slider', label: 'Rotation Y (°)', min: -360, max: 360, step: 1 })],
@@ -66,14 +66,14 @@ class Rotate3DEffect extends Effect {
     }
 
     clone(): this {
-        const cloned = new Rotate3DEffect() as this;
+        const newInstance = new Rotate3DEffect(this.id) as this;
         this.properties.forEach((prop, name) => {
-            const clonedProp = cloned.properties.get(name);
+            const clonedProp = newInstance.properties.get(name);
             if (clonedProp) {
                 clonedProp.value = prop.value;
             }
         });
-        return cloned;
+        return newInstance;
     }
 }
 

@@ -24,9 +24,12 @@ function interpolateRgb(color1: { r: number; g: number; b: number }, color2: { r
     return `#${clamp(r).toString(16).padStart(2, '0')}${clamp(g).toString(16).padStart(2, '0')}${clamp(b).toString(16).padStart(2, '0')}`;
 }
 
+/**
+ * An effect that overrides the color of visual objects.
+ */
 class ColorEffect extends Effect {
-    constructor() {
-        super();
+    constructor(id?: string) {
+        super(id);
         this.properties = new Map<string, Property<any>>([
             ['colorStart', new Property<string>('colorStart', '#ff0000', { uiType: 'color', label: 'Start Color (Min Y)' })],
             ['colorEnd', new Property<string>('colorEnd', '#0000ff', { uiType: 'color', label: 'End Color (Max Y)' })],
@@ -71,14 +74,14 @@ class ColorEffect extends Effect {
     }
 
     clone(): this {
-        const cloned = new ColorEffect() as this;
-        this.properties.forEach((prop, name) => {
-            const clonedProp = cloned.properties.get(name);
+        const newInstance = new ColorEffect(this.id) as this;
+        this.properties.forEach((prop, key) => {
+            const clonedProp = newInstance.properties.get(key);
             if (clonedProp) {
                 clonedProp.value = prop.value;
             }
         });
-        return cloned;
+        return newInstance;
     }
 }
 

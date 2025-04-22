@@ -8,7 +8,11 @@ import { v4 as uuidv4 } from 'uuid';
 abstract class Effect {
   // Map to store configurable properties for the effect
   public properties: Map<string, Property<any>> = new Map();
-  public id: string = uuidv4();
+  public id: string;
+
+  constructor(id?: string) {
+    this.id = id ?? uuidv4();
+  }
 
   /**
    * Abstract method that subclasses must implement to apply the effect logic.

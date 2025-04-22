@@ -17,8 +17,8 @@ class DelayEffect extends Effect {
   // A small time threshold to check for echo emission
   private timeThreshold = 0.01; // This might need tuning or a different approach
 
-  constructor() {
-    super();
+  constructor(id?: string) {
+    super(id);
     this.properties.set('delayTime', new Property<number>(
       'delayTime', 1.0, 
       { 
@@ -114,10 +114,10 @@ class DelayEffect extends Effect {
 
   /**
    * Creates a clone of the DelayEffect instance.
-   * @returns A new DelayEffect instance with the same property values but an empty buffer.
+   * @returns A new DelayEffect instance with the same property values.
    */
   clone(): this {
-    const newInstance = new DelayEffect() as this;
+    const newInstance = new DelayEffect(this.id) as this;
     // Clone properties
     this.properties.forEach((prop, key) => {
       newInstance.properties.set(key, prop.clone());

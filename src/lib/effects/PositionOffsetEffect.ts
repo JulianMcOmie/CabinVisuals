@@ -2,9 +2,12 @@ import Effect from '../Effect';
 import { VisualObject } from '../types';
 import { Property } from '../properties/Property';
 
+/**
+ * An effect that offsets the position of visual objects.
+ */
 class PositionOffsetEffect extends Effect {
-    constructor() {
-        super();
+    constructor(id?: string) {
+        super(id);
         this.properties = new Map<string, Property<any>>([
             ['offsetX', new Property<number>('offsetX', 0, { uiType: 'slider', label: 'Offset X', min: -10, max: 10, step: 0.1 })],
             ['offsetY', new Property<number>('offsetY', 0, { uiType: 'slider', label: 'Offset Y', min: -10, max: 10, step: 0.1 })],
@@ -30,15 +33,18 @@ class PositionOffsetEffect extends Effect {
         }));
     }
 
+    /**
+     * Creates a clone of the PositionOffsetEffect instance.
+     */
     clone(): this {
-        const cloned = new PositionOffsetEffect() as this;
-        this.properties.forEach((prop, name) => {
-            const clonedProp = cloned.properties.get(name);
+        const newInstance = new PositionOffsetEffect(this.id) as this;
+        this.properties.forEach((prop, key) => {
+            const clonedProp = newInstance.properties.get(key);
             if (clonedProp) {
                 clonedProp.value = prop.value;
             }
         });
-        return cloned;
+        return newInstance;
     }
 }
 

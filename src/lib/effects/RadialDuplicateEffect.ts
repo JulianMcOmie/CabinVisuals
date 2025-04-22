@@ -6,8 +6,8 @@ import { Property, NumericMetadata } from '../properties/Property';
  * An effect that creates radial duplicates of incoming objects.
  */
 class RadialDuplicateEffect extends Effect {
-  constructor() {
-    super();
+  constructor(id?: string) {
+    super(id);
     this.properties.set('numCopies', new Property<number>(
       'numCopies',
       3, // defaultValue
@@ -83,10 +83,10 @@ class RadialDuplicateEffect extends Effect {
 
   /**
    * Creates a clone of the RadialDuplicateEffect instance.
-   * @returns A new instance with the same property values.
+   * @returns A new RadialDuplicateEffect instance with the same property values.
    */
   clone(): this {
-    const newInstance = new RadialDuplicateEffect() as this;
+    const newInstance = new RadialDuplicateEffect(this.id) as this;
     this.properties.forEach((prop, key) => {
       newInstance.properties.set(key, prop.clone());
     });

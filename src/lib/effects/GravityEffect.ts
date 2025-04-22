@@ -3,12 +3,11 @@ import { VisualObject } from '../types';
 import { Property, NumericMetadata } from '../properties/Property';
 
 /**
- * An effect that applies a constant directional acceleration (gravity-like) to objects,
- * modifying their velocity and position over time.
+ * An effect that applies a gravitational pull to visual objects towards a center point.
  */
 class GravityEffect extends Effect {
-  constructor() {
-    super();
+  constructor(id?: string) {
+    super(id);
     this.properties.set('gravityX', new Property<number>(
       'gravityX', 0, 
       { 
@@ -92,10 +91,10 @@ class GravityEffect extends Effect {
 
   /**
    * Creates a clone of the GravityEffect instance.
-   * @returns A new instance with the same property values.
+   * @returns A new GravityEffect instance with the same property values.
    */
   clone(): this {
-    const newInstance = new GravityEffect() as this;
+    const newInstance = new GravityEffect(this.id) as this;
     this.properties.forEach((prop, key) => {
       newInstance.properties.set(key, prop.clone());
     });
