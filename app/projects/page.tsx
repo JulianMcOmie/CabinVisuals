@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation'; // Import useRouter
 import ProjectsDisplay from "../../src/components/ProjectsDisplay";
 import { initializeStore } from '../../src/store/store'; // Import the initializer
 import useStore from '../../src/store/store'; // Import the hook
 
 export default function ProjectsPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
   
   // Use the store hook to get state and actions
   const projects = useStore((state) => state.projectList);
@@ -45,15 +47,8 @@ export default function ProjectsPage() {
   };
 
   const handleSelectProject = async (projectId: string) => {
-     console.log(`Switching to project: ${projectId}`);
-     // Show loading/indicator maybe?
-     try {
-        await switchProject(projectId);
-        // Page will reload due to switchProject logic
-     } catch (error) {
-         console.error(`Failed to switch project: ${projectId}`, error);
-         alert("Failed to switch project.");
-     }
+     await switchProject(projectId);
+     router.push('/alpha'); 
   };
 
   if (isLoading) {
