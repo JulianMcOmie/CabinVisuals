@@ -77,7 +77,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     scrollX, 
     scrollY, 
     handleGridScroll 
-  } = useZoomScroll({ editorRef:scrollContainerRef, numMeasures });
+  } = useZoomScroll({ editorRef, numMeasures });
 
   const blockStartBeat = block.startBeat;
   const blockDuration = block.endBeat - block.startBeat;
@@ -216,7 +216,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
               zIndex: 2, // Higher z-index
               backgroundColor: 'transparent' // Allows canvas to show through
             }}
-            onScroll={handleGridScroll}
+            //onScroll={handleGridScroll}
             ref={scrollContainerRef}
           >
             {/* Sizer & Interaction Div (Inside Scrollable Grid) - MUST NOT be absolute */}

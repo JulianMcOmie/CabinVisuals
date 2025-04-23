@@ -126,6 +126,8 @@ export const useZoomScroll = ({
             // If not over keys (presumably over the grid), allow default browser scroll
             // which should target the grid element correctly.
             // --------------------------------
+            setScrollX(gridElement.scrollLeft);
+            setScrollY(gridElement.scrollTop);
         }
     }, [numMeasures, editorRef]); // Dependencies
 
