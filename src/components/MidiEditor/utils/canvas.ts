@@ -188,7 +188,7 @@ const drawMidiBlock = (
     blockStartBeat * pixelsPerBeat - scrollX, 
     0, 
     blockDuration * pixelsPerBeat, 
-    pixelsPerSemitone / 2
+    6
   );
 };
 /**
