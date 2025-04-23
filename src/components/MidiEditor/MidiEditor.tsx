@@ -152,6 +152,8 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       isDragging,
       pixelsPerBeat,
       pixelsPerSemitone,
+      blockStartBeat,
+      blockDuration,
       scrollX,
       scrollY,
       currentBeat

@@ -51,6 +51,8 @@ export const drawMidiEditor = (
   isDragging: boolean,        // Keep for selection box visibility
   pixelsPerBeat: number,
   pixelsPerSemitone: number,
+  blockStartBeat: number,
+  blockDuration: number,
   scrollX: number,            // Current horizontal scroll offset
   scrollY: number,            // Current vertical scroll offset
   currentBeat: number         // Playhead position in beats
@@ -67,18 +69,17 @@ export const drawMidiEditor = (
   const endNoteYVisible = scrollY + canvasHeight;
   // Optional: Convert Y range to note value range if needed for grid line optimization
   // const highestNoteVisible = ... calculation based on startNoteYVisible ...
-  // const lowestNoteVisible = ... calculation based on endNoteYVisible ...
+  // const lowestNoteVisible = ... calculation based on endNoteYVisible ..
 
-  // 3. Draw Grid (only visible lines)
+
   drawGrid(ctx, canvasWidth, canvasHeight, numMeasures, pixelsPerBeat, pixelsPerSemitone, scrollX, scrollY);
 
-  // 4. Draw Notes (only visible notes)
-  drawNotes(ctx, notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, scrollX, scrollY, canvasWidth, canvasHeight);
+  drawMidiBlock(ctx, blockStartBeat, blockDuration, pixelsPerBeat, pixelsPerSemitone, scrollX, scrollY, canvasWidth, canvasHeight);
 
-  // 5. Draw Playhead (if visible)
+  drawNotes(ctx, notes, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, scrollX, scrollY, blockStartBeat, canvasWidth, canvasHeight);
+
   drawPlayhead(ctx, currentBeat, pixelsPerBeat, canvasHeight, scrollX, canvasWidth);
 
-  // 6. Draw Selection Box (if active and visible)
   if (selectionBox && isDragging) {
     drawSelectionBox(ctx, selectionBox, scrollX, scrollY, canvasWidth, canvasHeight);
   }
@@ -156,6 +157,40 @@ const drawGrid = (
   }
 };
 
+
+/**
+ * Draws the MIDI block on the canvas.
+ */
+const drawMidiBlock = (
+  ctx: CanvasRenderingContext2D,
+  blockStartBeat: number,
+  blockDuration: number,
+  pixelsPerBeat: number,
+  pixelsPerSemitone: number,
+  scrollX: number,
+  scrollY: number,
+  canvasWidth: number,
+  canvasHeight: number
+): void => {
+  // Draw the block
+  // Draw a semi-transparent grey fill with light green borders
+  ctx.fillStyle = 'rgba(50, 50, 50, 0.5)';
+  ctx.fillRect(blockStartBeat * pixelsPerBeat - scrollX, 0, blockDuration * pixelsPerBeat, canvasHeight);
+  
+  // Add soft light green border
+  ctx.strokeStyle = 'rgba(144, 238, 144, 0.8)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(blockStartBeat * pixelsPerBeat - scrollX, 0, blockDuration * pixelsPerBeat, canvasHeight);
+  
+  // Add thicker transparent soft green rectangle at the top
+  ctx.fillStyle = 'rgba(144, 238, 144, 0.8)';
+  ctx.fillRect(
+    blockStartBeat * pixelsPerBeat - scrollX, 
+    0, 
+    blockDuration * pixelsPerBeat, 
+    pixelsPerSemitone / 2
+  );
+};
 /**
  * Draws only the visible MIDI notes on the canvas.
  */
@@ -167,6 +202,7 @@ const drawNotes = (
   pixelsPerSemitone: number,
   scrollX: number,
   scrollY: number,
+  blockStartBeat: number,
   canvasWidth: number,
   canvasHeight: number
 ): void => {
@@ -181,7 +217,7 @@ const drawNotes = (
     if (isRangeVisibleX(noteX, noteX + noteWidth, scrollX, canvasWidth) &&
         isRangeVisibleY(noteY, noteY + noteHeight, scrollY, canvasHeight))
     {
-      drawNote(ctx, note, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, scrollX, scrollY);
+      drawNote(ctx, note, blockStartBeat, selectedNoteIds, pixelsPerBeat, pixelsPerSemitone, scrollX, scrollY);
     }
   });
 };
@@ -193,6 +229,7 @@ const drawNotes = (
 const drawNote = (
   ctx: CanvasRenderingContext2D,
   note: MIDINote,
+  blockStartBeat: number,
   selectedNoteIds: string[],
   pixelsPerBeat: number,
   pixelsPerSemitone: number,
@@ -200,7 +237,7 @@ const drawNote = (
   scrollY: number
 ) => {
   // Calculate screen coordinates
-  const screenX = note.startBeat * pixelsPerBeat - scrollX;
+  const screenX = (note.startBeat + blockStartBeat) * pixelsPerBeat - scrollX;
   const screenY = getNoteY(note.pitch, pixelsPerSemitone) - scrollY; // Use note.pitch here
   const noteWidth = note.duration * pixelsPerBeat;
   const noteHeight = pixelsPerSemitone;
@@ -233,7 +270,7 @@ const drawNote = (
   ctx.closePath();
   ctx.fill();
 
-  // Optional: Add subtle border
+  //Optional: Add subtle border
   // ctx.strokeStyle = 'rgba(0,0,0,0.2)';
   // ctx.lineWidth = 0.5;
   // ctx.stroke();
