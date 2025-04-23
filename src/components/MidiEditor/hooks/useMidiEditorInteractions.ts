@@ -109,6 +109,7 @@ export const useMidiEditorInteractions = ({
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
+            // console.log("handleMouseMove");
             const currentDragOp = dragOperationRef.current;
             const currentBlock = blockRef.current;
             const currentInitialBlockState = initialBlockStateRef.current;
@@ -118,6 +119,7 @@ export const useMidiEditorInteractions = ({
             const currentSelectedNoteIds = selectedNoteIdsRef.current;
 
             if (currentDragOp === 'none') {
+                // console.log("currentDragOp === 'none'");
                 return;
             }
 
@@ -128,6 +130,7 @@ export const useMidiEditorInteractions = ({
             const currentBlockWidth = blockDuration * currentPixelsPerBeat;
 
             if (currentDragOp === 'select' && currentSelectionBox) {
+                // console.log("currentDragOp === 'select' && currentSelectionBox");
                 setSelectionBox({
                     ...currentSelectionBox,
                     endX: coords.scrolledX,
@@ -140,6 +143,7 @@ export const useMidiEditorInteractions = ({
             }
 
             if (currentDragOp === 'drag-playhead') {
+                // console.log("currentDragOp === 'drag-playhead'");
                 let newBeat = coords.scrolledX / currentPixelsPerBeat;
                 newBeat = Math.round(newBeat * 4) / 4;
                 const maxBeat = numMeasures * BEATS_PER_MEASURE;
@@ -149,6 +153,7 @@ export const useMidiEditorInteractions = ({
             }
 
             if ((currentDragOp === 'resize-start' || currentDragOp === 'resize-end') && currentInitialBlockState) {
+                // console.log("currentDragOp === 'resize-start' || currentDragOp === 'resize-end' && currentInitialBlockState");
                 const updatedBlock = handleBlockResizeDrag(
                     currentInitialBlockState,
                     currentBlock,
@@ -165,10 +170,12 @@ export const useMidiEditorInteractions = ({
             }
 
             if (!dragNoteId) {
+                // console.log("!dragNoteId");
                 return;
             }
 
             if (!isDraggingRef.current) {
+                // console.log("!isDraggingRef.current");
                 if (isDragThresholdMet(dragStart.clientX, dragStart.clientY, e.clientX, e.clientY)) {
                     setIsDragging(true);
                 } else {
@@ -177,6 +184,7 @@ export const useMidiEditorInteractions = ({
             }
             
             if (currentDragOp === 'move' || currentDragOp === 'start' || currentDragOp === 'end') {
+                // console.log("currentDragOp === 'move' || currentDragOp === 'start' || currentDragOp === 'end'");
                 const elementCoords = { x: coords.x, y: coords.y }; 
                 const deltaX = e.clientX - dragStart.clientX; 
                 const updatedBlock = handleDragMove(
@@ -199,6 +207,7 @@ export const useMidiEditorInteractions = ({
         };
 
         const handleMouseUp = (e: MouseEvent) => {
+            // console.log("handleMouseUp");
             const currentDragOp = dragOperationRef.current;
             const currentBlock = blockRef.current;
             const currentSelectionBox = selectionBoxRef.current;
@@ -207,9 +216,13 @@ export const useMidiEditorInteractions = ({
             const currentPixelsPerSemitone = pixelsPerSemitoneRef.current;
 
             if (currentDragOp === 'select' && mouseDownButton === 0) {
+                // console.log("currentDragOp === 'select' && mouseDownButton === 0");
+                // console.log("currentSelectionBox", currentSelectionBox);
                 if (currentSelectionBox) {
+                    // console.log("currentSelectionBox");
                     const coords = getCoordsAndDerivedCallback(e);
                     if (coords) {
+                        // console.log("coords");
                         const { action, newNote, selectedIds, selectedNotes } = handleSelectionBoxComplete(
                             currentBlock,
                             currentSelectionBox,
@@ -220,6 +233,10 @@ export const useMidiEditorInteractions = ({
                             currentPixelsPerSemitone
                         );
 
+                        // console.log("action", action);
+                        // console.log("newNote", newNote);
+                        // console.log("selectedIds", selectedIds);
+                        // console.log("selectedNotes", selectedNotes);
 
                         if (action === 'create-note' && newNote) {
                             const updatedBlock = { ...currentBlock, notes: [...currentBlock.notes, newNote] };
@@ -233,7 +250,7 @@ export const useMidiEditorInteractions = ({
                     }
                 }
             } else if ((currentDragOp === 'resize-start' || currentDragOp === 'resize-end')) {
-                console.log("currentDragOp === 'resize-start' || currentDragOp === 'resize-end'");
+                // console.log("currentDragOp === 'resize-start' || currentDragOp === 'resize-end'");
                 setInitialBlockState(null);
             }
 
@@ -246,7 +263,9 @@ export const useMidiEditorInteractions = ({
         };
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            // console.log("handleKeyDown");
             if (selectedWindow !== 'midiEditor') {
+                // console.log("selectedWindow !== 'midiEditor'");
                 return;
             }
             handleKeyboardShortcuts(
@@ -282,6 +301,7 @@ export const useMidiEditorInteractions = ({
     ]);
 
     const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        // console.log("handleCanvasMouseDown");
         setSelectedWindow('midiEditor');
         setMouseDownButton(e.button);
         const currentBlock = blockRef.current;
@@ -291,6 +311,7 @@ export const useMidiEditorInteractions = ({
 
         const coords = getCoordsAndDerivedCallback(e);
         if (!coords) {
+            // console.log("!coords");
             return;
         }
 
@@ -298,8 +319,10 @@ export const useMidiEditorInteractions = ({
         const currentBlockWidth = blockDuration * currentPixelsPerBeat;
 
         if (e.button === 0) {
+            // console.log("e.button === 0 FIRST");
             const playheadX = currentBeatRef.current * currentPixelsPerBeat;
             if (scrolledX >= playheadX - PLAYHEAD_DRAG_WIDTH / 2 && scrolledX <= playheadX + PLAYHEAD_DRAG_WIDTH / 2) {
+                // console.log("playead within range");
                 setDragOperation('drag-playhead');
                 setDragStart({ clientX: e.clientX, clientY: e.clientY, elementX: x, elementY: y });
                 setIsDragging(false);
@@ -309,9 +332,11 @@ export const useMidiEditorInteractions = ({
         }
 
         if (e.button === 0) {
+            // console.log("e.button === 0 SECOND");
             const blockStartX_px = blockStartBeat * currentPixelsPerBeat;
             const blockEndX_px = blockStartX_px + currentBlockWidth;
             if (scrolledX >= blockStartX_px - BLOCK_RESIZE_HANDLE_WIDTH / 2 && scrolledX <= blockStartX_px + BLOCK_RESIZE_HANDLE_WIDTH / 2) {
+                // console.log("resize-start within range");
                 setDragOperation('resize-start');
                 setDragStart({ clientX: e.clientX, clientY: e.clientY, elementX: x, elementY: y });
                 setInitialBlockState({ ...currentBlock });
@@ -319,6 +344,7 @@ export const useMidiEditorInteractions = ({
                 e.stopPropagation();
                 return;
             } else if (scrolledX >= blockEndX_px - BLOCK_RESIZE_HANDLE_WIDTH / 2 && scrolledX <= blockEndX_px + BLOCK_RESIZE_HANDLE_WIDTH / 2) {
+                // console.log("resize-end within range");
                 setDragOperation('resize-end');
                 setDragStart({ clientX: e.clientX, clientY: e.clientY, elementX: x, elementY: y });
                 setInitialBlockState({ ...currentBlock });
@@ -337,17 +363,25 @@ export const useMidiEditorInteractions = ({
         setIsDragging(false);
 
         if (noteClickResult) {
+            // console.log("noteClickResult");
             e.stopPropagation();
             const { note, area } = noteClickResult;
             const { selectedIds, selectedNotes, dragOperation: newDragOperation, cursorType, clickOffset: newClickOffset } = handleNoteClick(
                 currentBlock, note, area, currentSelectedNoteIds, e.shiftKey, x, y, currentPixelsPerBeat, currentPixelsPerSemitone
             );
-
+            // console.log("newDragOperation", newDragOperation);
+            // console.log("selectedIds", selectedIds);
+            // console.log("selectedNotes", selectedNotes);
+            // console.log("newClickOffset", newClickOffset);
+            // console.log("selectedIds", selectedIds);
+            // console.log("selectedNotes", selectedNotes);
+            // console.log("cursorType", cursorType);
 
             setSelectedNoteIds(selectedIds);
             storeSelectNotes(selectedNotes);
             setDragNoteId(note.id);
             setDragOperation(newDragOperation);
+            // console.log("setting hoverCursor to", cursorType);
             setHoverCursor(cursorType);
             setClickOffset(newClickOffset);
 
@@ -359,6 +393,7 @@ export const useMidiEditorInteractions = ({
             setInitialDragStates(newStates);
 
             if (e.altKey && newDragOperation === 'move') {
+                // console.log("e.altKey && newDragOperation === 'move'");
                 const { updatedBlock, newSelectedIds, newDragNoteId, notesToSelect } = handleOptionDrag(currentBlock, selectedIds, note.id);
                 updateMidiBlock(trackId, updatedBlock);
                 setSelectedNoteIds(newSelectedIds);
@@ -373,6 +408,7 @@ export const useMidiEditorInteractions = ({
             }
         } else {
             if (e.button === 0) {
+                // console.log("e.button === 0 ELSE");
                 setDragOperation('select');
                 setSelectionBox({ startX: scrolledX, startY: scrolledY, endX: scrolledX, endY: scrolledY });
                 if (!e.shiftKey) {
@@ -380,6 +416,7 @@ export const useMidiEditorInteractions = ({
                     storeSelectNotes([]);
                 }
                 setDragNoteId(null);
+                // console.log("setting hoverCursor to default");
                 setHoverCursor('default');
             }
         }
@@ -392,12 +429,16 @@ export const useMidiEditorInteractions = ({
     ]);
 
     const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        // console.log("handleCanvasMouseMove");
         if (dragOperationRef.current !== 'none') {
+            // console.log("dragOperationRef.current !== 'none'");
             return;
         }
 
         const coords = getCoordsAndDerivedCallback(e);
         if (!coords) {
+            // console.log("!coords");
+            // console.log("setting hoverCursor to default");
             setHoverCursor('default');
             return;
         }
@@ -411,6 +452,7 @@ export const useMidiEditorInteractions = ({
 
         const playheadX = currentBeatRef.current * currentPixelsPerBeat;
         if (scrolledX >= playheadX - PLAYHEAD_DRAG_WIDTH / 2 && scrolledX <= playheadX + PLAYHEAD_DRAG_WIDTH / 2) {
+            // console.log("playead within range");
             setHoverCursor('col-resize');
             return;
         }
@@ -419,9 +461,11 @@ export const useMidiEditorInteractions = ({
         const blockEndX_px = blockStartX_px + currentBlockWidth;
         let isOverEdge = false;
         if (scrolledX >= blockStartX_px - BLOCK_RESIZE_HANDLE_WIDTH / 2 && scrolledX <= blockStartX_px + BLOCK_RESIZE_HANDLE_WIDTH / 2) {
+            // console.log("resize-start within range");
             setHoverCursor('ew-resize');
             isOverEdge = true;
         } else if (scrolledX >= blockEndX_px - BLOCK_RESIZE_HANDLE_WIDTH / 2 && scrolledX <= blockEndX_px + BLOCK_RESIZE_HANDLE_WIDTH / 2) {
+            // console.log("resize-end within range");
             setHoverCursor('ew-resize');
             isOverEdge = true;
         }
@@ -433,8 +477,12 @@ export const useMidiEditorInteractions = ({
         );
 
         if (cursorResult) {
+            // console.log("cursorResult");
+            // console.log("cursorResult.area", cursorResult.area);
             setHoverCursor(cursorResult.area === 'start' ? 'w-resize' : cursorResult.area === 'end' ? 'e-resize' : 'move');
         } else {
+            // console.log("!cursorResult");
+            // console.log("setting hoverCursor to default");
             setHoverCursor('default');
         }
     }, [
@@ -442,9 +490,11 @@ export const useMidiEditorInteractions = ({
     ]);
 
     const handleCanvasMouseUp = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        // console.log("handleCanvasMouseUp");
     }, []);
 
     const handleCanvasContextMenu = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        // console.log("handleCanvasContextMenu");
         e.preventDefault();
         setSelectedWindow('midiEditor');
         const currentBlock = blockRef.current;
@@ -454,6 +504,7 @@ export const useMidiEditorInteractions = ({
 
         const coords = getCoordsAndDerivedCallback(e);
         if (!coords) {
+            // console.log("!coords");
             return;
         }
 
@@ -463,11 +514,13 @@ export const useMidiEditorInteractions = ({
         );
 
         if (result) {
+            // console.log("result");
             const clickedNoteId = result.note.id;
             const wasSelected = currentSelectedNoteIds.includes(clickedNoteId);
             const updatedBlock = handleContextMenuOnNote(currentBlock, clickedNoteId, currentSelectedNoteIds);
             updateMidiBlock(trackId, updatedBlock);
             if (wasSelected) {
+                //  console.log("wasSelected");
                 setSelectedNoteIds([]);
                 storeSelectNotes([]);
             }
