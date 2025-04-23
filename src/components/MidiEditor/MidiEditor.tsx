@@ -40,16 +40,12 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     seekTo
   } = useStore();
   const editorRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const invisibleSpacerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [editorDimensions, setEditorDimensions] = useState({ width: 0, height: 0 });
   // -------------------------------------------
-
-  // Use state dimensions, fallback if needed
-  // Use original constants for initial calculation before state/hook values are ready
-  const editorWidth = editorDimensions.width || numMeasures * BEATS_PER_MEASURE * PIXELS_PER_BEAT; 
-  const editorHeight = editorDimensions.height || KEY_COUNT * PIXELS_PER_SEMITONE;
   
   useEffect(() => {
     const editorElement = editorRef.current;
@@ -135,15 +131,15 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     const dpr = window.devicePixelRatio || 1;
     // Set bitmap resolution based on visible dimensions
-    canvas.width = totalGridWidth * dpr;
-    canvas.height = totalGridHeight * dpr;
+    canvas.width = editorDimensions.width * dpr;
+    canvas.height = editorDimensions.height * dpr;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
     ctx.save();
     ctx.scale(dpr, dpr);
-    ctx.translate(-scrollX, -scrollY);
+    //ctx.translate(-scrollX, -scrollY);
     
     drawMidiEditor(
       ctx,
@@ -151,13 +147,15 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       selectedNoteIds,
       editorDimensions.width,
       editorDimensions.height,
-      blockDuration,
-      blockStartBeat,
-      totalGridWidth,
+      numMeasures,
       selectionBox,
       isDragging,
       pixelsPerBeat,
       pixelsPerSemitone,
+      blockStartBeat,
+      blockDuration,
+      scrollX,
+      scrollY,
       currentBeat
     );
 
@@ -190,67 +188,62 @@ function MidiEditor({ block, track }: MidiEditorProps) {
         style={{ overflow: 'hidden', height: '100%', }}
         onClick={handleEditorClick}
     >
-      {/* <div className="piano-roll flex flex-col h-full">
-        <div className="flex">
-          <div className="piano-roll-header" style={{ overflow: 'hidden' }}>
-            <PianoRollHeader 
-              startBeat={block.startBeat} 
-              endBeat={block.endBeat} 
-              pixelsPerBeat={pixelsPerBeat} 
-              scrollX={scrollX}
-            />
-          </div>
-        </div> */}
-        {/* <div className="flex" style={{ flex: 1, minHeight: 0 }}>
-          <div className="piano-keys" style={{ overflow: 'hidden', flexShrink: 0 }}>
-            <PianoKeys 
-              keyCount={KEY_COUNT} 
-              keyHeight={pixelsPerSemitone} 
-              scrollY={scrollY}
-            />
-          </div> */}
-          <div
-            className="piano-roll-grid relative"
+        {/* Canvas Layer (Bottom) - Positioned absolutely to fill parent */}
+        <canvas
+            ref={canvasRef} 
             style={{
-              width: `100%`,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%', // Fill parent width
+              height: '100%',// Fill parent height
+              display: 'block',
+              zIndex: 1, // Lower z-index
+              pointerEvents: 'none' // Ignore mouse events
+            }}
+            // width/height attributes (for resolution) set in useEffect
+            // should use editorDimensions, not totalGridWidth/blockHeight
+          />
+
+        {/* Scrollable Grid Layer (Top) - Positioned absolutely to fill parent */}
+        <div
+            className="piano-roll-grid"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%', // Fill parent width
+              height: '100%',// Fill parent height
               overflow: 'scroll',
-              height: '100%'
+              zIndex: 2, // Higher z-index
+              backgroundColor: 'transparent' // Allows canvas to show through
             }}
             onScroll={handleGridScroll}
+            ref={scrollContainerRef}
           >
+            {/* Sizer & Interaction Div (Inside Scrollable Grid) - MUST NOT be absolute */}
             <div className="invisible-spacer"
-              ref={invisibleSpacerRef}
-              onMouseDown={handleCanvasMouseDown}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseMove={handleCanvasMouseMove}
-              onContextMenu={handleCanvasContextMenu}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: `${totalGridWidth}px`,
-                height: `${blockHeight}px`,
-                backgroundColor: 'transparent'
-              }}
+                ref={invisibleSpacerRef}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseMove={handleCanvasMouseMove}
+                onContextMenu={handleCanvasContextMenu}
+                // onMouseLeave={...} // Add if needed
+                style={{
+                  position: 'relative', // Or static (default) - NOT absolute
+                  width: `${totalGridWidth}px`, // Full scrollable width
+                  height: `${blockHeight}px`,  // Full scrollable height
+                  backgroundColor: 'transparent',
+                  cursor: hoverCursor,
+                }}
             />
-            <canvas
-              ref={canvasRef} 
-              style={{
-                display: 'block',
-                width: `${totalGridWidth}px`,   // Full content width
-                height: `${blockHeight}px`, // Full content height
-                cursor: hoverCursor
-              }}
-              // Width/Height attributes still set by editorDimensions in useEffect
-              // onMouseDown={handleCanvasMouseDown}
-              // onMouseUp={handleCanvasMouseUp}
-              // onMouseMove={handleCanvasMouseMove}
-              // onContextMenu={handleCanvasContextMenu}
-            />
+            {/* No canvas here anymore */}
           </div>
-        </div>
-    //   </div>
-    // </div>
+        
+        {/* Header/Keys would need similar absolute positioning if re-enabled */}
+        {/* <div className="piano-roll flex flex-col h-full"> ... */}
+        
+    </div>
   );
 }
 

@@ -119,6 +119,8 @@ export const useZoomScroll = ({
                 // Manually forward scroll delta to the grid element
                 gridElement.scrollTop += e.deltaY;
                 gridElement.scrollLeft += e.deltaX;
+                //(gridElement.scrollLeft);
+                //setScrollY(gridElement.scrollTop);
                 // Prevent the browser's default scroll action for this event,
                 // as we are handling it manually by forwarding to the grid.
                 e.preventDefault(); 
@@ -126,6 +128,8 @@ export const useZoomScroll = ({
             // If not over keys (presumably over the grid), allow default browser scroll
             // which should target the grid element correctly.
             // --------------------------------
+            //setScrollX(gridElement.scrollLeft);
+            //setScrollY(gridElement.scrollTop);
         }
     }, [numMeasures, editorRef]); // Dependencies
 
@@ -166,6 +170,7 @@ export const useZoomScroll = ({
                     targetScrollX = Math.max(0, Math.min(targetScrollX, newContentWidth - viewportWidth));
                     if (!isNaN(targetScrollX) && isFinite(targetScrollX)) {
                         gridElement.scrollLeft = targetScrollX;
+                        //setScrollX(targetScrollX);
                     } else {
                         console.warn("Calculated invalid targetScrollX", { proportionX, newContentWidth, mouseX, targetScrollX });
                     }
@@ -175,6 +180,7 @@ export const useZoomScroll = ({
                     targetScrollY = Math.max(0, Math.min(targetScrollY, newContentHeight - viewportHeight));
                     if (!isNaN(targetScrollY) && isFinite(targetScrollY)) {
                         gridElement.scrollTop = targetScrollY;
+                        //setScrollY(targetScrollY);
                     } else {
                         console.warn("Calculated invalid targetScrollY", { proportionY, newContentHeight, mouseY, targetScrollY });
                     }
@@ -194,12 +200,18 @@ export const useZoomScroll = ({
 
     // Scroll handler for the grid element
     const handleGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        console.log('[useZoomScroll] handleGridScroll fired. isAdjusting:', zoomScrollAdjustmentRef.current.isAdjusting);
         // Prevent scroll state update if we are programmatically adjusting scroll during zoom
         if (zoomScrollAdjustmentRef.current.isAdjusting) {
+            // console.log("Ignoring scroll event during zoom adjustment");
             return;
         }
-        // setScrollX(e.currentTarget.scrollLeft);
-        // setScrollY(e.currentTarget.scrollTop);
+        // Update the state based on the scroll event
+        const currentScrollX = e.currentTarget.scrollLeft;
+        const currentScrollY = e.currentTarget.scrollTop;
+        console.log(`[useZoomScroll] Setting scroll state: X=${currentScrollX}, Y=${currentScrollY}`);
+        setScrollX(currentScrollX);
+        setScrollY(currentScrollY);
     }, []); // No dependencies needed as it only uses the ref and setters
 
     return {
