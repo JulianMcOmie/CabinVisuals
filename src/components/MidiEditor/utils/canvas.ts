@@ -208,7 +208,7 @@ const drawNotes = (
 ): void => {
   notes.forEach(note => {
     // Calculate note's theoretical full coordinates and dimensions
-    const noteX = note.startBeat * pixelsPerBeat;
+    const noteX = blockStartBeat * pixelsPerBeat + note.startBeat * pixelsPerBeat;
     const noteY = getNoteY(note.pitch, pixelsPerSemitone); // Use note.pitch here
     const noteWidth = note.duration * pixelsPerBeat;
     const noteHeight = pixelsPerSemitone;
