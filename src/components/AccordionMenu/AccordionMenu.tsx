@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Disc3, SquareIcon } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 // Define types for the accordion menu items
@@ -70,17 +70,18 @@ const AccordionMenu: React.FC<AccordionMenuProps> = ({
                 </div>
                 </button>
           {expandedCategories[category] && (
-            <ul className="item-list">
+            <div className="pl-4 space-y-1 py-1">
               {items.map((item) => (
-                <li
+                <div
                   key={item.id}
                   onClick={() => handleItemSelect(item.id)}
-                  className={`menu-item ${item.id === selectedItemId ? 'selected' : ''}`}
+                  className="mx-2 p-2 pl-4 hover:bg-[#333] cursor-pointer transition-all rounded-lg flex items-center group"
                 >
-                  {item.name}
-                </li>
+                  <div className="mr-2 text-gray-400">{<Disc3 className="h-4 w-4"/>}</div>
+                  <span className="text-sm group-hover:text-white transition-colors">{item.name}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       ))}
