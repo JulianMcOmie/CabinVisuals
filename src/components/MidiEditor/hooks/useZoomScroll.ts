@@ -119,6 +119,8 @@ export const useZoomScroll = ({
                 // Manually forward scroll delta to the grid element
                 gridElement.scrollTop += e.deltaY;
                 gridElement.scrollLeft += e.deltaX;
+                setScrollX(gridElement.scrollLeft);
+                setScrollY(gridElement.scrollTop);
                 // Prevent the browser's default scroll action for this event,
                 // as we are handling it manually by forwarding to the grid.
                 e.preventDefault(); 
@@ -168,6 +170,7 @@ export const useZoomScroll = ({
                     targetScrollX = Math.max(0, Math.min(targetScrollX, newContentWidth - viewportWidth));
                     if (!isNaN(targetScrollX) && isFinite(targetScrollX)) {
                         gridElement.scrollLeft = targetScrollX;
+                        setScrollX(targetScrollX);
                     } else {
                         console.warn("Calculated invalid targetScrollX", { proportionX, newContentWidth, mouseX, targetScrollX });
                     }
@@ -177,6 +180,7 @@ export const useZoomScroll = ({
                     targetScrollY = Math.max(0, Math.min(targetScrollY, newContentHeight - viewportHeight));
                     if (!isNaN(targetScrollY) && isFinite(targetScrollY)) {
                         gridElement.scrollTop = targetScrollY;
+                        setScrollY(targetScrollY);
                     } else {
                         console.warn("Calculated invalid targetScrollY", { proportionY, newContentHeight, mouseY, targetScrollY });
                     }
