@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../../store/store'; // Import the actual store hook
 import { InstrumentDefinition } from '@/src/store/instrumentSlice';
-import AccordionMenu, { AccordionItem } from '../AccordionMenu';
-import { COLORS } from '../colors';
+import AccordionMenu, { AccordionItem } from '../AccordionMenu/AccordionMenu';
+import styles from './InstrumentSidebar.module.css';
 
 const InstrumentSidebar: React.FC = () => {
   const {
@@ -79,32 +79,23 @@ const InstrumentSidebar: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={styles.container}>
         <div
-            className="sticky top-0 z-10 border-b"
-            style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border }}
+            className={styles.header}
         >
-            <div className="p-3">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-400 font-medium">Library</span>
+            <div className={styles.headerPadding}>
+            <div className={styles.libraryHeader}>
+                <span className={styles.libraryLabel}>Library</span>
             </div>
-            <div className="flex rounded-md overflow-hidden border" style={{ borderColor: COLORS.border }}>
+            <div className={styles.buttonGroup}>
                 <button
-                className={`flex-1 py-2 px-3 text-sm font-medium transition-colors ${
-                    true// sidebarView === "instruments"
-                    ? "bg-[#3a3a3a] text-white"
-                    : "bg-[#252525] text-gray-300 hover:bg-[#333]"
-                }`}
+                className={`${styles.button} ${styles.buttonActive}`}
                 onClick={() => {}}
                 >
                 Instruments
                 </button>
                 <button
-                className={`flex-1 py-2 px-3 text-sm font-medium transition-colors ${
-                    true// sidebarView === "effects"
-                    ? "bg-[#3a3a3a] text-white"
-                    : "bg-[#252525] text-gray-300 hover:bg-[#333]"
-                }`}
+                 className={`${styles.button} ${styles.buttonInactive}`}
                 onClick={() => {}}
                 >
                 Effects

@@ -2,6 +2,7 @@ import { ChevronDown, Disc3, SquareIcon } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import styles from './AccordionMenu.module.css'; // Import the CSS module
 
+
 // Define types for the accordion menu items
 export interface AccordionItem {
   id: string;
