@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 // Define types for the accordion menu items
@@ -53,13 +54,21 @@ const AccordionMenu: React.FC<AccordionMenuProps> = ({
   };
 
   return (
-    <div className="accordion-menu" onClick={onMenuClick}>
+    <div className="accordion-menu text-white" onClick={onMenuClick}>
       <h3>{title}</h3>
       {Object.entries(normalizedCategories).map(([category, items]) => (
         <div key={category} className="category-section">
-          <h4 onClick={() => toggleCategory(category)} style={{ cursor: 'pointer' }}>
-            {expandedCategories[category] ? '▼' : '▶'} {category}
-          </h4>
+            <button
+                    className="w-full flex items-center justify-between p-3 hover:bg-[#333] transition-colors"
+                    onClick={() => toggleCategory(category)}
+                  >
+                <div className="flex items-center">
+                    <ChevronDown
+                    className={`h-4 w-4 mr-2 transition-transform ${expandedCategories[category] ? "" : "-rotate-90"}`}
+                    />
+                    <span className="font-medium">{category}</span>
+                </div>
+                </button>
           {expandedCategories[category] && (
             <ul className="item-list">
               {items.map((item) => (
