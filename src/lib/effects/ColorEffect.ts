@@ -28,7 +28,7 @@ function interpolateRgb(color1: { r: number; g: number; b: number }, color2: { r
  * An effect that overrides the color of visual objects.
  */
 class ColorEffect extends Effect {
-    constructor(id?: string) {
+    constructor(id: string) {
         super(id);
         this.properties = new Map<string, Property<any>>([
             ['colorStart', new Property<string>('colorStart', '#ff0000', { uiType: 'color', label: 'Start Color (Min Y)' })],

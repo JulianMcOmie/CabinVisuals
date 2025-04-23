@@ -8,7 +8,7 @@ import { Property, NumericMetadata } from '../properties/Property';
  * An effect that scales visual objects uniformly.
  */
 class ScaleEffect extends Effect {
-  constructor(id?: string) {
+  constructor(id: string) {
     super(id);
     this.initializeProperties();
   }

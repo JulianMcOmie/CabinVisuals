@@ -6,7 +6,7 @@ import { Property } from '../properties/Property';
  * An effect that creates horizontal duplicates of incoming objects.
  */
 class HorizontalDuplicateEffect extends Effect {
-    constructor(id?: string) {
+    constructor(id: string) {
         super(id);
         this.initializeProperties();
     }

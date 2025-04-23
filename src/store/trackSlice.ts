@@ -451,7 +451,9 @@ export const createTrackSlice: StateCreator<
             const currentEffects = track.effects || [];
             if (effectIndex >= 0 && effectIndex < currentEffects.length) {
               const effectToUpdate = currentEffects[effectIndex];
+              console.log(`Updating effect: ${effectToUpdate.id} with property: ${propertyName} to value: ${value}`);
               const clonedEffect = effectToUpdate.clone(); // Clone the specific effect
+              console.log(`Cloned effect: ${clonedEffect.id}`);
               clonedEffect.setPropertyValue(propertyName, value); // Update the property on the clone
               
               const updatedEffects = [

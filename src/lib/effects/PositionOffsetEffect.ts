@@ -6,7 +6,7 @@ import { Property } from '../properties/Property';
  * An effect that offsets the position of visual objects.
  */
 class PositionOffsetEffect extends Effect {
-    constructor(id?: string) {
+    constructor(id: string) {
         super(id);
         this.properties = new Map<string, Property<any>>([
             ['offsetX', new Property<number>('offsetX', 0, { uiType: 'slider', label: 'Offset X', min: -10, max: 10, step: 0.1 })],

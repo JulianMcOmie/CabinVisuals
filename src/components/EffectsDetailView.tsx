@@ -6,6 +6,7 @@ import { Track } from '../lib/types';
 import Effect from '../lib/Effect';
 import { Property } from '../lib/properties/Property';
 import { EffectDefinition } from '../store/effectSlice';
+import { v4 as uuidv4 } from 'uuid';
 import SliderPropertyControl from './properties/SliderPropertyControl';
 import NumberInputPropertyControl from './properties/NumberInputPropertyControl';
 import DropdownPropertyControl from './properties/DropdownPropertyControl';
@@ -86,9 +87,10 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     
     const definition = allEffectDefinitions.find(def => def.id === selectedEffectToAdd);
     if (definition) {
-      const newEffectInstance = new definition.constructor();
+      const newId = uuidv4();
+      const newEffectInstance = new definition.constructor(newId);
       addEffectToTrack(track.id, newEffectInstance);
-      setSelectedEffectToAdd(''); // Reset dropdown
+      setSelectedEffectToAdd('');
     }
   };
 

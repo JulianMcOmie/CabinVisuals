@@ -2,6 +2,7 @@ import { Track, MIDIBlock, MIDINote } from '../lib/types';
 import { TrackData, MidiBlockData, MidiNoteData, SynthData, EffectData } from '../Persistence/persistence-service';
 import Synthesizer from '../lib/Synthesizer';
 import Effect from '../lib/Effect';
+import * as P from '../Persistence/persistence-service';
 
 import { synthesizerConstructors, effectConstructors } from '../store/store';
 
@@ -158,14 +159,14 @@ export function serializeEffect(instance: Effect, trackId: string, order: number
      };
 }
 
-export function deserializeEffect(data: { type: string; settings: any }): Effect | null {
+export function deserializeEffect(data: P.EffectData): Effect | null {
      const Constructor = effectConstructors.get(data.type);
      if (!Constructor) {
          console.error(`No effect constructor found for type: ${data.type}`);
          return null;
      }
      try {
-         const instance = new Constructor(); // Pass settings to constructor if needed/supported
+         const instance = new Constructor(data.id); 
          applySettings(instance, data.settings);
          return instance;
      } catch (error) {

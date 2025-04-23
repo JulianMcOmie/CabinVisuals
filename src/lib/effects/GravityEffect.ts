@@ -6,7 +6,7 @@ import { Property, NumericMetadata } from '../properties/Property';
  * An effect that applies a gravitational pull to visual objects towards a center point.
  */
 class GravityEffect extends Effect {
-  constructor(id?: string) {
+  constructor(id: string) {
     super(id);
     this.properties.set('gravityX', new Property<number>(
       'gravityX', 0, 

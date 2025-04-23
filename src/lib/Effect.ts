@@ -10,8 +10,8 @@ abstract class Effect {
   public properties: Map<string, Property<any>> = new Map();
   public id: string;
 
-  constructor(id?: string) {
-    this.id = id ?? uuidv4();
+  constructor(id: string) {
+    this.id = id;
   }
 
   /**

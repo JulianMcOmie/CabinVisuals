@@ -6,7 +6,7 @@ import { Property, NumericMetadata } from '../properties/Property';
  * An effect that creates radial duplicates of incoming objects.
  */
 class RadialDuplicateEffect extends Effect {
-  constructor(id?: string) {
+  constructor(id: string) {
     super(id);
     this.properties.set('numCopies', new Property<number>(
       'numCopies',

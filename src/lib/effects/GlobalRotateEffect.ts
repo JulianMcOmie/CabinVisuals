@@ -5,8 +5,8 @@ import * as THREE from 'three';
 
 class GlobalRotateEffect extends Effect {
 
-    constructor() {
-        super();
+    constructor(id: string) {
+        super(id);
         this.initializeProperties();
     }
 
@@ -61,7 +61,7 @@ class GlobalRotateEffect extends Effect {
     }
 
     clone(): this {
-        const newInstance = new (this.constructor as any)();
+        const newInstance = new (this.constructor as any)(this.id);
         this.properties.forEach((value, key) => {
             newInstance.setPropertyValue(key, value.value);
         });

@@ -3,7 +3,7 @@ import { VisualObject } from '../types';
 import { Property } from '../properties/Property';
 
 class Rotate3DEffect extends Effect {
-    constructor(id?: string) {
+    constructor(id: string) {
         super(id);
         this.properties = new Map<string, Property<any>>([
             ['rotationX', new Property<number>('rotationX', 0, { uiType: 'slider', label: 'Rotation X (°)', min: -360, max: 360, step: 1 })],

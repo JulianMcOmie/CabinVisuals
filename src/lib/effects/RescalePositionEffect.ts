@@ -6,7 +6,7 @@ import { Property } from '../properties/Property';
  * An effect that rescales the positions of visual objects relative to a center point.
  */
 class RescalePositionEffect extends Effect {
-    constructor(id?: string) {
+    constructor(id: string) {
         super(id);
         this.properties = new Map<string, Property<any>>([
             ['scaleX', new Property<number>('scaleX', 1, { uiType: 'slider', label: 'Scale X', min: 0, max: 5, step: 0.05 })],

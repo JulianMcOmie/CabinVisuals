@@ -3,7 +3,7 @@ import { VisualObject } from '../types';
 import { Property } from '../properties/Property';
 
 class PanEffect extends Effect {
-    constructor(id?: string) {
+    constructor(id: string) {
         super(id);
         this.properties = new Map<string, Property<any>>([
             ['directionX', new Property<number>('directionX', 1, { uiType: 'numberInput', label: 'Pan Direction X', min: -1, max: 1, step: 0.1 })],

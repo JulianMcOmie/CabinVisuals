@@ -17,7 +17,7 @@ class DelayEffect extends Effect {
   // A small time threshold to check for echo emission
   private timeThreshold = 0.01; // This might need tuning or a different approach
 
-  constructor(id?: string) {
+  constructor(id: string) {
     super(id);
     this.properties.set('delayTime', new Property<number>(
       'delayTime', 1.0, 
