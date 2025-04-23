@@ -1,7 +1,14 @@
 @import "tailwindcss";
 
+/* Basic Global Colors - Defined outside Tailwind layers */
+:root {
+  --cabin-black: #000000;
+  --cabin-white: #ffffff;
+}
+
 @layer base {
   :root {
+    /* Tailwind/Shadcn variables */
     --background: 0 0% 0%;
     --foreground: 0 0% 100%;
     --card: 0 0% 3%;
