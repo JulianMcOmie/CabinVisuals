@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../../store/store'; // Import the actual store hook
 import { InstrumentDefinition } from '@/src/store/instrumentSlice';
-// import { InstrumentDefinition } from '../../store/store'; // Commented out - likely type is inferred or comes from a slice
+import AccordionMenu, { AccordionItem } from '../AccordionMenu';
+
 
 const InstrumentSidebar: React.FC = () => {
-  // Select needed state and actions from the store
   const {
     availableInstruments,
     selectedTrackId,
@@ -13,18 +13,9 @@ const InstrumentSidebar: React.FC = () => {
     setSelectedWindow
   } = useStore();
 
-  // State to track the ID of the highlighted instrument in the sidebar
   const [selectedInstrumentId, setSelectedInstrumentId] = useState<string | null>(null);
 
-  // State for expanded categories (remains the same)
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() =>
-    Object.keys(availableInstruments).reduce((acc, category) => {
-      acc[category] = true; // Default to expanded
-      return acc;
-    }, {} as Record<string, boolean>)
-  );
-
-  // Effect to update highlighted instrument based on the selected track
+  // Highlight the selected track's instrument
   useEffect(() => {
     if (selectedTrack && selectedTrack.synthesizer) {
       const currentSynthConstructor = selectedTrack.synthesizer.constructor;
@@ -42,20 +33,6 @@ const InstrumentSidebar: React.FC = () => {
       setSelectedInstrumentId(null); // No track selected or track has no synthesizer
     }
   }, [selectedTrack, availableInstruments]); // Rerun when selectedTrack or instrument list changes
-
-  // Effect to reset expanded state if availableInstruments changes (remains the same)
-  useEffect(() => {
-    setExpandedCategories(
-      Object.keys(availableInstruments).reduce((acc, category) => {
-        acc[category] = true; // Default to expanded
-        return acc;
-      }, {} as Record<string, boolean>)
-    );
-  }, [availableInstruments]);
-
-  const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }));
-  };
 
   const handleInstrumentSelect = (instrumentId: string) => {
     if (selectedTrackId) {
@@ -84,88 +61,32 @@ const InstrumentSidebar: React.FC = () => {
 
   // Function to handle clicks on the sidebar itself
   const handleSidebarClick = () => {
-      setSelectedWindow(null);
+    setSelectedWindow(null);
+  };
+
+  // Convert availableInstruments to the format expected by AccordionMenu
+  const convertToAccordionItems = (): Record<string, AccordionItem[]> => {
+    const result: Record<string, AccordionItem[]> = {};
+    
+    Object.entries(availableInstruments).forEach(([category, instruments]) => {
+      result[category] = instruments.map(instrument => ({
+        id: instrument.id,
+        name: instrument.name
+      }));
+    });
+    
+    return result;
   };
 
   return (
-    <div className="instrument-sidebar" onClick={handleSidebarClick}>
-      <h3>Instruments</h3>
-      {Object.entries(availableInstruments).map(([category, instruments]) => (
-        <div key={category} className="category-section">
-          <h4 onClick={() => toggleCategory(category)} style={{ cursor: 'pointer' }}>
-            {expandedCategories[category] ? '▼' : '▶'} {category}
-          </h4>
-          {expandedCategories[category] && (
-            <ul className="instrument-list">
-              {instruments.map((instrument) => (
-                <li
-                  key={instrument.id}
-                  onClick={() => handleInstrumentSelect(instrument.id)}
-                  // Apply 'selected' class if this instrument is the selected one
-                  className={`instrument-item ${instrument.id === selectedInstrumentId ? 'selected' : ''}`}
-                >
-                  {instrument.name}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ))}
-
-      <style jsx>{`
-        .instrument-sidebar {
-          padding: 10px;
-          height: 100%; /* Fill parent */
-          overflow-y: auto;
-          border-right: 1px solid #ccc;
-          background-color: #f8f8f8; /* Light background for distinction */
-          box-sizing: border-box;
-        }
-        h3 {
-          margin-top: 0;
-          margin-bottom: 15px;
-          border-bottom: 1px solid #eee;
-          padding-bottom: 5px;
-          color: #000;
-        }
-        .category-section {
-          margin-bottom: 10px;
-        }
-        h4 {
-          margin: 5px 0;
-          font-weight: bold;
-          user-select: none; /* Prevent text selection on click */
-          color: #000;
-        }
-        .instrument-list {
-          list-style: none;
-          padding-left: 20px; /* Indent instrument names */
-          margin: 0;
-        }
-        .instrument-item {
-          padding: 4px 8px; /* Added some horizontal padding */
-          cursor: pointer;
-          border-radius: 3px;
-          margin: 1px 0; /* Added tiny margin */
-          color: #000;
-        }
-        .instrument-item:hover {
-          background-color: #e0e0e0;
-        }
-        /* Style for the selected instrument */
-        .instrument-item.selected {
-          background-color: #cce5ff; /* Light blue background */
-          font-weight: bold;
-          color: #004085; /* Darker blue text */
-        }
-        .instrument-item.selected:hover {
-          background-color: #b8daff; /* Slightly darker blue on hover */
-        }
-        .instrument-item:hover {
-          color: #000;
-        }
-      `}</style>
-    </div>
+    <AccordionMenu
+      categories={convertToAccordionItems()}
+      selectedItemId={selectedInstrumentId}
+      onItemSelect={handleInstrumentSelect}
+      onMenuClick={handleSidebarClick}
+      title="Instruments"
+      defaultExpanded={true}
+    />
   );
 };
 
