@@ -1,0 +1,115 @@
+/* src/components/AccordionMenu/AccordionMenu.module.css */
+.accordionMenu {
+  /* width: 16rem; */
+  display: flex;
+  flex-direction: column;
+  background-color: #252525;
+  border-right: 1px solid #3a3a3a;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  color: white; /* Added from inline style */
+}
+
+.title {
+  margin: 0;
+  padding: 0.75rem;
+  border-bottom: 1px solid #3a3a3a;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.categoryButton {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem; /* Adjusted padding from p-3 */
+    transition: background-color 0.2s;
+    color: #ffffff;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+.categoryButton:hover {
+    background-color: #333333;
+}
+
+.categoryButtonContent {
+    display: flex;
+    align-items: center;
+}
+
+.chevronIcon {
+    height: 1rem; /* h-4 */
+    width: 1rem; /* w-4 */
+    margin-right: 0.5rem; /* mr-2 */
+    transition: transform 0.2s; /* Keep transition-transform */
+}
+
+.chevronIconCollapsed {
+    transform: rotate(-90deg);
+}
+
+.categoryName {
+    font-weight: 500; /* font-medium */
+}
+
+
+.itemsContainer {
+  padding-left: 1rem; /* pl-4 */
+  padding-top: 0.25rem; /* py-1 */
+  padding-bottom: 0.25rem; /* py-1 */
+  /* space-y-1 is handled by item margin */
+}
+
+.item {
+  margin: 0.25rem 0.5rem; /* mx-2 and space-y-1 */
+  padding: 0.5rem; /* p-2 */
+  padding-left: 1rem; /* pl-4 */
+  border-radius: 0.375rem; /* rounded-lg */
+  cursor: pointer;
+  transition: all 0.2s; /* transition-all */
+  display: flex;
+  align-items: center;
+  color: #ffffff; /* Default text color */
+}
+
+.item:hover {
+  background-color: #333333;
+}
+
+.itemIcon {
+  margin-right: 0.5rem; /* mr-2 */
+  color: #a0aec0; /* text-gray-400 */
+}
+
+.itemIcon svg {
+    height: 1rem; /* h-4 */
+    width: 1rem; /* w-4 */
+}
+
+.itemName {
+  font-size: 0.875rem; /* text-sm */
+  transition: color 0.2s; /* transition-colors */
+}
+
+.item:hover .itemName {
+  color: #ffffff; /* group-hover:text-white */
+}
+
+/* Styles previously applied via .menu-item and .menu-item.selected are merged into .item */
+.selectedItem {
+  /* Add specific styles for selected items if needed, or handle via JS */
+  /* Example: */
+   background-color: #2d3540;
+   font-weight: 600;
+   color: #ffffff;
+}
+
+.selectedItem:hover {
+    background-color: #384252; /* Slightly different hover for selected */
+} 
