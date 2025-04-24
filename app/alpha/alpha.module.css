@@ -11,14 +11,15 @@
 }
 
 .playbarContainer {
-  height: 80px; /* Fixed height */
+  height: 72px; /* Fixed height */
   width: 100%;
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0; /* Prevent shrinking */
   display: flex;
   align-items: center;
   padding: 0 10px;
   box-sizing: border-box;
+  background-color: var(--surface);
 }
 
 /* Panel Group Styles */

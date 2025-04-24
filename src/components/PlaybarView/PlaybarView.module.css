@@ -2,12 +2,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border);
   background-color: var(--surface);
   width: 100%;
   padding: 0;
   box-sizing: border-box;
-  height: 60px;
 }
 
 .sidebarToggle {
