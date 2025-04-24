@@ -3,4 +3,83 @@
   -webkit-user-select: none; /* Safari */
   -moz-user-select: none;    /* Firefox */
   -ms-user-select: none;     /* IE/Edge */
+}
+
+.instrumentView {
+  padding: 0 10px;
+  height: 100%;
+  border-bottom: 1px solid #333;
+  display: flex;
+  align-items: center;
+  color: #ddd;
+  background-color: #1a1a1a; /* Default background */
+  transition: background-color 0.1s ease, opacity 0.1s ease;
+  min-width: 150px;
+  box-sizing: border-box;
+  opacity: 1;
+  user-select: none;
+}
+
+.instrumentView.selected:not(.dragging) {
+  background-color: #333;
+}
+
+.instrumentView.dragging {
+  opacity: 0.8;
+  cursor: grabbing; /* Indicate dragging */
+}
+
+.trackNameContainer {
+  flex-grow: 1;
+  margin-right: 8px;
+}
+
+.trackNameInput {
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  box-sizing: border-box;
+}
+
+.trackNameDisplay {
+  width: 100%;
+  pointer-events: auto; /* Default */
+}
+
+.trackNameDisplay.dragging {
+  pointer-events: none;
+}
+
+.controlsContainer {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.controlButton {
+  padding: 2px 5px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  background-color: #444;
+  color: #ddd;
+  min-width: 25px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.controlButton.mute.active {
+  border-color: #4A90E2;
+  background-color: #4A90E2;
+  color: #fff;
+}
+
+.controlButton.solo.active {
+  border-color: #FFD700;
+  background-color: #FFD700;
+  color: #000;
 } 
