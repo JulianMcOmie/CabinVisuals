@@ -38,7 +38,7 @@
 }
 
 .clearButton:hover {
-  background-color: var(--lightSurface);
+  background-color: var(--lightSurfaceHover);
 }
 
 .loadButton {
