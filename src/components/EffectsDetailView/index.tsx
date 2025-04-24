@@ -129,8 +129,32 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     }
   };
 
+  // Handle dropping an effect onto the view
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      if (data.type === 'effect' && data.id) {
+        handleAddEffect(data.id);
+      }
+    } catch (err) {
+      console.error("Failed to parse dropped data:", err);
+    }
+  };
+
+  // Handle dragging over the view
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Necessary to allow dropping
+    // Optional: Add visual feedback here, e.g., changing background color or border
+    e.dataTransfer.dropEffect = "copy"; // Indicate the drop operation is a copy
+  };
+
   return (
-    <div className="flex-1 p-4 overflow-auto text-white">
+    <div 
+      className="flex-1 p-4 overflow-auto text-white"
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+    >
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium">Effects Chain for Track {track.id}</h3>
       </div>

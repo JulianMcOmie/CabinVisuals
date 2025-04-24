@@ -21,6 +21,7 @@ interface AccordionMenuProps {
   onMenuClick?: () => void;
   title?: string;
   defaultExpanded?: boolean;
+  onItemDragStart?: (event: React.DragEvent, itemId: string) => void;
 }
 
 const AccordionMenu: React.FC<AccordionMenuProps> = ({
@@ -30,6 +31,7 @@ const AccordionMenu: React.FC<AccordionMenuProps> = ({
   onMenuClick,
   title = 'Menu',
   defaultExpanded = true,
+  onItemDragStart,
 }) => {
   // Convert categories to standardized format for internal use
   const normalizedCategories = Array.isArray(categories)
@@ -77,7 +79,15 @@ const AccordionMenu: React.FC<AccordionMenuProps> = ({
                 <div
                   key={item.id}
                   onClick={() => handleItemSelect(item.id)}
-                  className={`${styles.item} ${item.id === selectedItemId ? styles.selectedItem : ''}`}
+                  onDragStart={(e) => {
+                    if (onItemDragStart) {
+                        onItemDragStart(e, item.id);
+                    } else {
+                      e.dataTransfer.setData('text/plain', item.id);
+                    }
+                  }}
+                  draggable={!!onItemDragStart}
+                  className={`${styles.item} ${item.id === selectedItemId ? styles.selectedItem : ''} ${onItemDragStart ? styles.draggableItem : ''}`}
                   title={item.name}
                 >
                   <div className={styles.itemIcon}>{<Disc3 />}</div>

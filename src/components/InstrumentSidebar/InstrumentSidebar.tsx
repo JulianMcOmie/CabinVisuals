@@ -69,6 +69,12 @@ const InstrumentSidebar: React.FC = () => {
     console.log('Effect selected:', effectId);
   };
 
+  // Function to handle drag start for effects
+  const handleEffectDragStart = (event: React.DragEvent, effectId: string) => {
+    // Set data for the drag operation
+    event.dataTransfer?.setData('text/plain', JSON.stringify({ type: 'effect', id: effectId }));
+  };
+
   // Function to handle clicks on the sidebar itself
   const handleSidebarClick = () => {
     setSelectedWindow(null);
@@ -143,6 +149,7 @@ const InstrumentSidebar: React.FC = () => {
           selectedItemId={null}
           onItemSelect={handleEffectSelect}
           onMenuClick={handleSidebarClick}
+          onItemDragStart={handleEffectDragStart}
           title="Effects"
           defaultExpanded={true}
         />
