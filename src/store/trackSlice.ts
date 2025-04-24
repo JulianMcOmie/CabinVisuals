@@ -495,28 +495,27 @@ export const createTrackSlice: StateCreator<
             const newTracks = state.tracks.map(track => {
                 if (track.id === trackId) {
                     const currentEffects = [...(track.effects || [])]; // Create a mutable copy
-                    if (draggedIndex >= 0 && draggedIndex < currentEffects.length) {
+
+                    // Validate indices - targetIndex can be equal to length for appending
+                    if (draggedIndex >= 0 && draggedIndex < currentEffects.length &&
+                        targetIndex >= 0 && targetIndex <= currentEffects.length) {
+
                         const [draggedEffect] = currentEffects.splice(draggedIndex, 1); // Remove the dragged effect
+                        currentEffects.splice(targetIndex, 0, draggedEffect); // Insert at the target index
 
-                        // Adjust targetIndex if it's affected by the removal
-                        const adjustedTargetIndex = targetIndex > draggedIndex ? targetIndex -1 : targetIndex;
+                        return { ...track, effects: currentEffects }; // Return updated track
 
-                        if (adjustedTargetIndex >= 0 && adjustedTargetIndex <= currentEffects.length) {
-                             currentEffects.splice(adjustedTargetIndex, 0, draggedEffect); // Insert at the target
-                             return { ...track, effects: currentEffects };
-                        } else {
-                            console.warn(`reorderEffectsOnTrack: Invalid target index ${targetIndex} (adjusted: ${adjustedTargetIndex}) after removal.`);
-                            // Optionally put it back or at the end if target is invalid
-                            currentEffects.splice(draggedIndex, 0, draggedEffect); // Put back original position
-                            return { ...track, effects: currentEffects }; // Return original if target invalid
-                        }
                     } else {
-                         console.warn(`reorderEffectsOnTrack: Invalid dragged index ${draggedIndex}.`);
+                        console.warn(`reorderEffectsOnTrack: Invalid indices (dragged: ${draggedIndex}, target: ${targetIndex}) for track ${trackId}.`);
+                        // Return the track unchanged if indices are invalid
+                        return track;
                     }
                 }
+                // Return other tracks unchanged
                 return track;
             });
 
+            // Selections don't change, but get updated references
             const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
 
             return {
