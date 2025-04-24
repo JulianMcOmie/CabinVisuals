@@ -48,8 +48,8 @@
 
 /* Resize Handle Styles */
 .resizeHandle {
-  background-color: #e0e0e0; /* Light gray */
-  border: 1px solid #ccc;
+  background-color: var(--border); /* Changed to use CSS variable */
+  border: none; /* Removed default border */
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -57,16 +57,17 @@
 }
 
 .resizeHandle:hover {
-  background-color: #d0d0d0; /* Darker gray on hover */
+  /* Consider adding a hover effect if needed, e.g., slightly lighter/darker */
+  /* background-color: var(--some-hover-color); */
 }
 
 .horizontalHandle {
-  width: 5px;
+  width: 5px; /* Reverted size */
   cursor: col-resize;
 }
 
 .verticalHandle {
-  height: 5px;
+  height: 5px; /* Reverted size */
   cursor: row-resize;
 }
 
