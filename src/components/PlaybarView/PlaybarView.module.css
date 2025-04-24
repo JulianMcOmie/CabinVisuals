@@ -2,15 +2,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem;
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  background-color: var(--surface);
+  width: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  height: 60px;
 }
 
 .sidebarToggle {
   color: var(--text);
   border-radius: 0.375rem;
   border: 1px solid var(--border);
+  background-color: var(--surface);
 }
 
 .sidebarToggle:hover {
@@ -29,6 +33,7 @@
   border-radius: 0.375rem;
   overflow: hidden;
   border: 1px solid var(--border);
+  background-color: var(--background-color);
 }
 
 .controlButton {
@@ -40,7 +45,11 @@
 }
 
 .stopButton {
-  composes: controlButton;
+  color: var(--text);
+  border-radius: 0;
+  height: 2.25rem;
+  width: 2.25rem;
+  border: 0;
   background-color: #333;
 }
 
@@ -48,13 +57,13 @@
   background-color: #444;
 }
 
-.playButton {
-  composes: controlButton;
-}
-
 .playButtonActive {
-  composes: playButton;
   color: var(--text);
+  border-radius: 0;
+  height: 2.25rem;
+  width: 2.25rem;
+  border: 0;
+  background-color: rgba(0, 230, 118, 0.5);
 }
 
 .playButtonActive:hover {
@@ -62,8 +71,12 @@
 }
 
 .playButtonInactive {
-  composes: playButton;
   color: var(--text);
+  border-radius: 0;
+  height: 2.25rem;
+  width: 2.25rem;
+  border: 0;
+  background-color: var(--lightSurface);
 }
 
 .playButtonInactive:hover {
@@ -71,13 +84,13 @@
   color: rgb(134, 239, 172);
 }
 
-.loopButton {
-  composes: controlButton;
-}
-
 .loopButtonActive {
-  composes: loopButton;
   color: var(--text);
+  border-radius: 0;
+  height: 2.25rem;
+  width: 2.25rem;
+  border: 0;
+  background-color: rgba(255, 221, 0, 0.5);
 }
 
 .loopButtonActive:hover {
@@ -85,8 +98,12 @@
 }
 
 .loopButtonInactive {
-  composes: loopButton;
   color: var(--text);
+  border-radius: 0;
+  height: 2.25rem;
+  width: 2.25rem;
+  border: 0;
+  background-color: var(--lightSurface);
 }
 
 .loopButtonInactive:hover {
@@ -120,6 +137,7 @@
 .bpmLabel {
   font-size: 0.875rem;
   font-weight: 500;
+  color: var(--text);
 }
 
 .bpmInput {
@@ -131,10 +149,14 @@
   padding-bottom: 0.25rem;
   width: 4rem;
   text-align: center;
+  background-color: var(--lightSurface);
+  color: var(--text);
 }
 
 .bpmInput:focus {
   outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.5);
 }
 
 .exportButton {
