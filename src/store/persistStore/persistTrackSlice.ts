@@ -239,6 +239,37 @@ export const persistUpdateEffectPropertyOnTrack = async (get: () => AppState, tr
      }
 };
 
+export const persistReorderEffectsOnTrack = async (get: () => AppState, trackId: string) => {
+    try {
+        const finalState = get();
+        const track = finalState.tracks.find(t => t.id === trackId);
+        if (!track?.effects) {
+            // No effects to reorder or track not found
+            console.warn(`PersistReorderEffects: Track ${trackId} not found or has no effects.`);
+            return; 
+        }
+
+        const savePromises = track.effects.map((effect, index) => {
+            const serialized = serializeEffect(effect, trackId, index);
+            if (!effect.id) throw new Error(`Effect at index ${index} missing ID during reorder persistence`);
+            if (!serialized) throw new Error(`Failed to serialize effect ${effect.id} during reorder persistence`);
+
+            const effectData: P.EffectData = {
+                ...serialized,
+                id: effect.id, // Ensure ID is correctly passed
+                trackId: trackId, // Ensure TrackID is correctly passed
+                order: index // Update order based on the new index
+            };
+            return P.saveEffect(effectData);
+        });
+
+        await Promise.all(savePromises);
+
+    } catch (error) {
+        logError('reorderEffectsOnTrack', error);
+    }
+};
+
 export const persistSplitMidiBlock = async (get: () => AppState, trackId: string, block1Id: string, block2Id: string) => {
     try {
         const finalState = get();

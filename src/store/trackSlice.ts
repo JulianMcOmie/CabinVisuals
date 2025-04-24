@@ -33,7 +33,7 @@ export interface TrackActions {
   addEffectToTrack: (trackId: string, effectToAdd: Effect) => void;
   removeEffectFromTrack: (trackId: string, effectIndex: number) => void;
   updateEffectPropertyOnTrack: (trackId: string, effectIndex: number, propertyName: string, value: any) => void;
-  // reorderEffectsOnTrack: (trackId: string, draggedIndex: number, targetIndex: number) => void; // Reordering skipped
+  reorderEffectsOnTrack: (trackId: string, draggedIndex: number, targetIndex: number) => void;
   splitMidiBlock: (trackId: string, blockId: string, splitBeat: number) => void; // Added for splitting
 }
 
@@ -489,6 +489,44 @@ export const createTrackSlice: StateCreator<
       });
       // Call persistence function after state update
       PersistFns.persistUpdateEffectPropertyOnTrack(get, trackId, effectIndex);
+    },
+    reorderEffectsOnTrack: (trackId: string, draggedIndex: number, targetIndex: number) => {
+        set((state) => {
+            const newTracks = state.tracks.map(track => {
+                if (track.id === trackId) {
+                    const currentEffects = [...(track.effects || [])]; // Create a mutable copy
+                    if (draggedIndex >= 0 && draggedIndex < currentEffects.length) {
+                        const [draggedEffect] = currentEffects.splice(draggedIndex, 1); // Remove the dragged effect
+
+                        // Adjust targetIndex if it's affected by the removal
+                        const adjustedTargetIndex = targetIndex > draggedIndex ? targetIndex -1 : targetIndex;
+
+                        if (adjustedTargetIndex >= 0 && adjustedTargetIndex <= currentEffects.length) {
+                             currentEffects.splice(adjustedTargetIndex, 0, draggedEffect); // Insert at the target
+                             return { ...track, effects: currentEffects };
+                        } else {
+                            console.warn(`reorderEffectsOnTrack: Invalid target index ${targetIndex} (adjusted: ${adjustedTargetIndex}) after removal.`);
+                            // Optionally put it back or at the end if target is invalid
+                            currentEffects.splice(draggedIndex, 0, draggedEffect); // Put back original position
+                            return { ...track, effects: currentEffects }; // Return original if target invalid
+                        }
+                    } else {
+                         console.warn(`reorderEffectsOnTrack: Invalid dragged index ${draggedIndex}.`);
+                    }
+                }
+                return track;
+            });
+
+            const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
+
+            return {
+                tracks: newTracks,
+                selectedTrack: selections.selectedTrack,
+                selectedBlock: selections.selectedBlock
+            };
+        });
+        // Call persistence function after state update
+        PersistFns.persistReorderEffectsOnTrack(get, trackId);
     },
     splitMidiBlock: (trackId: string, blockId: string, splitBeat: number) => {
       let newBlockId2: string | null = null; // Need to capture the ID of the second block generated
