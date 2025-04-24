@@ -10,7 +10,7 @@ import {
 import TimelineView from '../../src/components/TimelineView'; // Adjusted import path
 import VisualizerView from '../../src/components/VisualizerView'; // Adjusted import path
 import PlaybarView from '../../src/components/PlaybarView/PlaybarView'; // Adjusted import path
-import DetailView from '../../src/components/DetailView'; // Adjusted import path
+import DetailView from '../../src/components/DetailView/DetailView'; // Import from folder
 import AudioLoader from '../../src/components/AudioLoader/AudioLoader'; // Adjusted import path
 import InstrumentSidebar from '../../src/components/InstrumentSidebar/InstrumentSidebar'; // Adjusted import path
 import useStore from '../../src/store/store'; // Adjusted import path
