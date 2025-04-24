@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Track } from '../../lib/types';
 import { ChevronDown, GripVertical, X } from 'lucide-react';
 import useStore from '../../store/store';
@@ -11,32 +11,43 @@ import NumberInputPropertyControl from '../properties/NumberInputPropertyControl
 import DropdownPropertyControl from '../properties/DropdownPropertyControl';
 import ColorPropertyControl from '../properties/ColorPropertyControl';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 interface EffectsDetailViewProps {
   track: Track;
 }
 
-interface EffectParam {
-  [key: string]: number;
-}
-
 function EffectsDetailView({ track }: EffectsDetailViewProps) {
-  // Colors constant - matches the one from page.tsx
-  const COLORS = {
-    accent: "#5a8ea3", // Subtle blue-gray
-    highlight: "#c8a45b", // Muted gold/amber
-    green: "#6a9955", // Muted green
-    background: "#1e1e1e", // Dark background
-    surface: "#252525", // Slightly lighter surface
-    border: "#3a3a3a", // Border color
-    activeBg: "#2d3540", // Active element background
-  };
+  // Sensors for dnd-kit
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-  // Get store actions
-  const { 
+  // Get store actions and state needed for dnd-kit
+  const {
     availableEffects,
-    addEffectToTrack, 
-    removeEffectFromTrack, 
-    updateEffectPropertyOnTrack 
+    addEffectToTrack,
+    removeEffectFromTrack,
+    updateEffectPropertyOnTrack,
+    reorderEffectsOnTrack // Import the reorder action
   } = useStore();
 
   // State for adding new effects
@@ -59,13 +70,17 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
 
   // Handler for changing effect properties
   const handleEffectPropertyChange = (effectIndex: number, propertyName: string, newValue: any) => {
+    const effectId = track.effects[effectIndex]?.id;
+    if (!effectId) return; // Should not happen if index is valid
+    // Note: We might need to adjust how effects are identified if reordering frequently.
+    // Using index might be brittle. Sticking with index for now as per store action.
     updateEffectPropertyOnTrack(track.id, effectIndex, propertyName, newValue);
   };
 
   // Handler to add a new effect
   const handleAddEffect = (effectId: string) => {
     if (!effectId) return;
-    
+
     const definition = allEffectDefinitions.find(def => def.id === effectId);
     if (definition) {
       const newEffectInstance = new definition.constructor(uuidv4());
@@ -88,34 +103,34 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     switch (property.uiType) {
       case 'slider':
         return (
-          <SliderPropertyControl 
+          <SliderPropertyControl
             key={key}
-            property={property as Property<number>} 
-            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
+            property={property as Property<number>}
+            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)}
           />
         );
       case 'numberInput':
         return (
-          <NumberInputPropertyControl 
+          <NumberInputPropertyControl
             key={key}
-            property={property as Property<number>} 
-            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
+            property={property as Property<number>}
+            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)}
           />
         );
       case 'dropdown':
         return (
           <DropdownPropertyControl
             key={key}
-            property={property as Property<unknown>} 
-            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
+            property={property as Property<unknown>}
+            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)}
           />
         );
       case 'color':
         return (
-          <ColorPropertyControl 
-            key={key} 
-            property={property as Property<string>} 
-            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
+          <ColorPropertyControl
+            key={key}
+            property={property as Property<string>}
+            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)}
           />
         );
       default:
@@ -157,9 +172,109 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     }
   };
 
+  // dnd-kit drag end handler
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      const oldIndex = track.effects.findIndex(effect => effect.id === active.id);
+      const newIndex = track.effects.findIndex(effect => effect.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        reorderEffectsOnTrack(track.id, oldIndex, newIndex);
+      }
+    }
+  };
+
+  // Colors constant - needed for SortableEffectItem style
+  const COLORS = {
+    accent: "#5a8ea3", // Subtle blue-gray
+    highlight: "#c8a45b", // Muted gold/amber
+    green: "#6a9955", // Muted green
+    background: "#1e1e1e", // Dark background
+    surface: "#252525", // Slightly lighter surface
+    border: "#3a3a3a", // Border color
+    activeBg: "#2d3540", // Active element background
+  };
+
+  // Component for each sortable effect item
+  const SortableEffectItem = ({ effect, index }: { effect: Effect, index: number }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging, // Use this for styling during drag
+    } = useSortable({ id: effect.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1, // Example style for dragging
+      zIndex: isDragging ? 10 : 'auto', // Ensure dragged item is on top
+      backgroundColor: COLORS.surface,
+      borderColor: COLORS.border,
+      borderWidth: 1,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="rounded-md p-3 relative"
+      >
+        {/* Drag Handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="absolute left-0 inset-y-0 flex items-center px-1 cursor-grab opacity-30 hover:opacity-100 touch-none" // touch-none helps with touch devices
+        >
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+
+        {/* Effect Content */}
+        <div
+          className="flex justify-between items-center pl-6 cursor-pointer"
+          onClick={() => toggleEffectCollapsed(effect.id)}
+        >
+          <div className="flex items-center">
+            <h4 className="font-medium">{getEffectName(effect)}</h4>
+          </div>
+          <div className="flex items-center">
+            <button
+              className="h-6 w-6 p-0 mr-1 rounded-md hover:bg-[#444] hover:text-white transition-all flex items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeEffectFromTrack(track.id, index);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <ChevronDown
+              className={`h-4 w-4 text-gray-400 transition-transform ${collapsedEffects[effect.id] ? "-rotate-90" : ""}`}
+            />
+          </div>
+        </div>
+
+        {!collapsedEffects[effect.id] && (
+          <div className="mt-2 space-y-2 pl-6">
+            {Array.from(effect.properties.values()).length > 0 ? (
+              Array.from(effect.properties.values()).map(property =>
+                renderPropertyControl(index, property)
+              )
+            ) : (
+              <div className="text-xs text-gray-400">No adjustable parameters</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div 
-      className="flex-1 p-4 overflow-auto text-white"
+    <div
+      className="flex-1 p-4 overflow-y-auto text-white"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
@@ -167,111 +282,80 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
         <h3 className="text-lg font-medium">Effects Chain for Track {track.id}</h3>
       </div>
 
-      <div className="space-y-3">
-        {track.effects && track.effects.length > 0 ? (
-          track.effects.map((effect, index) => (
-            <div
-              key={effect.id}
-              className="rounded-md p-3 relative"
-              style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1 }}
-            >
-              <div className="absolute left-0 inset-y-0 flex items-center px-1 cursor-grab opacity-30 hover:opacity-100">
-                <GripVertical className="h-4 w-4 text-gray-400" />
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={track.effects.map(e => e.id)} // Use effect IDs as stable identifiers
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            {track.effects && track.effects.length > 0 ? (
+              track.effects.map((effect, index) => (
+                <SortableEffectItem key={effect.id} effect={effect} index={index} />
+              ))
+            ) : (
+              <div className="text-center text-gray-400 py-4">
+                No effects added to this track. Drag one from the list below or the sidebar.
               </div>
-              
-              <div
-                className="flex justify-between items-center pl-6 cursor-pointer"
-                onClick={() => toggleEffectCollapsed(effect.id)}
-              >
-                <div className="flex items-center">
-                  <h4 className="font-medium">{getEffectName(effect)}</h4>
-                </div>
-                <div className="flex items-center">
-                  <button
-                    className="h-6 w-6 p-0 mr-1 rounded-md hover:bg-[#444] hover:text-white transition-all flex items-center justify-center"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeEffectFromTrack(track.id, index);
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                  <ChevronDown
-                    className={`h-4 w-4 text-gray-400 transition-transform ${collapsedEffects[effect.id] ? "-rotate-90" : ""}`}
-                  />
-                </div>
-              </div>
+            )}
+          </div>
+        </SortableContext>
+      </DndContext>
 
-              {!collapsedEffects[effect.id] && (
-                <div className="mt-2 space-y-2 pl-6">
-                  {Array.from(effect.properties.values()).length > 0 ? (
-                    Array.from(effect.properties.values()).map(property => 
-                      renderPropertyControl(index, property)
-                    )
-                  ) : (
-                    <div className="text-xs text-gray-400">No adjustable parameters</div>
-                  )}
-                </div>
-              )}
+      {/* Add Effect Button and Menu (remains the same) */}
+      <div className="mt-4 relative"> {/* Added margin top */}
+        <button
+          className="w-full py-2 border border-dashed rounded-md text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
+          style={{ borderColor: "#555" }}
+          onClick={() => setShowEffectsMenu(!showEffectsMenu)}
+        >
+          + Add Effect
+        </button>
+
+        {showEffectsMenu && (
+          <div
+            className="absolute left-0 right-0 bottom-full mb-1 rounded-md shadow-lg z-20 border max-h-60 overflow-y-auto" // Positioned above, added max-height and scroll
+            style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border }}
+          >
+            <div className="p-2">
+              <div className="text-sm font-medium mb-2 text-gray-300">Effect Type</div>
+              <div className="space-y-1">
+                {/* Group by category */}
+                {allEffectDefinitions.length > 0 ? (
+                  Object.entries(
+                    allEffectDefinitions.reduce((acc, def) => {
+                      // Default to 'Other' if category doesn't exist
+                      const category = 'Other'; // Simplified category logic for now
+                      if (!acc[category]) acc[category] = [];
+                      acc[category].push(def);
+                      return acc;
+                    }, {} as Record<string, typeof allEffectDefinitions>)
+                  ).map(([category, effects]) => (
+                    <div key={category} className="mb-2">
+                      <div className="text-xs font-medium text-gray-400 mb-1">{category}</div>
+                      <div className="pl-2 space-y-1">
+                        {effects.map(effect => (
+                          <div
+                            key={effect.id}
+                            className="text-sm py-1 px-2 hover:bg-[#3a3a3a] rounded cursor-pointer flex items-center"
+                            onClick={() => handleAddEffect(effect.id)}
+                          >
+                            {effect.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-gray-400">No effects available</div>
+                )}
+              </div>
             </div>
-          ))
-        ) : (
-          <div className="text-center text-gray-400 py-4">
-            No effects added to this track.
           </div>
         )}
-
-        <div className="relative">
-          <button
-            className="w-full py-2 border border-dashed rounded-md text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
-            style={{ borderColor: "#555" }}
-            onClick={() => setShowEffectsMenu(!showEffectsMenu)}
-          >
-            + Add Effect
-          </button>
-
-          {showEffectsMenu && (
-            <div
-              className="absolute left-0 right-0 mt-1 rounded-md shadow-lg z-20 border"
-              style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border }}
-            >
-              <div className="p-2">
-                <div className="text-sm font-medium mb-2 text-gray-300">Effect Type</div>
-                <div className="space-y-1">
-                  {/* Group by category */}
-                  {allEffectDefinitions.length > 0 ? (
-                    Object.entries(
-                      allEffectDefinitions.reduce((acc, def) => {
-                        // Default to 'Other' if category doesn't exist
-                        const category = 'Other';
-                        if (!acc[category]) acc[category] = [];
-                        acc[category].push(def);
-                        return acc;
-                      }, {} as Record<string, typeof allEffectDefinitions>)
-                    ).map(([category, effects]) => (
-                      <div key={category} className="mb-2">
-                        <div className="text-xs font-medium text-gray-400 mb-1">{category}</div>
-                        <div className="pl-2 space-y-1">
-                          {effects.map(effect => (
-                            <div
-                              key={effect.id}
-                              className="text-sm py-1 px-2 hover:bg-[#3a3a3a] rounded cursor-pointer flex items-center"
-                              onClick={() => handleAddEffect(effect.id)}
-                            >
-                              {effect.name}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-gray-400">No effects available</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
