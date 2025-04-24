@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Track } from '../../lib/types';
 import { ChevronDown, GripVertical, X } from 'lucide-react';
 import useStore from '../../store/store';
@@ -31,6 +31,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import debounce from 'lodash/debounce';
 
 interface EffectsDetailViewProps {
   track: Track;
@@ -78,10 +79,19 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     }));
   };
 
-  // Handler for changing effect properties
-  const handleEffectPropertyChange = (effectIndex: number, propertyName: string, newValue: any) => {
+  // Original handler - remains the same
+  const handleEffectPropertyChangeInternal = (effectIndex: number, propertyName: string, newValue: any) => {
     updateEffectPropertyOnTrack(track.id, effectIndex, propertyName, newValue);
   };
+
+  // Debounced version of the handler for the store update
+  // We use useCallback to ensure the debounced function is memoized
+  const debouncedUpdateEffectProperty = useCallback(
+    debounce((effectIndex: number, propertyName: string, newValue: any) => {
+      handleEffectPropertyChangeInternal(effectIndex, propertyName, newValue);
+    }, 300), // 300ms delay
+    [track.id, updateEffectPropertyOnTrack] // Dependencies for useCallback
+  );
 
   // Handler to add a new effect
   const handleAddEffect = (effectId: string) => {
@@ -112,7 +122,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
           <SliderPropertyControl
             key={key}
             property={property as Property<number>}
-            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)}
+            onChange={(value) => debouncedUpdateEffectProperty(effectIndex, property.name, value)}
           />
         );
       case 'numberInput':
@@ -120,7 +130,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
           <NumberInputPropertyControl
             key={key}
             property={property as Property<number>}
-            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)}
+            onChange={(value) => handleEffectPropertyChangeInternal(effectIndex, property.name, value)}
           />
         );
       case 'dropdown':
@@ -128,7 +138,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
           <DropdownPropertyControl
             key={key}
             property={property as Property<unknown>}
-            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)}
+            onChange={(value) => handleEffectPropertyChangeInternal(effectIndex, property.name, value)}
           />
         );
       case 'color':
@@ -136,7 +146,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
           <ColorPropertyControl
             key={key}
             property={property as Property<string>}
-            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)}
+            onChange={(value) => handleEffectPropertyChangeInternal(effectIndex, property.name, value)}
           />
         );
       default:

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Property, NumericMetadata } from '../../lib/properties/Property';
 
 interface SliderPropertyControlProps {
@@ -10,12 +10,17 @@ function SliderPropertyControl({ property, onChange }: SliderPropertyControlProp
   // Type assertion is safe here because parent component checks uiType
   const metadata = property.metadata as NumericMetadata;
 
+  // Use local state for the slider value
+  const [localValue, setLocalValue] = useState<number>(property.value);
+
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(parseFloat(event.target.value));
+    const newValue = parseFloat(event.target.value);
+    setLocalValue(newValue); // Update local state immediately for smooth UI
+    onChange(newValue); // Call the (debounced) onChange prop to update the store
   };
 
-  // Get percentage value for display
-  const percentage = ((property.value - metadata.min) / (metadata.max - metadata.min)) * 100;
+  // Get percentage value for display using localValue
+  const percentage = ((localValue - metadata.min) / (metadata.max - metadata.min)) * 100;
 
   return (
     <div style={{ marginBottom: '24px' }}>
@@ -77,7 +82,7 @@ function SliderPropertyControl({ property, onChange }: SliderPropertyControlProp
           min={metadata.min}
           max={metadata.max}
           step={metadata.step}
-          value={property.value}
+          value={localValue}
           onChange={handleChange}
           onPointerDown={(e) => e.stopPropagation()}
           style={{ 
