@@ -68,7 +68,7 @@ const AccordionMenu: React.FC<AccordionMenuProps> = ({
                 <ChevronDown
                   className={`${styles.chevronIcon} ${expandedCategories[category] ? "" : styles.chevronIconCollapsed}`}
                 />
-                <span className={styles.categoryName}>{category}</span>
+                <span className={styles.categoryName} title={category}>{category}</span>
             </div>
           </button>
           {expandedCategories[category] && (
@@ -77,9 +77,10 @@ const AccordionMenu: React.FC<AccordionMenuProps> = ({
                 <div
                   key={item.id}
                   onClick={() => handleItemSelect(item.id)}
-                  className={`${styles.item} ${item.id === selectedItemId ? styles.selectedItem : ''}`} // Apply selected style conditionally
+                  className={`${styles.item} ${item.id === selectedItemId ? styles.selectedItem : ''}`}
+                  title={item.name}
                 >
-                  <div className={styles.itemIcon}>{<Disc3 />}</div> {/* Adjusted to remove hardcoded icon size */}
+                  <div className={styles.itemIcon}>{<Disc3 />}</div>
                   <span className={styles.itemName}>{item.name}</span>
                 </div>
               ))}

@@ -41,6 +41,7 @@
 .categoryButtonContent {
     display: flex;
     align-items: center;
+    width: 100%; /* Ensure it takes full width */
 }
 
 .chevronIcon {
@@ -48,6 +49,7 @@
     width: 1rem; /* w-4 */
     margin-right: 0.5rem; /* mr-2 */
     transition: transform 0.2s; /* Keep transition-transform */
+    flex-shrink: 0; /* Prevent icon from shrinking */
 }
 
 .chevronIconCollapsed {
@@ -56,8 +58,13 @@
 
 .categoryName {
     font-weight: 500; /* font-medium */
+    white-space: nowrap; /* Keep text on a single line */
+    overflow: hidden; /* Hide overflowing text */
+    text-overflow: ellipsis; /* Show ellipsis for overflowing text */
+    max-width: 100%; /* Ensure it doesn't expand beyond parent width */
+    flex: 1; /* Allow this element to take remaining space */
+    min-width: 0; /* Required for text-overflow to work in flex containers */
 }
-
 
 .itemsContainer {
   padding-left: 1rem; /* pl-4 */
@@ -77,9 +84,7 @@
   display: flex;
   align-items: center;
   color: #ffffff; /* Default text color */
-  white-space: nowrap;  
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: calc(100% - 1rem); /* Ensure it takes full width minus margins */
 }
 
 .item:hover {
@@ -89,6 +94,7 @@
 .itemIcon {
   margin-right: 0.5rem; /* mr-2 */
   color: #a0aec0; /* text-gray-400 */
+  flex-shrink: 0; /* Prevent icon from shrinking */
 }
 
 .itemIcon svg {
@@ -99,6 +105,12 @@
 .itemName {
   font-size: 0.875rem; /* text-sm */
   transition: color 0.2s; /* transition-colors */
+  white-space: nowrap; /* Keep text on a single line */
+  overflow: hidden; /* Hide overflowing text */
+  text-overflow: ellipsis; /* Show ellipsis for overflowing text */
+  max-width: 100%; /* Ensure it doesn't expand beyond parent width */
+  flex: 1; /* Allow this element to take remaining space */
+  min-width: 0; /* Required for text-overflow to work in flex containers */
 }
 
 .item:hover .itemName {
