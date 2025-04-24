@@ -104,7 +104,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     handleCanvasContextMenu, 
     hoverCursor, 
     selectionBox, 
-    isDragging 
+    isDragging
   } = useMidiEditorInteractions({
     block,
     trackId: track.id, 
