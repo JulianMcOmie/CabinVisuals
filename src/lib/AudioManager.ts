@@ -7,6 +7,7 @@ export class AudioManager {
     private startTime: number = 0; // AudioContext time when playback started relative to context timeline
     private startOffset: number = 0; // Offset within the buffer where playback started (in seconds)
     private pausedAt: number | null = null; // AudioContext time when pause() was called
+    private fileName: string | null = null; // Store the file name
 
     constructor() {
         if (typeof window !== 'undefined' && (window.AudioContext || (window as any).webkitAudioContext)) {
@@ -29,7 +30,11 @@ export class AudioManager {
         return this.duration;
     }
 
-    async loadAudio(audioData: ArrayBuffer): Promise<{ duration: number }> {
+    get audioFileName(): string | null {
+        return this.fileName;
+    }
+
+    async loadAudio(audioData: ArrayBuffer, fileName: string = ''): Promise<{ duration: number }> {
         if (!this.audioContext) {
             throw new Error("AudioContext is not initialized.");
         }
@@ -47,6 +52,7 @@ export class AudioManager {
         this.pausedAt = null;
         this.startOffset = 0;
         this.startTime = 0;
+        this.fileName = fileName;
 
         try {
             // Resume context if suspended (often required after user interaction)
@@ -56,13 +62,14 @@ export class AudioManager {
             this.audioBuffer = await this.audioContext.decodeAudioData(audioData);
             this.isLoaded = true;
             this.duration = this.audioBuffer.duration;
-            console.log(`AudioManager: Audio loaded successfully. Duration: ${this.duration.toFixed(2)}s`);
+            console.log(`AudioManager: Audio loaded successfully. File: ${this.fileName}, Duration: ${this.duration.toFixed(2)}s`);
             return { duration: this.duration };
         } catch (error) {
             console.error("AudioManager: Error decoding audio data:", error);
             this.isLoaded = false;
             this.duration = null;
             this.audioBuffer = null;
+            this.fileName = null;
             throw new Error(`Failed to decode audio: ${error instanceof Error ? error.message : String(error)}`);
         }
     }

@@ -40,8 +40,10 @@ export default function AlphaPage() {
         if (persistedFile) {
           console.log('Found persisted audio file, attempting to load...');
           const arrayBuffer = await persistedFile.arrayBuffer();
+          // Get the filename if available (only File objects have name, not Blob)
+          const fileName = persistedFile instanceof File ? persistedFile.name : 'persisted-audio';
           // Use the action fetched via useStore
-          await loadAudioAction(arrayBuffer);
+          await loadAudioAction(arrayBuffer, fileName);
           console.log('Successfully loaded persisted audio file into store.');
         } else {
           console.log('No persisted audio file found.');
