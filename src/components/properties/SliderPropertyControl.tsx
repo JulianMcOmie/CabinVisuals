@@ -28,7 +28,10 @@ function SliderPropertyControl({ property, onChange }: SliderPropertyControlProp
         </span>
       </div>
       
-      <div style={{ position: 'relative', height: '32px', display: 'flex', alignItems: 'center' }}>
+      <div 
+        style={{ position: 'relative', height: '32px', display: 'flex', alignItems: 'center' }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         {/* Track background */}
         <div style={{ 
           position: 'absolute', 
@@ -76,6 +79,7 @@ function SliderPropertyControl({ property, onChange }: SliderPropertyControlProp
           step={metadata.step}
           value={property.value}
           onChange={handleChange}
+          onPointerDown={(e) => e.stopPropagation()}
           style={{ 
             position: 'absolute',
             inset: '0px',

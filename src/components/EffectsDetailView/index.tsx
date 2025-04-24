@@ -17,29 +17,33 @@ import {
   KeyboardSensor,
   PointerSensor,
   useSensor,
-  useSensors,
+  // useSensors, // Commented out
 } from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+// import { // Commented out sortable imports
+//   arrayMove,
+//   SortableContext,
+//   sortableKeyboardCoordinates,
+//   verticalListSortingStrategy,
+//   useSortable,
+// } from '@dnd-kit/sortable';
+// import { CSS } from '@dnd-kit/utilities'; // Commented out
 
 interface EffectsDetailViewProps {
   track: Track;
 }
 
 function EffectsDetailView({ track }: EffectsDetailViewProps) {
-  // Sensors for dnd-kit
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  // Sensors for dnd-kit - COMMENTED OUT
+  // const sensors = useSensors(
+  //   useSensor(PointerSensor, {
+  //     activationConstraint: {
+  //       distance: 5,
+  //     },
+  //   }),
+  //   useSensor(KeyboardSensor, {
+  //     coordinateGetter: sortableKeyboardCoordinates,
+  //   })
+  // );
 
   // Get store actions and state needed for dnd-kit
   const {
@@ -47,7 +51,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     addEffectToTrack,
     removeEffectFromTrack,
     updateEffectPropertyOnTrack,
-    reorderEffectsOnTrack // Import the reorder action
+    // reorderEffectsOnTrack // Commented out
   } = useStore();
 
   // State for adding new effects
@@ -72,8 +76,6 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
   const handleEffectPropertyChange = (effectIndex: number, propertyName: string, newValue: any) => {
     const effectId = track.effects[effectIndex]?.id;
     if (!effectId) return; // Should not happen if index is valid
-    // Note: We might need to adjust how effects are identified if reordering frequently.
-    // Using index might be brittle. Sticking with index for now as per store action.
     updateEffectPropertyOnTrack(track.id, effectIndex, propertyName, newValue);
   };
 
@@ -144,12 +146,10 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     }
   };
 
-  // Handle dropping an effect onto the view
+  // Handle dropping an effect onto the view (Keep this for potential future use, doesn't involve dnd-kit directly)
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    // Do nothing if no track is selected
     if (!track) return;
-
     try {
       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
       if (data.type === 'effect' && data.id) {
@@ -160,141 +160,109 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     }
   };
 
-  // Handle dragging over the view
+  // Handle dragging over the view (Keep this for potential future use, doesn't involve dnd-kit directly)
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); // Necessary to allow dropping in general
-    
-    // Set drop effect based on whether a track is selected
+    e.preventDefault();
     if (track) {
-      e.dataTransfer.dropEffect = "copy"; // Show copy cursor (+ icon)
+      e.dataTransfer.dropEffect = "copy";
     } else {
-      e.dataTransfer.dropEffect = "none"; // Show 'not allowed' cursor
+      e.dataTransfer.dropEffect = "none";
     }
   };
 
-  // dnd-kit drag end handler
-  const handleDragEnd = (event: any) => {
-    const { active, over } = event;
+  // dnd-kit drag end handler - COMMENTED OUT
+  // const handleDragEnd = (event: any) => {
+  //   const { active, over } = event;
+  //   if (active.id !== over.id) {
+  //     const oldIndex = track.effects.findIndex(effect => effect.id === active.id);
+  //     const newIndex = track.effects.findIndex(effect => effect.id === over.id);
+  //     if (oldIndex !== -1 && newIndex !== -1) {
+  //       // reorderEffectsOnTrack(track.id, oldIndex, newIndex);
+  //     }
+  //   }
+  // };
 
-    if (active.id !== over.id) {
-      const oldIndex = track.effects.findIndex(effect => effect.id === active.id);
-      const newIndex = track.effects.findIndex(effect => effect.id === over.id);
-
-      if (oldIndex !== -1 && newIndex !== -1) {
-        reorderEffectsOnTrack(track.id, oldIndex, newIndex);
-      }
-    }
-  };
-
-  // Colors constant - needed for SortableEffectItem style
+  // Colors constant
   const COLORS = {
-    accent: "#5a8ea3", // Subtle blue-gray
-    highlight: "#c8a45b", // Muted gold/amber
-    green: "#6a9955", // Muted green
-    background: "#1e1e1e", // Dark background
-    surface: "#252525", // Slightly lighter surface
-    border: "#3a3a3a", // Border color
-    activeBg: "#2d3540", // Active element background
+    accent: "#5a8ea3",
+    highlight: "#c8a45b",
+    green: "#6a9955",
+    background: "#1e1e1e",
+    surface: "#252525",
+    border: "#3a3a3a",
+    activeBg: "#2d3540",
   };
 
-  // Component for each sortable effect item
-  const SortableEffectItem = ({ effect, index }: { effect: Effect, index: number }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging, // Use this for styling during drag
-    } = useSortable({ id: effect.id });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1, // Example style for dragging
-      zIndex: isDragging ? 10 : 'auto', // Ensure dragged item is on top
-      backgroundColor: COLORS.surface,
-      borderColor: COLORS.border,
-      borderWidth: 1,
-    };
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className="rounded-md p-3 relative"
-      >
-        {/* Drag Handle */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="absolute left-0 inset-y-0 flex items-center px-1 cursor-grab opacity-30 hover:opacity-100 touch-none" // touch-none helps with touch devices
-        >
-          <GripVertical className="h-4 w-4 text-gray-400" />
-        </div>
-
-        {/* Effect Content */}
-        <div
-          className="flex justify-between items-center pl-6 cursor-pointer"
-          onClick={() => toggleEffectCollapsed(effect.id)}
-        >
-          <div className="flex items-center">
-            <h4 className="font-medium">{getEffectName(effect)}</h4>
-          </div>
-          <div className="flex items-center">
-            <button
-              className="h-6 w-6 p-0 mr-1 rounded-md hover:bg-[#444] hover:text-white transition-all flex items-center justify-center"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeEffectFromTrack(track.id, index);
-              }}
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <ChevronDown
-              className={`h-4 w-4 text-gray-400 transition-transform ${collapsedEffects[effect.id] ? "-rotate-90" : ""}`}
-            />
-          </div>
-        </div>
-
-        {!collapsedEffects[effect.id] && (
-          <div className="mt-2 space-y-2 pl-6">
-            {Array.from(effect.properties.values()).length > 0 ? (
-              Array.from(effect.properties.values()).map(property =>
-                renderPropertyControl(index, property)
-              )
-            ) : (
-              <div className="text-xs text-gray-400">No adjustable parameters</div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Component for each sortable effect item - COMMENTED OUT ENTIRELY
+  // const SortableEffectItem = ({ effect, index }: { effect: Effect, index: number }) => { ... };
 
   return (
     <div
       className="flex-1 p-4 overflow-y-auto text-white"
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
+      onDrop={handleDrop} // Keep native drop handler
+      onDragOver={handleDragOver} // Keep native drag over handler
     >
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium">Effects Chain for Track {track.id}</h3>
       </div>
 
       <DndContext
-        sensors={sensors}
+        // sensors={sensors} // COMMENTED OUT
         collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
+        // onDragEnd={handleDragEnd} // COMMENTED OUT
       >
-        <SortableContext
-          items={track.effects.map(e => e.id)} // Use effect IDs as stable identifiers
+        {/* <SortableContext // COMMENTED OUT
+          items={track.effects.map(e => e.id)}
           strategy={verticalListSortingStrategy}
-        >
+        > */}
           <div className="space-y-3">
             {track.effects && track.effects.length > 0 ? (
               track.effects.map((effect, index) => (
-                <SortableEffectItem key={effect.id} effect={effect} index={index} />
+                // Replace SortableEffectItem with the simple div structure
+                <div
+                  key={effect.id}
+                  className="rounded-md p-3 relative"
+                  style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1 }}
+                >
+                  {/* No Drag Handle */}
+                  <div
+                    className="flex justify-between items-center pl-6 cursor-pointer"
+                    onClick={() => toggleEffectCollapsed(effect.id)}
+                  >
+                    <div className="flex items-center">
+                      <h4 className="font-medium">{getEffectName(effect)}</h4>
+                    </div>
+                    <div className="flex items-center">
+                      <button
+                        className="h-6 w-6 p-0 mr-1 rounded-md hover:bg-[#444] hover:text-white transition-all flex items-center justify-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeEffectFromTrack(track.id, index);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      <ChevronDown
+                        className={`h-4 w-4 text-gray-400 transition-transform ${collapsedEffects[effect.id] ? "-rotate-90" : ""}`}
+                      />
+                    </div>
+                  </div>
+
+                  {!collapsedEffects[effect.id] && (
+                    <div 
+                      className="mt-2 space-y-2 pl-6" 
+                      // No stopPropagation needed here now
+                    >
+                      {Array.from(effect.properties.values()).length > 0 ? (
+                        Array.from(effect.properties.values()).map(property =>
+                          renderPropertyControl(index, property)
+                        )
+                      ) : (
+                        <div className="text-xs text-gray-400">No adjustable parameters</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               ))
             ) : (
               <div className="text-center text-gray-400 py-4">
@@ -302,7 +270,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
               </div>
             )}
           </div>
-        </SortableContext>
+        {/* </SortableContext> // COMMENTED OUT */}
       </DndContext>
 
       {/* Add Effect Button and Menu (remains the same) */}
@@ -327,8 +295,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
                 {allEffectDefinitions.length > 0 ? (
                   Object.entries(
                     allEffectDefinitions.reduce((acc, def) => {
-                      // Default to 'Other' if category doesn't exist
-                      const category = 'Other'; // Simplified category logic for now
+                      const category = 'Other';
                       if (!acc[category]) acc[category] = [];
                       acc[category].push(def);
                       return acc;
