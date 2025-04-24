@@ -1,0 +1,119 @@
+/* CSS Module for TimelineView */
+
+.timelineView {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  border: 2px solid transparent; /* Default border */
+}
+
+.timelineViewSelected {
+  border: 2px solid rgba(255, 255, 255, 0.3); /* Selected border */
+}
+
+.timelineContainer {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.tracksHeader {
+  position: absolute;
+  width: 200px; /* Corresponds to SIDEBAR_WIDTH */
+  height: 40px; /* Corresponds to HEADER_HEIGHT */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  font-weight: bold;
+  border-bottom: 1px solid #333;
+  border-right: 1px solid #333;
+  background-color: #1a1a1a; /* Corresponds to SIDEBAR_BG_COLOR */
+  z-index: 3;
+  color: white;
+  box-sizing: border-box;
+}
+
+.addTrackButton {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  color: white;
+}
+
+.timelinesColumn {
+  flex: 1;
+  position: absolute;
+  /* left: 200px; */ /* Dynamic - set inline */
+  top: 40px; /* Corresponds to HEADER_HEIGHT */
+  height: 100%;
+}
+
+.timelineContent {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+  background-color: transparent;
+}
+
+.sidebarBackground {
+  position: absolute;
+  left: 0;
+  top: 40px; /* Corresponds to HEADER_HEIGHT */
+  bottom: 0;
+  width: 200px; /* Corresponds to SIDEBAR_WIDTH */
+  background-color: #1a1a1a; /* Corresponds to SIDEBAR_BG_COLOR */
+  border-right: 1px solid #333;
+  z-index: 0;
+}
+
+.measuresHeaderContainer {
+  position: sticky;
+  top: 0;
+  padding-left: 200px; /* Corresponds to SIDEBAR_WIDTH */
+  z-index: 2;
+  background-color: black; /* Corresponds to HEADER_BG_COLOR */
+}
+
+.combinedContentArea {
+  /* width: dynamic */
+  min-height: 100%;
+  position: relative;
+  display: flex;
+  /* height: dynamic */
+}
+
+.instrumentsColumn {
+  position: sticky;
+  left: 0;
+  width: 200px; /* Corresponds to SIDEBAR_WIDTH */
+  z-index: 1;
+  background-color: #1a1a1a; /* Corresponds to SIDEBAR_BG_COLOR */
+  border-right: 1px solid #333;
+  height: 100%;
+}
+
+.noTracksMessage {
+  position: absolute;
+  top: 60px; /* HEADER_HEIGHT + 20px */
+  /* left: dynamic */
+  color: white;
+  font-style: italic;
+}
+
+.playhead {
+  position: absolute;
+  top: 40px; /* Corresponds to HEADER_HEIGHT */
+  /* left: dynamic */
+  width: 3px;
+  height: calc(100% - 40px);
+  background-color: red;
+  z-index: 10;
+  cursor: ew-resize;
+  pointer-events: auto;
+} 
