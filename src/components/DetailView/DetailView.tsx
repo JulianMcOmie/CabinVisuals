@@ -3,8 +3,8 @@
 import React from 'react';
 import useStore from '../../store/store';
 import MidiEditor from '../MidiEditor';
-import InstrumentDetailView from '../InstrumentDetailView';
-import EffectsDetailView from '../EffectsDetailView';
+import InstrumentDetailView from '../InstrumentDetailView/index';
+import EffectsDetailView from '../EffectsDetailView/index';
 import { Sliders, Music2, Wand2 } from 'lucide-react';
 import styles from './DetailView.module.css';
 
