@@ -11,7 +11,8 @@ const InstrumentSidebar: React.FC = () => {
     selectedTrackId,
     updateTrack,
     selectedTrack,
-    setSelectedWindow
+    setSelectedWindow,
+    setDetailViewMode
   } = useStore();
 
   const [selectedInstrumentId, setSelectedInstrumentId] = useState<string | null>(null);
@@ -52,6 +53,8 @@ const InstrumentSidebar: React.FC = () => {
         updateTrack(selectedTrackId, { synthesizer: newSynthesizerInstance });
         // Update the highlighted instrument immediately on click
         setSelectedInstrumentId(instrumentId);
+        // Set detail view mode to instrument when an instrument is selected
+        setDetailViewMode("instrument");
       } else {
         console.error(`Instrument definition or constructor not found for ID: ${instrumentId}`);
         setSelectedInstrumentId(null); // Clear selection if instantiation fails

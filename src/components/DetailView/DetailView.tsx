@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import useStore from '../../store/store';
 import MidiEditor from '../MidiEditor';
 import InstrumentDetailView from '../InstrumentDetailView';
+import EffectsDetailView from '../EffectsDetailView';
 import { Sliders, Music2, Wand2 } from 'lucide-react';
 import styles from './DetailView.module.css';
 
@@ -17,15 +18,6 @@ function DetailView() {
   } = useStore();
   
   const isMidiEditorVisible = selectedBlock && selectedTrack;
-
-  // Auto-switch detail view mode based on selection
-  useEffect(() => {
-    if (selectedBlock && selectedTrack) {
-      setDetailViewMode("midi");
-    } else if (selectedTrack && !selectedBlock) {
-      setDetailViewMode("instrument");
-    }
-  }, [selectedTrack, selectedBlock, setDetailViewMode]);
 
   return (
     <div 
@@ -56,19 +48,23 @@ function DetailView() {
           </button>
         ))}
       </div>
-      <div 
-        className={`${styles.contentContainer} ${
-          isMidiEditorVisible ? styles.contentContainerHidden : ''
-        }`}
-      >
-        {isMidiEditorVisible ? (
-          <MidiEditor block={selectedBlock} track={selectedTrack} />
-        ) : selectedTrack ? (
-          <InstrumentDetailView track={selectedTrack} />
-        ) : (
+      <div className={styles.contentContainer}>
+        {selectedTrack === null ? (
           <div className={styles.emptyStateContainer}>
-            <p>Select a track or MIDI block to edit</p>
+            <p>Select a track to edit</p>
           </div>
+        ) : (
+          <>
+            {detailViewMode === "midi" && selectedBlock && (
+              <MidiEditor block={selectedBlock} track={selectedTrack} />
+            )}
+            {detailViewMode === "instrument" && (
+              <InstrumentDetailView track={selectedTrack} />
+            )}
+            {detailViewMode === "effects" && (
+              <EffectsDetailView track={selectedTrack} />
+            )}
+          </>
         )}
       </div>
     </div>

@@ -82,6 +82,11 @@ export const createTrackSlice: StateCreator<
             selectedNotes: null
         };
       });
+      
+      // Set detail view mode to instrument when selecting a track (no block)
+      if (trackId) {
+        get().setDetailViewMode("instrument");
+      }
     },
     selectBlock: (blockId: string | null) => {
       set((state: TrackState & { tracks: Track[] }) => {
@@ -114,6 +119,11 @@ export const createTrackSlice: StateCreator<
               selectedNotes: null
           };
       });
+      
+      // Set detail view mode to midi when selecting a block
+      if (blockId) {
+        get().setDetailViewMode("midi");
+      }
     },
     addTrack: (track: Track) => {
       set((state: TrackState & { tracks: Track[] }) => {
