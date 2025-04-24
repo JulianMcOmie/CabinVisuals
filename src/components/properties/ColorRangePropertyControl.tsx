@@ -75,7 +75,7 @@ const ColorRangePropertyControl: React.FC<Props> = ({ property, onChange }) => {
                         position: 'absolute', 
                         inset: '0px',
                         height: '4px', 
-                        backgroundColor: '#3a3a3a',
+                        backgroundColor: 'var(--border)',
                         borderRadius: '9999px', 
                         top: '50%', 
                         transform: 'translateY(-50%)'
@@ -86,7 +86,7 @@ const ColorRangePropertyControl: React.FC<Props> = ({ property, onChange }) => {
                         position: 'absolute', 
                         height: '4px',
                         width: `${(startHue / 360) * 100}%`, 
-                        backgroundColor: COLORS.accent,
+                        backgroundColor: 'var(--accent)',
                         borderRadius: '9999px', 
                         top: '50%', 
                         transform: 'translateY(-50%)'
@@ -100,8 +100,8 @@ const ColorRangePropertyControl: React.FC<Props> = ({ property, onChange }) => {
                         width: '16px', 
                         height: '16px', 
                         left: `calc(${(startHue / 360) * 100}% - 8px)`,
-                        backgroundColor: COLORS.accent,
-                        borderColor: '#ddd',
+                        backgroundColor: 'var(--accent)',
+                        borderColor: 'var(--text)',
                         borderWidth: '2px',
                         borderRadius: '9999px',
                         cursor: 'grab'
@@ -137,7 +137,7 @@ const ColorRangePropertyControl: React.FC<Props> = ({ property, onChange }) => {
                         position: 'absolute', 
                         inset: '0px',
                         height: '4px', 
-                        backgroundColor: '#3a3a3a',
+                        backgroundColor: 'var(--border)',
                         borderRadius: '9999px', 
                         top: '50%', 
                         transform: 'translateY(-50%)'
@@ -148,7 +148,7 @@ const ColorRangePropertyControl: React.FC<Props> = ({ property, onChange }) => {
                         position: 'absolute', 
                         height: '4px',
                         width: `${(endHue / 360) * 100}%`, 
-                        backgroundColor: COLORS.accent,
+                        backgroundColor: 'var(--accent)',
                         borderRadius: '9999px', 
                         top: '50%', 
                         transform: 'translateY(-50%)'
@@ -162,8 +162,8 @@ const ColorRangePropertyControl: React.FC<Props> = ({ property, onChange }) => {
                         width: '16px', 
                         height: '16px', 
                         left: `calc(${(endHue / 360) * 100}% - 8px)`,
-                        backgroundColor: COLORS.accent,
-                        borderColor: '#ddd',
+                        backgroundColor: 'var(--accent)',
+                        borderColor: 'var(--text)',
                         borderWidth: '2px',
                         borderRadius: '9999px',
                         cursor: 'grab'

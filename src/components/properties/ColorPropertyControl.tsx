@@ -36,7 +36,7 @@ function ColorPropertyControl({ property, onChange }: ColorPropertyControlProps)
               height: '24px', 
               borderRadius: '9999px', 
               backgroundColor: property.value,
-              border: '1px solid #555'
+              border: '1px solid var(--border)'
             }}
           />
           <input

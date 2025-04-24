@@ -1,15 +1,6 @@
 import React from 'react';
 import { Property, DropdownMetadata, DropdownOption } from '../../lib/properties/Property';
 
-// Define colors matching page.tsx
-const COLORS = {
-  accent: "#5a8ea3", // Subtle blue-gray
-  background: "#1e1e1e", // Dark background
-  surface: "#252525", // Slightly lighter surface
-  border: "#3a3a3a", // Border color
-  activeBg: "#2d3540", // Active element background
-};
-
 interface DropdownPropertyControlProps<T> {
   property: Property<T>;
   onChange: (value: T) => void;
@@ -45,9 +36,9 @@ function DropdownPropertyControl<T>({ property, onChange }: DropdownPropertyCont
         style={{
           width: '100%',
           padding: '8px 12px',
-          backgroundColor: '#333',
-          color: '#ddd',
-          border: '1px solid #555',
+          backgroundColor: 'var(--lightSurface)',
+          color: 'var(--text)',
+          border: '1px solid var(--border)',
           borderRadius: '4px',
           fontSize: '0.875rem',
           height: '36px',

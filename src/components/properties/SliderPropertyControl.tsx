@@ -1,18 +1,6 @@
 import React from 'react';
 import { Property, NumericMetadata } from '../../lib/properties/Property';
 
-// Define colors matching page.tsx
-const COLORS = {
-  accent: "#5a8ea3", // Subtle blue-gray
-  highlight: "#c8a45b", // Muted gold/amber
-  green: "#6a9955", // Muted green
-  background: "#1e1e1e", // Dark background
-  surface: "#252525", // Slightly lighter surface
-  border: "#3a3a3a", // Border color
-  activeBg: "#2d3540", // Active element background
-  electricBlue: "#00c3ff", // Vibrant electric blue accent
-};
-
 interface SliderPropertyControlProps {
   property: Property<number>;
   onChange: (value: number) => void;
@@ -46,7 +34,7 @@ function SliderPropertyControl({ property, onChange }: SliderPropertyControlProp
           position: 'absolute', 
           inset: '0px',
           height: '4px', 
-          backgroundColor: '#3a3a3a',
+          backgroundColor: 'var(--border)',
           borderRadius: '9999px', 
           top: '50%', 
           transform: 'translateY(-50%)'
@@ -57,7 +45,7 @@ function SliderPropertyControl({ property, onChange }: SliderPropertyControlProp
           position: 'absolute', 
           height: '4px',
           width: `${percentage}%`, 
-          backgroundColor: COLORS.accent,
+          backgroundColor: 'var(--accent)',
           borderRadius: '9999px', 
           top: '50%', 
           transform: 'translateY(-50%)'
@@ -71,8 +59,8 @@ function SliderPropertyControl({ property, onChange }: SliderPropertyControlProp
           width: '16px', 
           height: '16px', 
           left: `calc(${percentage}% - 8px)`,
-          backgroundColor: COLORS.accent,
-          borderColor: '#ddd',
+          backgroundColor: 'var(--accent)',
+          borderColor: 'var(--text)',
           borderWidth: '2px',
           borderRadius: '9999px',
           cursor: 'grab'

@@ -1,14 +1,6 @@
 import React from 'react';
 import { Property, NumericMetadata } from '../../lib/properties/Property';
 
-// Define colors matching page.tsx
-const COLORS = {
-  accent: "#5a8ea3", // Subtle blue-gray
-  background: "#1e1e1e", // Dark background
-  surface: "#252525", // Slightly lighter surface
-  border: "#3a3a3a", // Border color
-};
-
 interface NumberInputPropertyControlProps {
   property: Property<number>;
   onChange: (value: number) => void;
@@ -51,9 +43,9 @@ function NumberInputPropertyControl({ property, onChange }: NumberInputPropertyC
         onWheel={handleWheel} // Prevent scroll changes
         style={{
           padding: '5px 10px',
-          backgroundColor: '#333',
-          color: '#ddd',
-          border: '1px solid #555',
+          backgroundColor: 'var(--lightSurface)',
+          color: 'var(--text)',
+          border: '1px solid var(--border)',
           borderRadius: '4px',
           width: '100%',
           fontSize: '0.875rem',
