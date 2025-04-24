@@ -10,7 +10,7 @@ import SliderPropertyControl from '../properties/SliderPropertyControl';
 import NumberInputPropertyControl from '../properties/NumberInputPropertyControl';
 import DropdownPropertyControl from '../properties/DropdownPropertyControl';
 import ColorPropertyControl from '../properties/ColorPropertyControl';
-
+import { v4 as uuidv4 } from 'uuid';
 interface EffectsDetailViewProps {
   track: Track;
 }
@@ -68,7 +68,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     
     const definition = allEffectDefinitions.find(def => def.id === effectId);
     if (definition) {
-      const newEffectInstance = new definition.constructor(effectId);
+      const newEffectInstance = new definition.constructor(uuidv4());
       addEffectToTrack(track.id, newEffectInstance);
       setSelectedEffectToAdd('');
       setShowEffectsMenu(false);
@@ -132,6 +132,9 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
   // Handle dropping an effect onto the view
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    // Do nothing if no track is selected
+    if (!track) return;
+
     try {
       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
       if (data.type === 'effect' && data.id) {
@@ -144,9 +147,14 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
 
   // Handle dragging over the view
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); // Necessary to allow dropping
-    // Optional: Add visual feedback here, e.g., changing background color or border
-    e.dataTransfer.dropEffect = "copy"; // Indicate the drop operation is a copy
+    e.preventDefault(); // Necessary to allow dropping in general
+    
+    // Set drop effect based on whether a track is selected
+    if (track) {
+      e.dataTransfer.dropEffect = "copy"; // Show copy cursor (+ icon)
+    } else {
+      e.dataTransfer.dropEffect = "none"; // Show 'not allowed' cursor
+    }
   };
 
   return (

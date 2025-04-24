@@ -22,11 +22,11 @@ function DetailView() {
   // Handle drag over to switch to effects view when dragging an effect
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    
+
+
     try {
-      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
       // If dragging an effect and not already in effects view, switch to it
-      if (data.type === 'effect' && detailViewMode !== 'effects') {
+      if (detailViewMode !== 'effects') {
         setDetailViewMode('effects');
       }
     } catch (err) {
