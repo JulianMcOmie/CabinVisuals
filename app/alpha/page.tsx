@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Panel,
   PanelGroup,
   PanelResizeHandle,
+  ImperativePanelHandle
 } from 'react-resizable-panels';
 import TimelineView from '../../src/components/TimelineView'; // Adjusted import path
 import VisualizerView from '../../src/components/VisualizerView'; // Adjusted import path
@@ -17,13 +18,31 @@ import { loadAudioFile } from '../../src/lib/idbHelper'; // Adjusted import path
 import { initializeStore } from '../../src/store/store'; // Import the store initializer
 import styles from './alpha.module.css';
 
+// Interface for the panel ref 
+interface PanelRef {
+  collapse: () => void;
+  expand: () => void;
+}
+
 // Renamed component to reflect the route
 export default function AlphaPage() { 
   const [isLoading, setIsLoading] = useState(true); // Add loading state
+  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
 
   // Fetch necessary state and actions from store
   const isInstrumentSidebarVisible = useStore((state) => state.isInstrumentSidebarVisible);
   const loadAudioAction = useStore((state) => state.loadAudio);
+
+  // Effect to collapse/expand sidebar based on visibility state
+  useEffect(() => {
+    if (sidebarPanelRef.current) {
+      if (isInstrumentSidebarVisible) {
+        sidebarPanelRef.current.expand();
+      } else {
+        sidebarPanelRef.current.collapse();
+      }
+    }
+  }, [isInstrumentSidebarVisible]);
 
   // Initialization Effect
   useEffect(() => {
@@ -73,16 +92,20 @@ export default function AlphaPage() {
       </div>
       
       <PanelGroup direction="horizontal" className={styles.contentPanelGroup}>
-        {isInstrumentSidebarVisible && (
-          <>
-            <Panel defaultSize={20} minSize={10} maxSize={40} collapsible={true} collapsedSize={0} id="sidebar-panel">
-              <div className={styles.sidebarArea}>
-                <InstrumentSidebar />
-              </div>
-            </Panel>
-            <PanelResizeHandle className={`${styles.resizeHandle} ${styles.horizontalHandle}`} />
-          </>
-        )}
+        <Panel 
+          ref={sidebarPanelRef}
+          defaultSize={20} 
+          minSize={10} 
+          maxSize={40} 
+          collapsible={true} 
+          collapsedSize={0} 
+          id="sidebar-panel"
+        >
+          <div className={styles.sidebarArea}>
+            <InstrumentSidebar />
+          </div>
+        </Panel>
+        <PanelResizeHandle className={`${styles.resizeHandle} ${styles.horizontalHandle}`} />
         <Panel id="main-content-panel">
           <PanelGroup direction="vertical" className={styles.mainContentPanelGroup}>
             <Panel defaultSize={50} minSize={20} id="top-panel">
