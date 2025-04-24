@@ -7,6 +7,7 @@ import styles from './InstrumentSidebar.module.css';
 const InstrumentSidebar: React.FC = () => {
   const {
     availableInstruments,
+    availableEffects,
     selectedTrackId,
     updateTrack,
     selectedTrack,
@@ -14,6 +15,7 @@ const InstrumentSidebar: React.FC = () => {
   } = useStore();
 
   const [selectedInstrumentId, setSelectedInstrumentId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'instruments' | 'effects'>('instruments');
 
   // Highlight the selected track's instrument
   useEffect(() => {
@@ -59,6 +61,11 @@ const InstrumentSidebar: React.FC = () => {
     }
   };
 
+  const handleEffectSelect = (effectId: string) => {
+    // For now, just log the selection as per requirement 4
+    console.log('Effect selected:', effectId);
+  };
+
   // Function to handle clicks on the sidebar itself
   const handleSidebarClick = () => {
     setSelectedWindow(null);
@@ -78,6 +85,20 @@ const InstrumentSidebar: React.FC = () => {
     return result;
   };
 
+  // Convert availableEffects to the format expected by AccordionMenu
+  const convertEffectsToAccordionItems = (): Record<string, AccordionItem[]> => {
+    const result: Record<string, AccordionItem[]> = {};
+    
+    Object.entries(availableEffects).forEach(([category, effects]) => {
+      result[category] = effects.map(effect => ({
+        id: effect.id,
+        name: effect.name
+      }));
+    });
+    
+    return result;
+  };
+
   return (
     <div className={styles.container}>
         <div
@@ -89,14 +110,14 @@ const InstrumentSidebar: React.FC = () => {
             </div>
             <div className={styles.buttonGroup}>
                 <button
-                className={`${styles.button} ${styles.buttonActive}`}
-                onClick={() => {}}
+                className={`${styles.button} ${activeTab === 'instruments' ? styles.buttonActive : styles.buttonInactive}`}
+                onClick={() => setActiveTab('instruments')}
                 >
                 Instruments
                 </button>
                 <button
-                 className={`${styles.button} ${styles.buttonInactive}`}
-                onClick={() => {}}
+                className={`${styles.button} ${activeTab === 'effects' ? styles.buttonActive : styles.buttonInactive}`}
+                onClick={() => setActiveTab('effects')}
                 >
                 Effects
                 </button>
@@ -104,14 +125,25 @@ const InstrumentSidebar: React.FC = () => {
             </div>
         </div>
 
-      <AccordionMenu
-        categories={convertToAccordionItems()}
-        selectedItemId={selectedInstrumentId}
-        onItemSelect={handleInstrumentSelect}
-        onMenuClick={handleSidebarClick}
-        title="Instruments"
-        defaultExpanded={true}
-      />
+      {activeTab === 'instruments' ? (
+        <AccordionMenu
+          categories={convertToAccordionItems()}
+          selectedItemId={selectedInstrumentId}
+          onItemSelect={handleInstrumentSelect}
+          onMenuClick={handleSidebarClick}
+          title="Instruments"
+          defaultExpanded={true}
+        />
+      ) : (
+        <AccordionMenu
+          categories={convertEffectsToAccordionItems()}
+          selectedItemId={null}
+          onItemSelect={handleEffectSelect}
+          onMenuClick={handleSidebarClick}
+          title="Effects"
+          defaultExpanded={true}
+        />
+      )}
     </div>
   );
 };
