@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import useStore from '../../store/store';
 import MidiEditor from '../MidiEditor';
 import InstrumentDetailView from '../InstrumentDetailView';
@@ -8,10 +8,24 @@ import { Sliders, Music2, Wand2 } from 'lucide-react';
 import styles from './DetailView.module.css';
 
 function DetailView() {
-  const { selectedTrack, selectedBlock, selectedWindow } = useStore();
-  const [detailViewMode, setDetailViewMode] = useState<"instrument" | "midi" | "effects">("instrument");
+  const { 
+    selectedTrack, 
+    selectedBlock, 
+    selectedWindow, 
+    detailViewMode, 
+    setDetailViewMode 
+  } = useStore();
   
   const isMidiEditorVisible = selectedBlock && selectedTrack;
+
+  // Auto-switch detail view mode based on selection
+  useEffect(() => {
+    if (selectedBlock && selectedTrack) {
+      setDetailViewMode("midi");
+    } else if (selectedTrack && !selectedBlock) {
+      setDetailViewMode("instrument");
+    }
+  }, [selectedTrack, selectedBlock, setDetailViewMode]);
 
   return (
     <div 
