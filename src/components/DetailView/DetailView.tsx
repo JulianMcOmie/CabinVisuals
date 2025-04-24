@@ -19,11 +19,27 @@ function DetailView() {
   
   const isMidiEditorVisible = selectedBlock && selectedTrack;
 
+  // Handle drag over to switch to effects view when dragging an effect
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      // If dragging an effect and not already in effects view, switch to it
+      if (data.type === 'effect' && detailViewMode !== 'effects') {
+        setDetailViewMode('effects');
+      }
+    } catch (err) {
+      // Silently ignore invalid data
+    }
+  };
+
   return (
     <div 
       className={`${styles.container} ${
         selectedWindow === 'midiEditor' && isMidiEditorVisible ? styles.containerHighlight : ''
       }`}
+      onDragOver={handleDragOver}
     >
       <div className={styles.trackInfo}>
         <span className={styles.trackLabel}>

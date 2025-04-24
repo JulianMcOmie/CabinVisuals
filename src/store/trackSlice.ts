@@ -83,9 +83,13 @@ export const createTrackSlice: StateCreator<
         };
       });
       
-      // Set detail view mode to instrument when selecting a track (no block)
+      // Set detail view mode to instrument only when selecting a track (no block)
+      // and current mode is midi
       if (trackId) {
-        get().setDetailViewMode("instrument");
+        const currentDetailViewMode = get().detailViewMode;
+        if (currentDetailViewMode === "midi") {
+          get().setDetailViewMode("instrument");
+        }
       }
     },
     selectBlock: (blockId: string | null) => {
