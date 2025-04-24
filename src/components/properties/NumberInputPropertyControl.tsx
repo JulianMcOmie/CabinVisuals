@@ -1,6 +1,14 @@
 import React from 'react';
 import { Property, NumericMetadata } from '../../lib/properties/Property';
 
+// Define colors matching page.tsx
+const COLORS = {
+  accent: "#5a8ea3", // Subtle blue-gray
+  background: "#1e1e1e", // Dark background
+  surface: "#252525", // Slightly lighter surface
+  border: "#3a3a3a", // Border color
+};
+
 interface NumberInputPropertyControlProps {
   property: Property<number>;
   onChange: (value: number) => void;
@@ -24,10 +32,13 @@ function NumberInputPropertyControl({ property, onChange }: NumberInputPropertyC
   };
 
   return (
-    <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
-      <label htmlFor={property.name} style={{ marginRight: '10px', minWidth: '120px' }}>
-        {metadata.label}:
-      </label>
+    <div style={{ marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <label htmlFor={property.name} style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+          {metadata.label}
+        </label>
+      </div>
+      
       <input
         type="number"
         id={property.name}
@@ -39,14 +50,22 @@ function NumberInputPropertyControl({ property, onChange }: NumberInputPropertyC
         onChange={handleChange}
         onWheel={handleWheel} // Prevent scroll changes
         style={{
-          padding: '5px',
+          padding: '5px 10px',
           backgroundColor: '#333',
           color: '#ddd',
           border: '1px solid #555',
-          width: '80px'
+          borderRadius: '4px',
+          width: '100%',
+          fontSize: '0.875rem',
+          height: '36px'
         }}
       />
-       {metadata.description && <small style={{ marginLeft: '10px', color: '#aaa' }}>{metadata.description}</small>}
+      
+      {metadata.description && (
+        <small style={{ display: 'block', marginTop: '4px', color: '#aaa', fontSize: '0.75rem' }}>
+          {metadata.description}
+        </small>
+      )}
     </div>
   );
 }
