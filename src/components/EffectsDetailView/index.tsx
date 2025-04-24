@@ -18,8 +18,13 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  DragCancelEvent
 } from '@dnd-kit/core';
 import {
+  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -32,25 +37,24 @@ interface EffectsDetailViewProps {
 }
 
 function EffectsDetailView({ track }: EffectsDetailViewProps) {
-  // Sensors for dnd-kit
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  // Colors constant - matches the one from page.tsx
+  const COLORS = {
+    accent: "#5a8ea3", // Subtle blue-gray
+    highlight: "#c8a45b", // Muted gold/amber
+    green: "#6a9955", // Muted green
+    background: "#1e1e1e", // Dark background
+    surface: "#252525", // Slightly lighter surface
+    border: "#3a3a3a", // Border color
+    activeBg: "#2d3540", // Active element background
+  };
 
-  // Get store actions and state needed for dnd-kit
+  // Get store actions
   const {
     availableEffects,
     addEffectToTrack,
     removeEffectFromTrack,
     updateEffectPropertyOnTrack,
-    // reorderEffectsOnTrack // Commented out
+    reorderEffectsOnTrack
   } = useStore();
 
   // State for adding new effects
@@ -59,6 +63,9 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
 
   // State to track collapsed state of effects
   const [collapsedEffects, setCollapsedEffects] = useState<Record<string, boolean>>({});
+
+  // State to track the currently dragged item
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   // Combine all available effects into a flat list for dropdown
   const allEffectDefinitions = Object.values(availableEffects || {}).flat();
@@ -73,8 +80,6 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
 
   // Handler for changing effect properties
   const handleEffectPropertyChange = (effectIndex: number, propertyName: string, newValue: any) => {
-    const effectId = track.effects[effectIndex]?.id;
-    if (!effectId) return; // Should not happen if index is valid
     updateEffectPropertyOnTrack(track.id, effectIndex, propertyName, newValue);
   };
 
@@ -100,7 +105,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
   // Render the appropriate property control for a given effect property
   const renderPropertyControl = (effectIndex: number, property: Property<any>) => {
     const key = `${track.id}-effect-${effectIndex}-prop-${property.name}`;
-    
+
     switch (property.uiType) {
       case 'slider':
         return (
@@ -145,61 +150,199 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     }
   };
 
-  // Handle dropping an effect onto the view (Keep this for potential future use, doesn't involve dnd-kit directly)
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (!track) return;
-    try {
-      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-      if (data.type === 'effect' && data.id) {
-        handleAddEffect(data.id);
-      }
-    } catch (err) {
-      console.error("Failed to parse dropped data:", err);
-    }
-  };
+  // Sensors for dnd-kit
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-  // Handle dragging over the view (Keep this for potential future use, doesn't involve dnd-kit directly)
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (track) {
-      e.dataTransfer.dropEffect = "copy";
-    } else {
-      e.dataTransfer.dropEffect = "none";
-    }
-  };
+   // --- Handlers for Drag Events ---
+   function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as string);
+  }
 
-  // dnd-kit drag end handler - COMMENTED OUT
-  const handleDragEnd = (event: any) => {
+  // Handler for when a drag operation ends (reordering)
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (active.id !== over.id) {
+
+    if (over && active.id !== over.id) {
       const oldIndex = track.effects.findIndex(effect => effect.id === active.id);
       const newIndex = track.effects.findIndex(effect => effect.id === over.id);
+
       if (oldIndex !== -1 && newIndex !== -1) {
-        // reorderEffectsOnTrack(track.id, oldIndex, newIndex);
+        reorderEffectsOnTrack(track.id, oldIndex, newIndex);
       }
     }
-  };
+    setActiveId(null); // Clear active ID on drag end
+  }
 
-  // Colors constant
-  const COLORS = {
-    accent: "#5a8ea3",
-    highlight: "#c8a45b",
-    green: "#6a9955",
-    background: "#1e1e1e",
-    surface: "#252525",
-    border: "#3a3a3a",
-    activeBg: "#2d3540",
-  };
+  function handleDragCancel(event: DragCancelEvent) {
+      setActiveId(null); // Clear active ID on drag cancel
+  }
+  // --- End Drag Event Handlers ---
 
-  // Component for each sortable effect item - COMMENTED OUT ENTIRELY
-  // const SortableEffectItem = ({ effect, index }: { effect: Effect, index: number }) => { ... };
+
+  // --- Effect Item Content Component (Presentational) ---
+  interface EffectItemContentProps {
+    effect: Effect;
+    index: number; // Keep index for property controls
+    trackId: string; // Keep trackId for remove action
+    collapsed: boolean;
+    isDragging?: boolean; // Optional: for potential styling differences in overlay
+    onToggleCollapse: (id: string) => void;
+    onRemove: (trackId: string, index: number) => void;
+    getEffectName: (effect: Effect) => string;
+    renderPropertyControl: (index: number, property: Property<any>) => React.ReactNode;
+    COLORS: typeof COLORS;
+    dragHandleProps?: any; // To pass down drag handle listeners/attributes
+  }
+
+  function EffectItemContent({
+    effect,
+    index,
+    trackId,
+    collapsed,
+    isDragging,
+    onToggleCollapse,
+    onRemove,
+    getEffectName,
+    renderPropertyControl,
+    COLORS,
+    dragHandleProps
+  }: EffectItemContentProps) {
+    return (
+      <div
+        className="rounded-md p-3 relative"
+        style={{
+          backgroundColor: COLORS.surface,
+          borderColor: COLORS.border,
+          borderWidth: 1,
+        }}
+      >
+        {/* Drag Handle */}
+        <div
+          className="absolute left-0 inset-y-0 flex items-center px-1 cursor-grab opacity-30 hover:opacity-100 touch-none"
+          {...dragHandleProps} // Apply drag handle props here
+        >
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+
+        {/* Effect Content */}
+        <div
+          className="flex justify-between items-center pl-6 cursor-pointer"
+          onClick={() => onToggleCollapse(effect.id)}
+        >
+          <div className="flex items-center">
+            <h4 className="font-medium">{getEffectName(effect)}</h4>
+          </div>
+          <div className="flex items-center">
+            <button
+              className="h-6 w-6 p-0 mr-1 rounded-md hover:bg-[#444] hover:text-white transition-all flex items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent toggling collapse when removing
+                onRemove(trackId, index);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <ChevronDown
+              className={`h-4 w-4 text-gray-400 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+            />
+          </div>
+        </div>
+
+        {/* Effect Properties (Conditionally Rendered) */}
+        {!collapsed && (
+          <div className="mt-2 space-y-2 pl-6">
+            {Array.from(effect.properties.values()).length > 0 ? (
+              Array.from(effect.properties.values()).map(property =>
+                renderPropertyControl(index, property)
+              )
+            ) : (
+              <div className="text-xs text-gray-400">No adjustable parameters</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+  // --- End Effect Item Content Component ---
+
+
+  // --- Sortable Effect Item Component ---
+  interface SortableEffectItemProps {
+    id: string;
+    effect: Effect;
+    index: number;
+    trackId: string;
+    collapsed: boolean;
+    onToggleCollapse: (id: string) => void;
+    onRemove: (trackId: string, index: number) => void;
+    getEffectName: (effect: Effect) => string;
+    renderPropertyControl: (index: number, property: Property<any>) => React.ReactNode;
+    COLORS: typeof COLORS;
+  }
+
+  function SortableEffectItem({
+    id,
+    effect,
+    index,
+    trackId,
+    collapsed,
+    onToggleCollapse,
+    onRemove,
+    getEffectName,
+    renderPropertyControl,
+    COLORS
+  }: SortableEffectItemProps) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging, // Use this for visual feedback during drag
+    } = useSortable({ id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0 : 1, // Hide original item when dragging
+      // Remove zIndex, backgroundColor, borderColor, borderWidth as they are now in EffectItemContent
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        // No className needed here anymore, moved to EffectItemContent
+      >
+        <EffectItemContent
+          effect={effect}
+          index={index}
+          trackId={trackId}
+          collapsed={collapsed}
+          onToggleCollapse={onToggleCollapse}
+          onRemove={onRemove}
+          getEffectName={getEffectName}
+          renderPropertyControl={renderPropertyControl}
+          COLORS={COLORS}
+          dragHandleProps={{ ...attributes, ...listeners }} // Pass down drag handle props
+        />
+      </div>
+    );
+  }
+  // --- End Sortable Effect Item Component ---
+
+  // Find the active effect instance for the DragOverlay
+  const activeEffect = activeId ? track.effects.find(effect => effect.id === activeId) : null;
+  const activeEffectIndex = activeId ? track.effects.findIndex(effect => effect.id === activeId) : -1;
 
   return (
     <div
-      className="flex-1 p-4 overflow-y-auto text-white"
-      onDrop={handleDrop} // Keep native drop handler
-      onDragOver={handleDragOver} // Keep native drag over handler
+      className="flex-1 p-4 overflow-auto text-white"
     >
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium">Effects Chain for Track {track.id}</h3>
@@ -208,72 +351,62 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        // onDragEnd={handleDragEnd} // Keep commented out for now
+        onDragStart={handleDragStart} // Added
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel} // Added
       >
         <SortableContext
-          items={track.effects.map(e => e.id)}
+          items={track.effects.map(effect => effect.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="space-y-3">
+          {/* Added mb-4 for padding */}
+          <div className="space-y-3 mb-4">
             {track.effects && track.effects.length > 0 ? (
               track.effects.map((effect, index) => (
-                // Replace SortableEffectItem with the simple div structure
-                <div
+                <SortableEffectItem
                   key={effect.id}
-                  className="rounded-md p-3 relative"
-                  style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1 }}
-                >
-                  {/* No Drag Handle */}
-                  <div
-                    className="flex justify-between items-center pl-6 cursor-pointer"
-                    onClick={() => toggleEffectCollapsed(effect.id)}
-                  >
-                    <div className="flex items-center">
-                      <h4 className="font-medium">{getEffectName(effect)}</h4>
-                    </div>
-                    <div className="flex items-center">
-                      <button
-                        className="h-6 w-6 p-0 mr-1 rounded-md hover:bg-[#444] hover:text-white transition-all flex items-center justify-center"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeEffectFromTrack(track.id, index);
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                      <ChevronDown
-                        className={`h-4 w-4 text-gray-400 transition-transform ${collapsedEffects[effect.id] ? "-rotate-90" : ""}`}
-                      />
-                    </div>
-                  </div>
-
-                  {!collapsedEffects[effect.id] && (
-                    <div 
-                      className="mt-2 space-y-2 pl-6" 
-                      // No stopPropagation needed here now
-                    >
-                      {Array.from(effect.properties.values()).length > 0 ? (
-                        Array.from(effect.properties.values()).map(property =>
-                          renderPropertyControl(index, property)
-                        )
-                      ) : (
-                        <div className="text-xs text-gray-400">No adjustable parameters</div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                  id={effect.id}
+                  effect={effect}
+                  index={index}
+                  trackId={track.id}
+                  collapsed={!!collapsedEffects[effect.id]}
+                  onToggleCollapse={toggleEffectCollapsed}
+                  onRemove={removeEffectFromTrack}
+                  getEffectName={getEffectName}
+                  renderPropertyControl={renderPropertyControl}
+                  COLORS={COLORS}
+                />
               ))
             ) : (
               <div className="text-center text-gray-400 py-4">
-                No effects added to this track. Drag one from the list below or the sidebar.
+                No effects added to this track. Drag effects here to add.
               </div>
             )}
           </div>
         </SortableContext>
+
+        {/* Drag Overlay for preview */}
+        <DragOverlay>
+          {activeEffect && activeEffectIndex !== -1 ? (
+            <EffectItemContent
+              effect={activeEffect}
+              index={activeEffectIndex} // Pass the correct index for the active item
+              trackId={track.id}
+              collapsed={!!collapsedEffects[activeEffect.id]} // Use collapsed state for the active item
+              isDragging={true} // Indicate it's being dragged (for potential styling)
+              onToggleCollapse={() => {}} // No-op for overlay
+              onRemove={() => {}} // No-op for overlay
+              getEffectName={getEffectName}
+              renderPropertyControl={renderPropertyControl}
+              COLORS={COLORS}
+              // No dragHandleProps needed for the overlay item itself
+            />
+          ) : null}
+        </DragOverlay>
+        {/* End Drag Overlay */}
       </DndContext>
 
-      {/* Add Effect Button and Menu (remains the same) */}
-      <div className="mt-4 relative"> {/* Added margin top */}
+      <div className="relative">
         <button
           className="w-full py-2 border border-dashed rounded-md text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
           style={{ borderColor: "#555" }}
@@ -284,9 +417,10 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
 
         {showEffectsMenu && (
           <div
-            className="absolute left-0 right-0 bottom-full mb-1 rounded-md shadow-lg z-20 border max-h-60 overflow-y-auto" // Positioned above, added max-height and scroll
+            className="absolute left-0 right-0 mt-1 rounded-md shadow-lg z-20 border"
             style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border }}
           >
+            {/* ... Effect selection menu ... */}
             <div className="p-2">
               <div className="text-sm font-medium mb-2 text-gray-300">Effect Type</div>
               <div className="space-y-1">
@@ -294,6 +428,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
                 {allEffectDefinitions.length > 0 ? (
                   Object.entries(
                     allEffectDefinitions.reduce((acc, def) => {
+                      // Default to 'Other' if category doesn't exist
                       const category = 'Other';
                       if (!acc[category]) acc[category] = [];
                       acc[category].push(def);
@@ -327,4 +462,4 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
   );
 }
 
-export default EffectsDetailView; 
+export default EffectsDetailView;
