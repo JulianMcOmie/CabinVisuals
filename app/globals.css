@@ -16,6 +16,7 @@
   --selectedBlue: #e0f7ff;
   --brightGreen: #00e676;
   --brightYellow: #ffdd00;
+  --windowSelectionColor: rgb(59, 99, 146); /* Selection highlight color */
 }
 
 /* Blob animations */

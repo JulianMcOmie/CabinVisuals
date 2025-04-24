@@ -317,114 +317,121 @@ function TimelineView() {
       className={`${styles.timelineView} ${selectedWindow === 'timelineView' ? styles.timelineViewSelected : ''}`}
       onClick={handleTimelineClick}
     >
-      {/* Timeline container */}
-      <div className={styles.timelineContainer}>
-        {/* Tracks header - fixed at top-left */}
-        <div className={styles.tracksHeader}>
-          <span>Tracks</span>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleAddTrack(); }}
-            className={styles.addTrackButton}
-            title="Add new track"
-          >
-            +
-          </button>
-        </div>
+      {/* Conditionally render the overlay outline */}
+      {selectedWindow === 'timelineView' && (
+        <div className={styles.selectionOutline} />
+      )}
 
-        {/* Single TrackTimelineView for all tracks */}
-        <div
-              className={styles.timelinesColumn}
-              style={{
-                left: `${SIDEBAR_WIDTH}px`,
-              }}
+      {/* Original Content Wrapper */}
+      <div className={styles.timelineContentWrapper}>
+        {/* Timeline container */}
+        <div className={styles.timelineContainer}>
+          {/* Tracks header - fixed at top-left */}
+          <div className={styles.tracksHeader}>
+            <span>Tracks</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleAddTrack(); }}
+              className={styles.addTrackButton}
+              title="Add new track"
             >
-              <TrackTimelineView
-                ref={trackTimelineViewRef}
-                tracks={tracks}
+              +
+            </button>
+          </div>
+
+          {/* Single TrackTimelineView for all tracks */}
+          <div
+                className={styles.timelinesColumn}
+                style={{
+                  left: `${SIDEBAR_WIDTH}px`,
+                }}
+              >
+                <TrackTimelineView
+                  ref={trackTimelineViewRef}
+                  tracks={tracks}
+                  horizontalZoom={horizontalZoom}
+                  verticalZoom={verticalZoom}
+                  pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
+                  trackHeightBase={TRACK_HEIGHT_BASE}
+                  numMeasures={numMeasures}
+                  renderMeasures={renderMeasures}
+                  scrollLeft={scrollLeft}
+                  timelineVisibleWidth={timelineVisibleWidth > 0 ? timelineVisibleWidth : 0}
+                  scrollTop={scrollTop}
+                  timelineVisibleHeight={timelineVisibleHeight > 0 ? timelineVisibleHeight : 0}
+                />
+              </div>
+          
+          {/* Main scrollable area */}
+          <div
+            ref={timelineContentRef}
+            className={styles.timelineContent}
+            onScroll={handleScroll}
+            onMouseDown={handleContentMouseDown}
+            onMouseMove={handleContentMouseMove}
+            onDoubleClick={handleContentDoubleClick}
+            onContextMenu={handleContentContextMenu}
+            onMouseLeave={handleContentMouseLeave}
+          >
+            {/* Fixed sidebar background that extends full height */}
+            <div className={styles.sidebarBackground} />
+            
+            {/* Measures header - sticky at top */}
+            <div className={styles.measuresHeaderContainer}>
+              <MeasuresHeader
                 horizontalZoom={horizontalZoom}
-                verticalZoom={verticalZoom}
                 pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
-                trackHeightBase={TRACK_HEIGHT_BASE}
                 numMeasures={numMeasures}
                 renderMeasures={renderMeasures}
-                scrollLeft={scrollLeft}
-                timelineVisibleWidth={timelineVisibleWidth > 0 ? timelineVisibleWidth : 0}
-                scrollTop={scrollTop}
-                timelineVisibleHeight={timelineVisibleHeight > 0 ? timelineVisibleHeight : 0}
               />
             </div>
-        
-        {/* Main scrollable area */}
-        <div
-          ref={timelineContentRef}
-          className={styles.timelineContent}
-          onScroll={handleScroll}
-          onMouseDown={handleContentMouseDown}
-          onMouseMove={handleContentMouseMove}
-          onDoubleClick={handleContentDoubleClick}
-          onContextMenu={handleContentContextMenu}
-          onMouseLeave={handleContentMouseLeave}
-        >
-          {/* Fixed sidebar background that extends full height */}
-          <div className={styles.sidebarBackground} />
-          
-          {/* Measures header - sticky at top */}
-          <div className={styles.measuresHeaderContainer}>
-            <MeasuresHeader
-              horizontalZoom={horizontalZoom}
-              pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
-              numMeasures={numMeasures}
-              renderMeasures={renderMeasures}
-            />
-          </div>
-          
-          {/* Combined content area for instruments and timelines */}
-          <div
-            className={styles.combinedContentArea}
-            style={{
-              width: `${(renderMeasures * 4 * effectivePixelsPerBeat)}px`,
-              height: `${totalTracksHeight}px`,
-            }}
-          >
-            {/* Instrument Views Column - sticky */}
+            
+            {/* Combined content area for instruments and timelines */}
             <div
-              ref={instrumentsColumnRef}
-              className={styles.instrumentsColumn}
-            >
-              {/* Map over tracks to render InstrumentView */}
-              <InstrumentsView 
-                tracks={tracks}
-                effectiveTrackHeight={effectiveTrackHeight}
-              />
-            </div>
-          </div>
-          
-          {/* Message when no tracks exist */}
-          {tracks.length === 0 && (
-            <div
-              className={styles.noTracksMessage}
+              className={styles.combinedContentArea}
               style={{
-                left: `${SIDEBAR_WIDTH + 20}px`,
+                width: `${(renderMeasures * 4 * effectivePixelsPerBeat)}px`,
+                height: `${totalTracksHeight}px`,
               }}
             >
-              Click the + button to add a track
+              {/* Instrument Views Column - sticky */}
+              <div
+                ref={instrumentsColumnRef}
+                className={styles.instrumentsColumn}
+              >
+                {/* Map over tracks to render InstrumentView */}
+                <InstrumentsView 
+                  tracks={tracks}
+                  effectiveTrackHeight={effectiveTrackHeight}
+                />
+              </div>
             </div>
-          )}
+            
+            {/* Message when no tracks exist */}
+            {tracks.length === 0 && (
+              <div
+                className={styles.noTracksMessage}
+                style={{
+                  left: `${SIDEBAR_WIDTH + 20}px`,
+                }}
+              >
+                Click the + button to add a track
+              </div>
+            )}
+          </div>
+
+          
+
+          {/* Playhead */} 
+          <div
+            ref={playheadRef}
+            className={styles.playhead}
+            onMouseDown={handlePlayheadMouseDown}
+            style={{
+              left: `${playheadLeftStyle}px`,
+            }}
+          />
         </div>
-
-        
-
-        {/* Playhead */} 
-        <div
-          ref={playheadRef}
-          className={styles.playhead}
-          onMouseDown={handlePlayheadMouseDown}
-          style={{
-            left: `${playheadLeftStyle}px`,
-          }}
-        />
       </div>
-    
     </div>
   );
 }

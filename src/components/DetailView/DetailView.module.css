@@ -8,7 +8,7 @@
 }
 
 .containerHighlight {
-  border: 2px solid rgba(74, 144, 226, 0.5);
+  border: 2px solid var(--windowSelectionColor);
 }
 
 .trackInfo {

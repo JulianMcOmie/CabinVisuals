@@ -4,12 +4,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
-  border: 2px solid transparent; /* Default border */
-}
-
-.timelineViewSelected {
-  border: 2px solid rgba(255, 255, 255, 0.3); /* Selected border */
+  position: relative; /* Needed for absolute positioning of outline */
 }
 
 .timelineContainer {
@@ -116,4 +111,31 @@
   z-index: 10;
   cursor: ew-resize;
   pointer-events: auto;
+}
+
+/* Remove the direct selection style from the main view */
+/*
+.timelineViewSelected {
+
+}
+*/
+
+/* Style for the new outline div */
+.selectionOutline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid var(--windowSelectionColor);
+  pointer-events: none; /* Prevent it from capturing clicks */
+  z-index: 10; /* Ensure it's above most other elements */
+  box-sizing: border-box;
+}
+
+/* Wrapper for the actual content to allow outline overlay */
+.timelineContentWrapper {
+  flex: 1;
+  display: flex; /* Keep flex behavior */
+  overflow: hidden; /* Maintain original overflow */
 } 
