@@ -20,7 +20,6 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -211,10 +210,10 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
         collisionDetection={closestCenter}
         // onDragEnd={handleDragEnd} // Keep commented out for now
       >
-        {/* <SortableContext // COMMENTED OUT
+        <SortableContext
           items={track.effects.map(e => e.id)}
           strategy={verticalListSortingStrategy}
-        > */}
+        >
           <div className="space-y-3">
             {track.effects && track.effects.length > 0 ? (
               track.effects.map((effect, index) => (
@@ -270,7 +269,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
               </div>
             )}
           </div>
-        {/* </SortableContext> // COMMENTED OUT */}
+        </SortableContext>
       </DndContext>
 
       {/* Add Effect Button and Menu (remains the same) */}
