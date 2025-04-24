@@ -3,6 +3,13 @@
 import React, { useState, useRef } from 'react';
 import { Track } from '../../lib/types';
 import { ChevronDown, GripVertical, X } from 'lucide-react';
+import useStore from '../../store/store';
+import Effect from '../../lib/Effect';
+import { Property } from '../../lib/properties/Property';
+import SliderPropertyControl from '../properties/SliderPropertyControl';
+import NumberInputPropertyControl from '../properties/NumberInputPropertyControl';
+import DropdownPropertyControl from '../properties/DropdownPropertyControl';
+import ColorPropertyControl from '../properties/ColorPropertyControl';
 
 interface EffectsDetailViewProps {
   track: Track;
@@ -10,13 +17,6 @@ interface EffectsDetailViewProps {
 
 interface EffectParam {
   [key: string]: number;
-}
-
-interface Effect {
-  id: number;
-  name: string;
-  params: EffectParam;
-  collapsed: boolean;
 }
 
 function EffectsDetailView({ track }: EffectsDetailViewProps) {
@@ -31,108 +31,102 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     activeBg: "#2d3540", // Active element background
   };
 
-  // Mock effects chain data
-  const [effectsChain, setEffectsChain] = useState<Effect[]>([
-    {
-      id: 1,
-      name: "Reverb",
-      params: { roomSize: 75, damping: 40 },
-      collapsed: false,
-    },
-    {
-      id: 2,
-      name: "Delay",
-      params: { time: 50, feedback: 30 },
-      collapsed: false,
-    },
-  ]);
+  // Get store actions
+  const { 
+    availableEffects,
+    addEffectToTrack, 
+    removeEffectFromTrack, 
+    updateEffectPropertyOnTrack 
+  } = useStore();
 
-  // Ref to track active slider
-  const sliderRef = useRef<{
-    isActive: boolean;
-    effectIndex: number;
-    paramName: string;
-  }>({
-    isActive: false,
-    effectIndex: -1,
-    paramName: '',
-  });
+  // State for adding new effects
+  const [selectedEffectToAdd, setSelectedEffectToAdd] = useState<string>('');
+  const [showEffectsMenu, setShowEffectsMenu] = useState(false);
 
-  const toggleEffectCollapsed = (index: number) => {
-    const newEffectsChain = [...effectsChain];
-    newEffectsChain[index] = {
-      ...newEffectsChain[index],
-      collapsed: !newEffectsChain[index].collapsed,
-    };
-    setEffectsChain(newEffectsChain);
+  // State to track collapsed state of effects
+  const [collapsedEffects, setCollapsedEffects] = useState<Record<string, boolean>>({});
+
+  // Combine all available effects into a flat list for dropdown
+  const allEffectDefinitions = Object.values(availableEffects || {}).flat();
+
+  // Toggle effect collapsed state
+  const toggleEffectCollapsed = (effectId: string) => {
+    setCollapsedEffects(prev => ({
+      ...prev,
+      [effectId]: !prev[effectId]
+    }));
   };
 
-  const removeEffect = (id: number) => {
-    const newEffectsChain = effectsChain.filter((effect) => effect.id !== id);
-    setEffectsChain(newEffectsChain);
+  // Handler for changing effect properties
+  const handleEffectPropertyChange = (effectIndex: number, propertyName: string, newValue: any) => {
+    updateEffectPropertyOnTrack(track.id, effectIndex, propertyName, newValue);
   };
 
-  const startSliderDrag = (effectIndex: number, paramName: string) => {
-    sliderRef.current = {
-      isActive: true,
-      effectIndex,
-      paramName,
-    };
+  // Handler to add a new effect
+  const handleAddEffect = (effectId: string) => {
+    if (!effectId) return;
     
-    // Add event listeners for mousemove and mouseup
-    document.addEventListener('mousemove', handleSliderDrag);
-    document.addEventListener('mouseup', endSliderDrag);
+    const definition = allEffectDefinitions.find(def => def.id === effectId);
+    if (definition) {
+      const newEffectInstance = new definition.constructor(effectId);
+      addEffectToTrack(track.id, newEffectInstance);
+      setSelectedEffectToAdd('');
+      setShowEffectsMenu(false);
+    }
   };
 
-  const handleSliderDrag = (e: MouseEvent) => {
-    if (!sliderRef.current.isActive) return;
-    
-    const sliderElements = document.querySelectorAll('.slider-track');
-    if (!sliderElements.length) return;
-    
-    const effectIndex = sliderRef.current.effectIndex;
-    const paramName = sliderRef.current.paramName;
-    
-    // Find the correct slider element
-    const elementIndex = Array.from(effectsChain).findIndex((_, index) => index === effectIndex);
-    if (elementIndex === -1) return;
-    
-    const paramIndex = Object.keys(effectsChain[elementIndex].params).findIndex(
-      key => key === paramName
-    );
-    if (paramIndex === -1) return;
-    
-    const sliderElement = sliderElements[elementIndex * Object.keys(effectsChain[elementIndex].params).length + paramIndex] as HTMLElement;
-    if (!sliderElement) return;
-    
-    const rect = sliderElement.getBoundingClientRect();
-    let percentage = ((e.clientX - rect.left) / rect.width) * 100;
-    
-    // Clamp value between 0 and 100
-    percentage = Math.max(0, Math.min(100, percentage));
-    
-    // Update value in state
-    updateParamValue(effectIndex, paramName, Math.round(percentage));
+  // Helper to get effect name from instance
+  const getEffectName = (effect: Effect): string => {
+    const definition = allEffectDefinitions.find(def => effect instanceof def.constructor);
+    return definition ? definition.name : effect.constructor.name;
   };
 
-  const endSliderDrag = () => {
-    sliderRef.current.isActive = false;
+  // Render the appropriate property control for a given effect property
+  const renderPropertyControl = (effectIndex: number, property: Property<any>) => {
+    const key = `${track.id}-effect-${effectIndex}-prop-${property.name}`;
     
-    // Remove event listeners when done
-    document.removeEventListener('mousemove', handleSliderDrag);
-    document.removeEventListener('mouseup', endSliderDrag);
-  };
-
-  const updateParamValue = (effectIndex: number, paramName: string, value: number) => {
-    const newEffectsChain = [...effectsChain];
-    newEffectsChain[effectIndex] = {
-      ...newEffectsChain[effectIndex],
-      params: {
-        ...newEffectsChain[effectIndex].params,
-        [paramName]: value,
-      },
-    };
-    setEffectsChain(newEffectsChain);
+    switch (property.uiType) {
+      case 'slider':
+        return (
+          <SliderPropertyControl 
+            key={key}
+            property={property as Property<number>} 
+            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
+          />
+        );
+      case 'numberInput':
+        return (
+          <NumberInputPropertyControl 
+            key={key}
+            property={property as Property<number>} 
+            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
+          />
+        );
+      case 'dropdown':
+        return (
+          <DropdownPropertyControl
+            key={key}
+            property={property as Property<unknown>} 
+            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
+          />
+        );
+      case 'color':
+        return (
+          <ColorPropertyControl 
+            key={key} 
+            property={property as Property<string>} 
+            onChange={(value) => handleEffectPropertyChange(effectIndex, property.name, value)} 
+          />
+        );
+      default:
+        return (
+          <div key={key} className="relative h-6 flex items-center">
+            <div className="text-xs text-gray-400">
+              {property.name}: {property.value} ({property.uiType})
+            </div>
+          </div>
+        );
+    }
   };
 
   return (
@@ -142,84 +136,109 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
       </div>
 
       <div className="space-y-3">
-        {effectsChain.map((effect, index) => (
-          <div
-            key={effect.id}
-            className="rounded-md p-3 relative"
-            style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1 }}
-          >
-            <div className="absolute left-0 inset-y-0 flex items-center px-1 cursor-grab opacity-30 hover:opacity-100">
-              <GripVertical className="h-4 w-4 text-gray-400" />
-            </div>
-            
+        {track.effects && track.effects.length > 0 ? (
+          track.effects.map((effect, index) => (
             <div
-              className="flex justify-between items-center pl-6 cursor-pointer"
-              onClick={() => toggleEffectCollapsed(index)}
+              key={effect.id}
+              className="rounded-md p-3 relative"
+              style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1 }}
             >
-              <div className="flex items-center">
-                <h4 className="font-medium">{effect.name}</h4>
+              <div className="absolute left-0 inset-y-0 flex items-center px-1 cursor-grab opacity-30 hover:opacity-100">
+                <GripVertical className="h-4 w-4 text-gray-400" />
               </div>
-              <div className="flex items-center">
-                <button
-                  className="h-6 w-6 p-0 mr-1 rounded-md hover:bg-[#444] hover:text-white transition-all flex items-center justify-center"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeEffect(effect.id);
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-                <ChevronDown
-                  className={`h-4 w-4 text-gray-400 transition-transform ${effect.collapsed ? "-rotate-90" : ""}`}
-                />
+              
+              <div
+                className="flex justify-between items-center pl-6 cursor-pointer"
+                onClick={() => toggleEffectCollapsed(effect.id)}
+              >
+                <div className="flex items-center">
+                  <h4 className="font-medium">{getEffectName(effect)}</h4>
+                </div>
+                <div className="flex items-center">
+                  <button
+                    className="h-6 w-6 p-0 mr-1 rounded-md hover:bg-[#444] hover:text-white transition-all flex items-center justify-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeEffectFromTrack(track.id, index);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  <ChevronDown
+                    className={`h-4 w-4 text-gray-400 transition-transform ${collapsedEffects[effect.id] ? "-rotate-90" : ""}`}
+                  />
+                </div>
               </div>
-            </div>
 
-            {!effect.collapsed && (
-              <div className="mt-2 space-y-2 pl-6">
-                {Object.entries(effect.params).map(([key, value]) => (
-                  <div key={key}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span>{key.charAt(0).toUpperCase() + key.slice(1)}</span>
-                      <span>{value}%</span>
-                    </div>
-                    <div className="relative h-6 flex items-center">
-                      <div 
-                        className="absolute inset-0 h-1 bg-[#3a3a3a] rounded-full top-1/2 -translate-y-1/2 slider-track"
-                        onClick={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const percentage = ((e.clientX - rect.left) / rect.width) * 100;
-                          updateParamValue(index, key, Math.round(percentage));
-                        }}
-                      ></div>
-                      <div
-                        className="absolute h-1 rounded-full top-1/2 -translate-y-1/2"
-                        style={{ width: `${value}%`, backgroundColor: COLORS.accent }}
-                      ></div>
-                      <div
-                        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border cursor-grab"
-                        style={{
-                          left: `calc(${value}% - 6px)`,
-                          backgroundColor: COLORS.accent,
-                          borderColor: "#ddd",
-                        }}
-                        onMouseDown={() => startSliderDrag(index, key)}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+              {!collapsedEffects[effect.id] && (
+                <div className="mt-2 space-y-2 pl-6">
+                  {Array.from(effect.properties.values()).length > 0 ? (
+                    Array.from(effect.properties.values()).map(property => 
+                      renderPropertyControl(index, property)
+                    )
+                  ) : (
+                    <div className="text-xs text-gray-400">No adjustable parameters</div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))
+        ) : (
+          <div className="text-center text-gray-400 py-4">
+            No effects added to this track.
           </div>
-        ))}
+        )}
 
         <div className="relative">
           <button
             className="w-full py-2 border border-dashed rounded-md text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
             style={{ borderColor: "#555" }}
+            onClick={() => setShowEffectsMenu(!showEffectsMenu)}
           >
             + Add Effect
           </button>
+
+          {showEffectsMenu && (
+            <div
+              className="absolute left-0 right-0 mt-1 rounded-md shadow-lg z-20 border"
+              style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border }}
+            >
+              <div className="p-2">
+                <div className="text-sm font-medium mb-2 text-gray-300">Effect Type</div>
+                <div className="space-y-1">
+                  {/* Group by category */}
+                  {allEffectDefinitions.length > 0 ? (
+                    Object.entries(
+                      allEffectDefinitions.reduce((acc, def) => {
+                        // Default to 'Other' if category doesn't exist
+                        const category = 'Other';
+                        if (!acc[category]) acc[category] = [];
+                        acc[category].push(def);
+                        return acc;
+                      }, {} as Record<string, typeof allEffectDefinitions>)
+                    ).map(([category, effects]) => (
+                      <div key={category} className="mb-2">
+                        <div className="text-xs font-medium text-gray-400 mb-1">{category}</div>
+                        <div className="pl-2 space-y-1">
+                          {effects.map(effect => (
+                            <div
+                              key={effect.id}
+                              className="text-sm py-1 px-2 hover:bg-[#3a3a3a] rounded cursor-pointer flex items-center"
+                              onClick={() => handleAddEffect(effect.id)}
+                            >
+                              {effect.name}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-400">No effects available</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
