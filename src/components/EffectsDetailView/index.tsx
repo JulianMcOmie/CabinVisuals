@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Track } from '../../lib/types';
+import { ChevronDown, GripVertical, X } from 'lucide-react';
 
 interface EffectsDetailViewProps {
   track: Track;
@@ -50,7 +51,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
   };
 
   return (
-    <div className="flex-1 p-4 overflow-auto">
+    <div className="flex-1 p-4 overflow-auto text-white">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium">Effects Chain for Track {track.id}</h3>
       </div>
@@ -62,8 +63,12 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
             className="rounded-md p-3 relative group"
             style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1 }}
           >
+            <div className="absolute left-0 inset-y-0 flex items-center px-1 cursor-grab opacity-30 group-hover:opacity-100">
+              <GripVertical className="h-4 w-4 text-gray-400" />
+            </div>
+            
             <div
-              className="flex justify-between items-center cursor-pointer"
+              className="flex justify-between items-center pl-6 cursor-pointer"
               onClick={() => toggleEffectCollapsed(index)}
             >
               <div className="flex items-center">
@@ -77,19 +82,16 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
                     removeEffect(effect.id);
                   }}
                 >
-                  ✕
+                  <X className="h-3 w-3" />
                 </button>
-                <span
-                  className="h-4 w-4 text-gray-400 transition-transform inline-block"
-                  style={{ transform: effect.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
-                >
-                  ▼
-                </span>
+                <ChevronDown
+                  className={`h-4 w-4 text-gray-400 transition-transform ${effect.collapsed ? "-rotate-90" : ""}`}
+                />
               </div>
             </div>
 
             {!effect.collapsed && (
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 space-y-2 pl-6">
                 {Object.entries(effect.params).map(([key, value]) => (
                   <div key={key}>
                     <div className="flex justify-between text-xs mb-1">
