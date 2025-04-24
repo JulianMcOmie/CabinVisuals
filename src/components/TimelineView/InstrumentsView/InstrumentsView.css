@@ -8,11 +8,11 @@
 .instrumentView {
   padding: 0 10px;
   height: 100%;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  color: #ddd;
-  background-color: #1a1a1a; /* Default background */
+  color: var(--text);
+  background-color: var(--surface);
   transition: background-color 0.1s ease, opacity 0.1s ease;
   min-width: 150px;
   box-sizing: border-box;
@@ -21,7 +21,7 @@
 }
 
 .instrumentView.selected:not(.dragging) {
-  background-color: #333;
+  background-color: var(--lightSurfaceHover);
 }
 
 .instrumentView.dragging {
@@ -42,13 +42,24 @@
   background: transparent;
   color: inherit;
   font-family: inherit;
-  font-size: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
   box-sizing: border-box;
+  outline: none;
+}
+
+.trackNameInput:focus {
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0 2px;
+  margin: -1px -2px;
 }
 
 .trackNameDisplay {
   width: 100%;
   pointer-events: auto; /* Default */
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .trackNameDisplay.dragging {
@@ -62,24 +73,29 @@
 }
 
 .controlButton {
-  padding: 2px 5px;
-  border: 1px solid #555;
-  border-radius: 3px;
-  background-color: #444;
-  color: #ddd;
-  min-width: 25px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background-color: var(--lightSurface);
+  color: var(--text);
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   cursor: pointer;
 }
 
 .controlButton.mute.active {
-  border-color: #4A90E2;
-  background-color: #4A90E2;
-  color: #fff;
+  border-color: var(--accent);
+  background-color: var(--accent);
+  color: var(--text);
 }
 
 .controlButton.solo.active {
-  border-color: #FFD700;
-  background-color: #FFD700;
-  color: #000;
+  border-color: var(--brightYellow);
+  background-color: var(--brightYellow);
+  color: var(--background);
 } 
