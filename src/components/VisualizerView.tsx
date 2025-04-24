@@ -67,7 +67,7 @@ function VisualObject({ object }: { object: VisualObject3D }) {
 
 // Main VisualizerView component
 function VisualizerView() {
-  const { timeManager, tracks } = useStore();
+  const { timeManager, tracks, currentBeat } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -142,6 +142,16 @@ function VisualizerView() {
             </EffectComposer>
           </Canvas>
         )}
+        {/* Beat indicator overlay - styled like page.tsx */}
+        <div
+          className="absolute top-3 left-3 px-3 py-1 rounded-md border text-xs text-gray-300"
+          style={{
+            backgroundColor: "rgba(40, 40, 40, 0.7)",
+            borderColor: "rgba(80, 80, 80, 0.5)",
+          }}
+        >
+          Beat: {currentBeat.toFixed(2)}
+        </div>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
