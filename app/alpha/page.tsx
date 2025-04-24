@@ -10,7 +10,7 @@ import TimelineView from '../../src/components/TimelineView'; // Adjusted import
 import VisualizerView from '../../src/components/VisualizerView'; // Adjusted import path
 import PlaybarView from '../../src/components/PlaybarView/PlaybarView'; // Adjusted import path
 import DetailView from '../../src/components/DetailView'; // Adjusted import path
-import AudioLoader from '../../src/components/AudioLoader'; // Adjusted import path
+import AudioLoader from '../../src/components/AudioLoader/AudioLoader'; // Adjusted import path
 import InstrumentSidebar from '../../src/components/InstrumentSidebar/InstrumentSidebar'; // Adjusted import path
 import useStore from '../../src/store/store'; // Adjusted import path
 import { loadAudioFile } from '../../src/lib/idbHelper'; // Adjusted import path
@@ -104,15 +104,12 @@ export default function AlphaPage() {
             <Panel minSize={20} id="timeline-panel">
               <div className={styles.bottomSection}>
                 <TimelineView />
+                <AudioLoader />
               </div>
             </Panel>
           </PanelGroup>
         </Panel>
       </PanelGroup>
-
-      <div className={styles.audioLoaderContainer}>
-        <AudioLoader />
-      </div>
     </main>
   );
 } 

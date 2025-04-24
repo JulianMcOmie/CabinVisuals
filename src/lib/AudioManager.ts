@@ -8,6 +8,7 @@ export class AudioManager {
     private startOffset: number = 0; // Offset within the buffer where playback started (in seconds)
     private pausedAt: number | null = null; // AudioContext time when pause() was called
     private fileName: string | null = null; // Store the file name
+    private progressCallback: ((progress: number) => void) | null = null; // Callback for progress updates
 
     constructor() {
         if (typeof window !== 'undefined' && (window.AudioContext || (window as any).webkitAudioContext)) {
@@ -34,10 +35,26 @@ export class AudioManager {
         return this.fileName;
     }
 
+    setProgressCallback(callback: (progress: number) => void): void {
+        this.progressCallback = callback;
+    }
+
+    private updateProgress(progress: number): void {
+        if (this.progressCallback) {
+            // Ensure progress is between 0-100
+            const boundedProgress = Math.max(0, Math.min(100, progress));
+            this.progressCallback(boundedProgress);
+        }
+    }
+
     async loadAudio(audioData: ArrayBuffer, fileName: string = ''): Promise<{ duration: number }> {
         if (!this.audioContext) {
             throw new Error("AudioContext is not initialized.");
         }
+        
+        // Initial progress: starting
+        this.updateProgress(0);
+        
         // Stop and clear any existing playback/state before loading new audio
         if (this.sourceNode) {
             try {
@@ -46,6 +63,10 @@ export class AudioManager {
             this.sourceNode.disconnect();
             this.sourceNode = null;
         }
+        
+        // Progress: 10% - Clean up complete
+        this.updateProgress(10);
+        
         this.audioBuffer = null;
         this.isLoaded = false;
         this.duration = null;
@@ -55,13 +76,53 @@ export class AudioManager {
         this.fileName = fileName;
 
         try {
+            // Progress: 20% - File read, starting decoding
+            this.updateProgress(20);
+            
             // Resume context if suspended (often required after user interaction)
             if (this.audioContext.state === 'suspended') {
                 await this.audioContext.resume();
+                // Progress: 25% - Context resumed
+                this.updateProgress(25);
             }
-            this.audioBuffer = await this.audioContext.decodeAudioData(audioData);
+            
+            // Create a custom promise for decodeAudioData to track progress
+            const decodePromise = new Promise<AudioBuffer>((resolve, reject) => {
+                // For large files, this shows intent to process
+                this.updateProgress(30);
+                
+                this.audioContext!.decodeAudioData(
+                    audioData,
+                    (buffer) => {
+                        // Progress: 80% - Decoding complete
+                        this.updateProgress(80);
+                        resolve(buffer);
+                    },
+                    (error) => {
+                        reject(error);
+                    }
+                );
+                
+                // Use setTimeout to simulate progress during decoding
+                // since the Web Audio API doesn't expose decode progress
+                setTimeout(() => this.updateProgress(40), 100);
+                setTimeout(() => this.updateProgress(50), 200);
+                setTimeout(() => this.updateProgress(60), 300);
+                setTimeout(() => this.updateProgress(70), 500);
+            });
+            
+            // Wait for decoding to complete
+            this.audioBuffer = await decodePromise;
+            
+            // Progress: 90% - Processing decoded audio
+            this.updateProgress(90);
+            
             this.isLoaded = true;
             this.duration = this.audioBuffer.duration;
+            
+            // Progress: 100% - Everything complete
+            this.updateProgress(100);
+            
             console.log(`AudioManager: Audio loaded successfully. File: ${this.fileName}, Duration: ${this.duration.toFixed(2)}s`);
             return { duration: this.duration };
         } catch (error) {
@@ -70,6 +131,10 @@ export class AudioManager {
             this.duration = null;
             this.audioBuffer = null;
             this.fileName = null;
+            
+            // Reset progress on error
+            this.updateProgress(0);
+            
             throw new Error(`Failed to decode audio: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
