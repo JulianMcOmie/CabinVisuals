@@ -17,33 +17,33 @@ import {
   KeyboardSensor,
   PointerSensor,
   useSensor,
-  // useSensors, // Commented out
+  useSensors,
 } from '@dnd-kit/core';
-// import { // Commented out sortable imports
-//   arrayMove,
-//   SortableContext,
-//   sortableKeyboardCoordinates,
-//   verticalListSortingStrategy,
-//   useSortable,
-// } from '@dnd-kit/sortable';
-// import { CSS } from '@dnd-kit/utilities'; // Commented out
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface EffectsDetailViewProps {
   track: Track;
 }
 
 function EffectsDetailView({ track }: EffectsDetailViewProps) {
-  // Sensors for dnd-kit - COMMENTED OUT
-  // const sensors = useSensors(
-  //   useSensor(PointerSensor, {
-  //     activationConstraint: {
-  //       distance: 5,
-  //     },
-  //   }),
-  //   useSensor(KeyboardSensor, {
-  //     coordinateGetter: sortableKeyboardCoordinates,
-  //   })
-  // );
+  // Sensors for dnd-kit
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Get store actions and state needed for dnd-kit
   const {
@@ -171,16 +171,16 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
   };
 
   // dnd-kit drag end handler - COMMENTED OUT
-  // const handleDragEnd = (event: any) => {
-  //   const { active, over } = event;
-  //   if (active.id !== over.id) {
-  //     const oldIndex = track.effects.findIndex(effect => effect.id === active.id);
-  //     const newIndex = track.effects.findIndex(effect => effect.id === over.id);
-  //     if (oldIndex !== -1 && newIndex !== -1) {
-  //       // reorderEffectsOnTrack(track.id, oldIndex, newIndex);
-  //     }
-  //   }
-  // };
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (active.id !== over.id) {
+      const oldIndex = track.effects.findIndex(effect => effect.id === active.id);
+      const newIndex = track.effects.findIndex(effect => effect.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // reorderEffectsOnTrack(track.id, oldIndex, newIndex);
+      }
+    }
+  };
 
   // Colors constant
   const COLORS = {
@@ -207,9 +207,9 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
       </div>
 
       <DndContext
-        // sensors={sensors} // COMMENTED OUT
+        sensors={sensors}
         collisionDetection={closestCenter}
-        // onDragEnd={handleDragEnd} // COMMENTED OUT
+        // onDragEnd={handleDragEnd} // Keep commented out for now
       >
         {/* <SortableContext // COMMENTED OUT
           items={track.effects.map(e => e.id)}
