@@ -38,9 +38,9 @@ export default function LoginPage() {
   }, []); // Empty dependency array ensures this runs only once on mount
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
-        <h1 className="mb-6 text-center text-2xl font-bold text-gray-800">
+    <div className="flex min-h-screen items-center justify-center bg-black text-white">
+      <div className="w-full max-w-md rounded-lg bg-gray-900/50 p-8 shadow-md border border-gray-800">
+        <h1 className="mb-6 text-center text-2xl font-bold text-white">
           Sign In
         </h1>
 
@@ -49,7 +49,7 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-300"
             >
               Email:
             </label>
@@ -58,14 +58,14 @@ export default function LoginPage() {
               name="email"
               type="email"
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
               placeholder="you@example.com"
             />
           </div>
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-300"
             >
               Password:
             </label>
@@ -74,21 +74,21 @@ export default function LoginPage() {
               name="password"
               type="password"
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
               placeholder="••••••••"
             />
           </div>
           {/* TODO: Add area to display login/signup errors */}
-          <div className="flex items-center justify-between space-x-2 pt-2">
+          <div className="flex items-center justify-between space-x-4 pt-2">
             <button
               formAction={login}
-              className="flex-1 justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="flex-1 justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               Log in
             </button>
             <button
               formAction={signup}
-              className="flex-1 justify-center rounded-md bg-gray-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600"
+              className="flex-1 justify-center rounded-full border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-300 shadow-sm hover:border-gray-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
             >
               Sign up
             </button>
@@ -97,9 +97,9 @@ export default function LoginPage() {
 
         {/* Divider */}
         <div className="my-6 flex items-center">
-          <div className="flex-grow border-t border-gray-300"></div>
+          <div className="flex-grow border-t border-gray-700"></div>
           <span className="mx-4 flex-shrink text-sm text-gray-500">Or</span>
-          <div className="flex-grow border-t border-gray-300"></div>
+          <div className="flex-grow border-t border-gray-700"></div>
         </div>
 
         {/* Google Sign-In */}
@@ -114,7 +114,7 @@ export default function LoginPage() {
              data-nonce="" // Optional
              // data-auto_select="true" // Can enable for auto sign-in attempt
              data-itp_support="true"
-             data-use_fedcm_for_prompt="false" // Important
+             data-use_fedcm_for_prompt="false" // Keep FedCM off for now based on previous errors
              style={{ display: 'none' }} // Hide this config div
            ></div>
 
