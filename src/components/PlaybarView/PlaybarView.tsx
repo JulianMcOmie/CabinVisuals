@@ -6,7 +6,7 @@ import styles from './PlaybarView.module.css';
 import { Repeat, Upload } from 'lucide-react';
 import { Play, Square, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
+import ExportView from '../ExportView';
 
 // Main PlaybarView component
 const PlaybarView: React.FC = () => {
@@ -26,11 +26,43 @@ const PlaybarView: React.FC = () => {
   } = useStore();
 
   const [exportButtonHover, setExportButtonHover] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStatusMessage, setExportStatusMessage] = useState('Preparing export...');
 
   const handlePlaybarClick = () => {
     setSelectedWindow(null);
   };
   
+  const handleExportClick = async () => {
+    setIsExporting(true);
+    setExportProgress(0);
+    setExportStatusMessage('Starting export process...');
+    setSelectedWindow(null);
+
+    try {
+      console.log('Export initiated (simulation)');
+      for (let i = 0; i <= 100; i += 10) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        setExportProgress(i);
+        setExportStatusMessage(`Rendering frame ${i * 2}...`);
+      }
+      setExportStatusMessage('Export complete! (simulation)');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+    } catch (error) {
+      console.error("Export failed:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setExportStatusMessage(`Export failed: ${errorMessage}`);
+    }
+  };
+
+  const handleCloseExportModal = () => {
+    setIsExporting(false);
+    setExportProgress(0);
+    setExportStatusMessage('Preparing export...');
+  };
+
   return (
     <div
       className={styles.playbarContainer}
@@ -113,11 +145,19 @@ const PlaybarView: React.FC = () => {
         }}
         onMouseEnter={() => setExportButtonHover(true)}
         onMouseLeave={() => setExportButtonHover(false)}
+        onClick={handleExportClick}
       >
         <Upload className={styles.exportIcon} />
         <span>Export</span>
       </Button>
     </div>
+
+    <ExportView 
+      isOpen={isExporting}
+      onClose={handleCloseExportModal}
+      progress={exportProgress}
+      statusMessage={exportStatusMessage}
+    />
   </div>
   );
 };

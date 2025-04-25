@@ -16,6 +16,7 @@ import VelocityRotateSynth from '../lib/synthesizers/VelocityRotateSynth';
 import RadialDuplicateGlowSynth from '../lib/synthesizers/RadialDuplicateGlowSynth';
 import VelocityOffsetDuplicateSynth from '../lib/synthesizers/VelocityOffsetDuplicateSynth';
 import PositionPulseSynth from '../lib/synthesizers/PositionPulseSynth';
+import BackgroundLightSynth from '../lib/synthesizers/BackgroundLightSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -53,6 +54,7 @@ export const availableInstrumentsData: InstrumentCategories = {
   ],
   Background: [
     { id: 'SpiralGalaxySynth', name: 'Spiral Galaxy', constructor: SpiralGalaxySynth },
+    { id: 'BackgroundLightSynth', name: 'Background Light', constructor: BackgroundLightSynth },
   ],
   Utility: [
     { id: 'PulseSynth', name: 'Global Pulse', constructor: PulseSynth },
