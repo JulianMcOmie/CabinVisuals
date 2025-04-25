@@ -44,3 +44,32 @@ export async function signup(formData: FormData) {
   revalidatePath('/', 'layout')
   redirect('/')
 }
+
+// export async function handleSignInWithGoogle(response: any) {
+//   const supabase = await createClient()
+//   const { data, error } = await supabase.auth.signInWithIdToken({
+//     provider: 'google',
+//     token: response.credential,
+//   })
+  
+//   if (error) {
+//     redirect('/error')
+//   }
+
+//   revalidatePath('/', 'layout')
+//   redirect('/')
+// }
+
+export async function handleSignInWithGoogle(response: any) {
+  const supabase = await createClient()
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google'
+  })
+
+  if (error) {
+    redirect('/error')
+  }
+
+  revalidatePath('/', 'layout')
+  redirect(data.url)
+}
