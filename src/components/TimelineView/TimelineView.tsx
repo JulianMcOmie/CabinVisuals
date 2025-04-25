@@ -17,10 +17,6 @@ const MIN_VIEWPORT_MEASURES = 8; // Minimum measures to allow zooming out to see
 const EXTRA_RENDER_MEASURES = 8; // Render this many extra measures beyond content or min viewport
 const HEADER_HEIGHT = 40; // Define header height as a constant
 
-// Color constants
-const SIDEBAR_BG_COLOR = '#1a1a1a';
-const HEADER_BG_COLOR = 'black';
-
 function TimelineView() {
   const { 
     currentBeat, 

@@ -1,8 +1,8 @@
 .measuresHeaderContainer {
   display: flex;
   /* height is set dynamically via props */
-  border-bottom: 1px solid #ccc;
-  background-color: black;
+  border-bottom: 1px solid var(--border); /* Use global border color */
+  background-color: var(--background);
   position: relative; /* Needed for absolute canvas positioning */
   overflow: hidden; /* Hide canvas overflow */
   /* width is set dynamically via props */

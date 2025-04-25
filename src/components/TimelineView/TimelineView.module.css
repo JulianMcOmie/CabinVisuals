@@ -25,7 +25,7 @@
   font-weight: bold;
   border-bottom: 1px solid #333;
   border-right: 1px solid #333;
-  background-color: #1a1a1a; /* Corresponds to SIDEBAR_BG_COLOR */
+  background-color: var(--surface); /* Corresponds to SIDEBAR_BG_COLOR */
   z-index: 3;
   color: white;
   box-sizing: border-box;
@@ -62,8 +62,8 @@
   top: 40px; /* Corresponds to HEADER_HEIGHT */
   bottom: 0;
   width: 200px; /* Corresponds to SIDEBAR_WIDTH */
-  background-color: #1a1a1a; /* Corresponds to SIDEBAR_BG_COLOR */
-  border-right: 1px solid #333;
+  background-color: var(--surface); /* Corresponds to SIDEBAR_BG_COLOR */
+  border-right: 1px solid var(--border);
   z-index: 0;
 }
 
