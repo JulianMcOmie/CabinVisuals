@@ -46,7 +46,6 @@
     padding-right: 0.75rem; /* px-3 */
     font-size: 0.875rem; /* text-sm */
     font-weight: 500; /* font-medium */
-    transition: background-color 0.2s, color 0.2s; /* transition-colors */
     border: none;
     cursor: pointer;
     background-color: transparent; /* Default */

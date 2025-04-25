@@ -46,6 +46,19 @@
   flex-direction: column; /* Or row, depending on content */
 }
 
+/* New styles for flex layout within bottomSection */
+.timelineViewWrapper {
+  flex: 1; /* Allow TimelineView to grow and shrink */
+  min-height: 0; /* Crucial for allowing flex items to shrink below their content size */
+  overflow: hidden; /* Ensure TimelineView content doesn't overflow its wrapper */
+}
+
+.audioLoaderWrapper {
+  flex-shrink: 0; /* Prevent AudioLoader wrapper from shrinking */
+  /* Add background or border if needed for visual separation */
+  /* background-color: var(--surface); */
+}
+
 /* Resize Handle Styles */
 .resizeHandle {
   background-color: var(--border); /* Changed to use CSS variable */

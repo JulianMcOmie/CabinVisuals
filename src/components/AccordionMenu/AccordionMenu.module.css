@@ -26,7 +26,6 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem; /* Adjusted padding from p-3 */
-    transition: background-color 0.2s;
     color: --text;
     background: none;
     border: none;
@@ -80,7 +79,6 @@
   padding-right: 1rem; /* pr-4 */
   border-radius: 0.375rem; /* rounded-lg */
   cursor: pointer;
-  transition: all 0.2s; /* transition-all */
   display: flex;
   align-items: center;
   color: #ffffff; /* Default text color */
@@ -104,7 +102,6 @@
 
 .itemName {
   font-size: 0.875rem; /* text-sm */
-  transition: color 0.2s; /* transition-colors */
   white-space: nowrap; /* Keep text on a single line */
   overflow: hidden; /* Hide overflowing text */
   text-overflow: ellipsis; /* Show ellipsis for overflowing text */

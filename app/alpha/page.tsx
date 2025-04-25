@@ -7,7 +7,7 @@ import {
   PanelResizeHandle,
   ImperativePanelHandle
 } from 'react-resizable-panels';
-import TimelineView from '../../src/components/TimelineView'; // Adjusted import path
+import TimelineView from '../../src/components/TimelineView/TimelineView'; // Adjusted import path
 import VisualizerView from '../../src/components/VisualizerView'; // Adjusted import path
 import PlaybarView from '../../src/components/PlaybarView/PlaybarView'; // Adjusted import path
 import DetailView from '../../src/components/DetailView/DetailView'; // Import from folder
@@ -80,8 +80,15 @@ export default function AlphaPage() {
 
   // Loading State Render
   if (isLoading) {
-      // TODO: Implement a more sophisticated loading screen
-      return <div style={{ padding: '20px', textAlign: 'center', fontSize: '1.2em' }}>Loading Project...</div>;
+      // New loading indicator based on user request
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-black gap-4">
+          {/* Simple spinner */}
+          <div className="w-8 h-8 border-2 border-slate-700 border-t-[#00a8ff] rounded-full animate-spin"></div>
+          {/* Minimal text */}
+          <p className="text-slate-500 text-sm font-light">loading project...</p>
+        </div>
+      )
   }
 
   // Main Content Render (only when not loading)
@@ -126,8 +133,12 @@ export default function AlphaPage() {
             <PanelResizeHandle className={`${styles.resizeHandle} ${styles.verticalHandle}`} />
             <Panel minSize={20} id="timeline-panel">
               <div className={styles.bottomSection}>
-                <TimelineView />
-                <AudioLoader />
+                <div className={styles.timelineViewWrapper}>
+                  <TimelineView />
+                </div>
+                <div className={styles.audioLoaderWrapper}>
+                  <AudioLoader />
+                </div>
               </div>
             </Panel>
           </PanelGroup>
