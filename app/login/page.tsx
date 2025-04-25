@@ -78,6 +78,14 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
+
+          {/* Forgot Password Link - Moved and Centered */}
+          <div className="text-center text-sm py-2"> {/* Added py-2 for vertical padding */}
+            <a href="/reset-password" className="font-medium text-indigo-400 hover:text-indigo-300">
+              Forgot password?
+            </a>
+          </div>
+
           {/* TODO: Add area to display login/signup errors */}
           <div className="flex items-center justify-between space-x-4 pt-2">
             <button
