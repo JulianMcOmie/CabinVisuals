@@ -8,6 +8,8 @@ import ApproachingCubeSynth from '../lib/synthesizers/ApproachingCubeSynth';
 import SymmetricResonanceSynth from '../lib/synthesizers/SymmetricResonanceSynth';
 import GlowSynth from '../lib/synthesizers/GlowSynth';
 import GlowingCubeSynth from '../lib/synthesizers/glowingCubeSynth';
+import ConvergingSpheresSynth from '../lib/synthesizers/ConvergingSpheresSynth';
+import SpiralGalaxySynth from '../lib/synthesizers/SpiralGalaxySynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -40,7 +42,10 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'GlowingCubeSynth', name: 'Glowing Cube', constructor: GlowingCubeSynth },
   ],
   Percussive: [
-
+    { id: 'ConvergingSpheresSynth', name: 'Converging Spheres', constructor: ConvergingSpheresSynth },
+  ],
+  Background: [
+    { id: 'SpiralGalaxySynth', name: 'Spiral Galaxy', constructor: SpiralGalaxySynth },
   ],
 };
 

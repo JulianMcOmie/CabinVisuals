@@ -1,4 +1,4 @@
-# Creating a New Synthesizer
+# Creating a New Visual Synthesizer
 
 This guide outlines the steps to create a new visual synthesizer for the application.
 
@@ -8,12 +8,23 @@ This guide outlines the steps to create a new visual synthesizer for the applica
     *   Create a new `.ts` file in `src/lib/synthesizers/`.
     *   Define a class that extends `Synthesizer` (from `../Synthesizer`).
     *   Make sure the `engine` property is `protected` to match the base class.
+    *   Include a `clone()` method to duplicate the synthesizer state.
 
     ```typescript
     import Synthesizer from '../Synthesizer';
-    import { MIDIBlock, VisualObject } from '../types';
-    import { Property } from '../properties/Property';
-    import VisualObjectEngine, { MappingContext, NoteContext, MappingUtils } from '../VisualObjectEngine';
+    import { MIDIBlock, VisualObject, MIDINote } from '../types';
+    import { Property, PropertyMetadata } from '../properties/Property';
+    import VisualObjectEngine, { 
+        MappingContext, 
+        NoteContext, 
+        MappingUtils, 
+        InstanceData, 
+        ADSRConfig 
+    } from '../VisualObjectEngine';
+
+    // Optional: Define simple vector helpers if needed
+    type Vec3Tuple = [number, number, number];
+    const vec3Scale = (v: Vec3Tuple, s: number): Vec3Tuple => [v[0] * s, v[1] * s, v[2] * s];
 
     class MyNewSynth extends Synthesizer {
         protected engine: VisualObjectEngine; // Must be protected
@@ -25,9 +36,8 @@ This guide outlines the steps to create a new visual synthesizer for the applica
             this.initializeEngine();
         }
 
-        // Required methods
+        // Required method: Implement cloning logic for properties
         clone(): this {
-             // Implement cloning logic
              const cloned = new MyNewSynth() as this;
              this.properties.forEach((prop, key) => {
                  const originalProp = this.properties.get(key);
@@ -38,8 +48,14 @@ This guide outlines the steps to create a new visual synthesizer for the applica
              return cloned;
         }
 
+        // Required method: Let the engine handle object generation
         getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
-             return this.engine.getObjectsAtTime(time, midiBlocks, bpm);
+             // ALWAYS delegate to the engine
+             const baseObjects = this.engine.getObjectsAtTime(time, midiBlocks, bpm);
+             
+             // OPTIONAL: Post-process baseObjects if needed (e.g., for emissive)
+             // ... see Post-Processing section ...
+             return baseObjects; 
         }
 
         // Helper for defining properties
@@ -57,9 +73,10 @@ This guide outlines the steps to create a new visual synthesizer for the applica
     ```
 
 2.  **Define Properties (`initializeProperties`)**:
-    *   Use the `Property` class (from `../properties/Property`) and its subclasses (e.g., `ColorProperty`, `SliderProperty`) to define configurable parameters.
-    *   Store these properties in the `this.properties` map within the `initializeProperties` method.
-    *   Properties are accessed within mappers using `this.getPropertyValue('propertyName')`.
+    *   Use the base `Property<T>` class (from `../properties/Property`) for all properties.
+    *   Provide the correct generic type (`Property<number>`, `Property<string>`).
+    *   Pass a `PropertyMetadata` object as the third argument, ensuring you specify the `uiType` ('slider', 'color', 'numberInput', etc.) and other relevant fields (like `min`, `max`, `step` for sliders).
+    *   Store these properties in the `this.properties` map.
 
     ```typescript
     // Inside initializeProperties method:
@@ -76,37 +93,60 @@ This guide outlines the steps to create a new visual synthesizer for the applica
     ```
 
 3.  **Configure `VisualObjectEngine` (`initializeEngine`)**:
-    *   In `initializeEngine`, use `this.engine.defineObject()` to start defining how MIDI notes map to visual objects.
-    *   Chain methods like `.withPosition`, `.withColor`, `.withScale`, etc., providing *mapper functions*.
-    *   Mapper functions receive a `MappingContext` (import from `../VisualObjectEngine`) and return the calculated value for the property. They run with the `Synthesizer` instance as `this`.
-    *   Access utility functions via `MappingUtils` (import from `../VisualObjectEngine`).
-
-    * ALWAYS USE VisualObjectEngine to implement getObjectsAtTime, NEVER try to do it yourself*
+    *   In `initializeEngine`, use `this.engine.defineObject('objectType')` to start defining a mapping.
+    *   Chain methods like `.withPosition`, `.withOpacity`, `.withScale`, etc., providing *mapper functions*.
+    *   **Mapper Functions (`(ctx: MappingContext) => Value`)**: 
+        *   Receive a `MappingContext` object.
+        *   Use `ctx` properties (see **MappingContext Details** below) and synthesizer properties (`this.getPropertyValue('propName')`) to calculate values.
+        *   **Return simple types**: `string` for color, `number` for opacity, `[number, number, number]` tuples for position, scale, rotation. **Do NOT use `THREE.Vec3`**. Perform vector math manually or with helpers.
+        *   The `this` keyword inside mappers refers to the `Synthesizer` instance.
+    *   **Context Functions (`(noteCtx: NoteContext) => Config`)**: 
+        *   Functions passed to modifiers like `applyADSR`, `applyPhysicsEnvelope`, or conditions like `when` receive a simpler `NoteContext` (containing just `note: MIDINote`).
+        *   These determine *how* or *if* the modifier/condition applies to a specific note.
+        *   `this` also refers to the `Synthesizer` instance here.
+    *   Use utility functions via `MappingUtils` (e.g., `MappingUtils.mapValue`).
 
     ```typescript
     // Inside initializeEngine method:
-    this.engine.defineObject('sphere')
-        .withPosition((ctx: MappingContext) => [
-            MappingUtils.mapPitchToRange(ctx.note.pitch, -5, 5), 
-            0,
-            0
-        ])
-        .withColor((ctx: MappingContext) => this.getPropertyValue('baseColor') ?? '#ff0000') 
-        .withScale((ctx: MappingContext) => {
-            const baseSize = this.getPropertyValue('sizeMultiplier') ?? 1;
-            // Example: Simple scaling with note velocity
-            const scale = baseSize * MappingUtils.mapValue(ctx.note.velocity, 0, 127, 0.5, 1.5); 
-            return [scale, scale, scale];
+
+    // Example: ADSR configuration function (uses NoteContext)
+    const adsrConfigFn = (noteCtx: NoteContext): ADSRConfig => ({
+        attack: this.getPropertyValue<number>('attackTime') ?? 0.01,
+        decay: this.getPropertyValue<number>('decayTime') ?? 0.2,
+        sustain: this.getPropertyValue<number>('sustainLevel') ?? 0.5,
+        release: this.getPropertyValue<number>('releaseTime') ?? 0.5,
+    });
+
+    this.engine.defineObject('sphere') // Or 'cube', 'line', etc.
+        .applyADSR(adsrConfigFn) // Apply modifier (uses NoteContext function)
+        .withPosition((ctx: MappingContext): [number, number, number] => { // Mapper (uses MappingContext)
+            // Access MappingContext properties
+            const yPos = MappingUtils.mapPitchToRange(ctx.note.pitch, -5, 5); 
+            // Access Synthesizer properties via `this`
+            const zOffset = this.getPropertyValue<number>('depth') ?? 0;
+            // Return a tuple
+            return [0, yPos, zOffset * ctx.noteProgressPercent]; 
         })
-        // Example: Simple opacity fade over note duration
-        .withOpacity((ctx: MappingContext) => {
-            return 1.0 - ctx.noteProgressPercent; // Fades from 1 to 0
+        .withColor((ctx: MappingContext): string => { // Example color mapper
+            return this.getPropertyValue<string>('baseColor') ?? '#ff0000';
+        }) 
+        .withScale((ctx: MappingContext): [number, number, number] => { // Example scale mapper
+            const baseSize = this.getPropertyValue<number>('sizeMultiplier') ?? 1;
+            const scale = baseSize * MappingUtils.mapValue(ctx.note.velocity, 0, 127, 0.5, 1.5);
+            // Access ADSR value from context
+            const adsrScale = ctx.adsrAmplitude !== undefined ? (0.1 + ctx.adsrAmplitude * 0.9) : 1.0; 
+            const finalScale = scale * adsrScale;
+            return [finalScale, finalScale, finalScale]; // Return a tuple
+        })
+        .withOpacity((ctx: MappingContext): number => {
+            // Fade using ADSR amplitude from context
+            return ctx.adsrAmplitude ?? 1.0; 
         });
     ```
 
 4.  **Register in `instrumentSlice.ts`**:
     *   Import your new synth class in `src/store/instrumentSlice.ts`.
-    *   Add an entry to the `availableInstrumentsData` object under the appropriate category.
+    *   Add an entry to the `availableInstrumentsData` object under the appropriate category ('Melodic' or 'Percussive').
 
     ```typescript
     // In src/store/instrumentSlice.ts
@@ -123,113 +163,96 @@ This guide outlines the steps to create a new visual synthesizer for the applica
     };
     ```
 
-## `VisualObjectEngine` Tips
+## `VisualObjectEngine` Deep Dive
 
-*   **Implicit Instance**: By default, `defineObject` creates *one* visual object per triggering MIDI note.
-*   **`.when(conditionFn)`**: Use this *before* defining mappings if the entire object definition should only apply to notes meeting specific criteria (e.g., certain pitch range). Rarely needed.
-*   **`.forEachInstance(generatorFn)`**: Use this to create *multiple* visual objects from a *single* MIDI note. 
-    *   The `generatorFn` runs *after* the parent level's mappers are calculated. It receives the parent's `MappingContext` as its argument (let's call it `parentCtx`).
-    *   Inside the generator, access the parent's calculated properties via `parentCtx.calculatedProperties` (e.g., `parentCtx.calculatedProperties.position`).
-    *   It should return an array of `InstanceData` objects (`{ [key: string]: any }`). Each object represents one new instance, and the data within is passed to the child level.
-    *   Mappings defined *after* `.forEachInstance` apply to these new child instances and receive their own `MappingContext` (let's call it `childCtx`), which contains the corresponding `instanceData` via `childCtx.instanceData`.
-*   **Modifiers (`applyADSR`, `applyPhysicsEnvelope`)**: These apply modifications based on note timing or physics simulations.
-    *   `applyADSR`: Takes an `ADSRConfig` or a function returning one (`ADSRConfigFn`). Provides `ctx.adsrAmplitude` (0-1) and `ctx.adsrPhase` in subsequent mapping functions. Useful for controlling properties like opacity or scale based on a traditional envelope.
-    *   `applyPhysicsEnvelope`: **Note:** The current implementation runs a **damped harmonic oscillator** simulation (`PhysicsUtils.calculateDampedOscillator`). It takes a `PhysicsEnvelopeConfig` (or function returning one) with `tension`, `friction`, and `initialVelocity`. The cumulative result of this simulation across all triggering notes is available in `ctx.physicsValue`. This is useful for springy/oscillating effects, but **not** for simple gravity/lifetime simulations.
-        *   **For simple fades or motion:** It's often easier to implement these directly in mappers (e.g., `withOpacity`, `withPosition`) using `ctx.timeSinceNoteStart`, `ctx.noteProgressPercent`, and synthesizer properties (like a custom `lifetime` property), rather than using `applyPhysicsEnvelope`.
+### Coordinate System Note
 
-*   **Note on Object Properties:** The engine provides common `.with...` methods. Not all potential `VisualObject` properties (like `emissiveIntensity`) have dedicated methods. Setting these requires post-processing.
+*   By convention in this application, the **XY plane** is generally aligned with the camera view.
+*   **X** typically represents horizontal movement.
+*   **Y** typically represents vertical movement.
+*   **Z** typically represents depth (positive Z away from camera, negative Z towards camera).
+*   Keep this in mind when defining `withPosition`, `withScale`, etc., returning `[x, y, z]` tuples.
 
-*   **Post-Processing for Complex Properties:** For properties not handled by the engine's built-in mappers (e.g., `emissive`, `emissiveIntensity`), override the `getObjectsAtTime` method in your synthesizer:
-    1.  Call `this.engine.getObjectsAtTime(...)` to get the base visual objects.
-    2.  Iterate over the returned objects.
-    3.  For each object, calculate and add/modify the missing properties (e.g., setting `emissive` based on `color`, and `emissiveIntensity` based on a synth property and `opacity`).
-    4.  Return the modified array.
+### Context Objects
 
-    ```typescript
-    // Example overriding getObjectsAtTime for emissive glow
-    getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
-        const baseObjects = this.engine.getObjectsAtTime(time, midiBlocks, bpm);
-    
-        const processedObjects = baseObjects.map(obj => {
-            // Ensure required base properties exist
-            if (!obj.properties || obj.properties.opacity === undefined || !obj.properties.color) {
-                return obj; 
+*   **`MappingContext` (for Mappers & Generators)**: Passed to functions defining *how* an object looks/behaves at a specific time.
+    *   `note: MIDINote`: The original MIDI note triggering this object.
+    *   `time: number`: Current global time (in beats).
+    *   `bpm: number`: Current tempo.
+    *   `noteAbsoluteStartBeat: number`: Absolute start beat of the note.
+    *   `timeSinceNoteStart: number`: Time elapsed in seconds since the note started (can be negative during approach/lookahead phases).
+    *   `noteProgressPercent: number`: Note duration progress (0 to 1), only valid when `timeSinceNoteStart >= 0`.
+    *   `noteDurationSeconds: number`: Total duration of the note in seconds.
+    *   `level: number`: Nesting depth (for `forEachInstance`).
+    *   `instanceData: InstanceData`: Custom data passed from the `forEachInstance` generator.
+    *   `parentContext?: MappingContext`: Context of the parent level (if nested).
+    *   `adsrAmplitude?: number`: Current ADSR value (0-1), if `applyADSR` is used.
+    *   `adsrPhase?: 'attack' | ... | 'idle'`: Current ADSR phase.
+    *   `physicsValue?: number`: Current value from `applyPhysicsEnvelope`.
+    *   `timeUntilNoteStart?: number`: Seconds *until* the note starts (used with `applyApproachEnvelope`).
+    *   `calculatedProperties?: VisualObjectProperties`: Read-only view of properties calculated *before* the current mapper.
+*   **`NoteContext` (for Modifier Configs & Conditions)**: Passed to functions determining *if* or *how* a modifier/condition applies per-note.
+    *   `note: MIDINote`: The specific MIDI note being considered.
+
+### Key Engine Methods
+
+*   **`.defineObject(type: string)`**: Starts a new definition for a visual object type.
+*   **`.when(conditionFn: (noteCtx: NoteContext) => boolean)`**: Conditionally applies the entire definition chain based on the note.
+*   **`.applyADSR(config: ADSRConfig | ((noteCtx: NoteContext) => ADSRConfig))`**: Applies an Attack-Decay-Sustain-Release envelope. Makes `adsrAmplitude` and `adsrPhase` available in subsequent `MappingContext`.
+*   **`.applyPhysicsEnvelope(...)`**: Applies a damped harmonic oscillator simulation. Makes `physicsValue` available. Often complex; consider manual animation in mappers for simpler effects.
+*   **`.applyApproachEnvelope(...)`**: Allows objects to appear before the note starts. Makes `timeUntilNoteStart` available in `MappingContext` when `timeSinceNoteStart < 0`.
+*   **`.forEachInstance(generatorFn: (parentCtx: MappingContext) => InstanceData[])`**: Creates multiple child objects from one parent/note trigger.
+    *   `generatorFn` receives the parent `MappingContext`.
+    *   It returns an array of `InstanceData` objects (e.g., `[{ id: 0, angle: 0 }, { id: 1, angle: Math.PI }]`).
+    *   Mappers defined *after* `.forEachInstance` apply to the child instances.
+    *   Child mappers receive their own `MappingContext`, which includes the corresponding `instanceData` from the generator.
+*   **`.withPosition(mapperFn: (ctx: MappingContext) => [number, number, number])`**: Defines position.
+*   **`.withScale(mapperFn: (ctx: MappingContext) => [number, number, number] | number)`**: Defines scale (tuple or uniform number).
+*   **`.withRotation(mapperFn: (ctx: MappingContext) => [number, number, number])`**: Defines rotation (Euler angles in radians).
+*   **`.withColor(mapperFn: (ctx: MappingContext) => string)`**: Defines color (e.g., hex string `#ffffff`).
+*   **`.withOpacity(mapperFn: (ctx: MappingContext) => number)`**: Defines opacity (0-1).
+*   **`.setType(type: string)`**: Changes the object type for the current level (overrides initial type or parent type).
+
+### Post-Processing (`getObjectsAtTime` override)
+
+*   The engine doesn't have built-in mappers for every possible `VisualObject` property (e.g., `emissive`, `emissiveIntensity`).
+*   To set these, override `getObjectsAtTime` in your synthesizer:
+    1.  Call `const baseObjects = this.engine.getObjectsAtTime(...)`.
+    2.  Map over `baseObjects`: For each `obj`, calculate and add/modify the desired properties (e.g., `obj.properties.emissive = obj.properties.color; obj.properties.emissiveIntensity = intensity;`).
+    3.  Return the modified array.
+
+```typescript
+// Example overriding getObjectsAtTime for emissive glow
+getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
+    const baseObjects = this.engine.getObjectsAtTime(time, midiBlocks, bpm);
+    const glowIntensity = this.getPropertyValue<number>('glowIntensityProp') ?? 1.0;
+
+    const processedObjects = baseObjects.map(obj => {
+        if (!obj.properties || obj.properties.opacity === undefined || !obj.properties.color) {
+            return obj; 
+        }
+        const effectiveOpacity = Math.max(0, obj.properties.opacity);
+        const intensity = glowIntensity * effectiveOpacity;
+
+        return {
+            ...obj,
+            properties: {
+                ...obj.properties,
+                emissive: obj.properties.color, // Use object color for glow
+                emissiveIntensity: intensity    // Scale glow with opacity
             }
-    
-            const baseIntensity = this.getPropertyValue<number>('glowIntensityProp') ?? 1.0;
-            // Prevent glow when opacity is effectively zero
-            const effectiveOpacity = obj.properties.opacity < 0.01 ? 0 : obj.properties.opacity;
-            const intensity = baseIntensity * effectiveOpacity;
-    
-            return {
-                ...obj,
-                properties: {
-                    ...obj.properties,
-                    emissive: obj.properties.color, // Use object color for glow
-                    emissiveIntensity: intensity    // Scale glow with opacity
-                }
-            };
-        });
-    
-        return processedObjects;
-    }
-    ```
+        };
+    });
+    return processedObjects;
+}
+```
 
 ### Dynamic Pitch Range Mapping
 
-If you need mapping based on the lowest/highest notes *currently* being processed, calculate min/max pitch in `getObjectsAtTime` and use them in your mapper, as `MappingUtils.mapPitchToRange` assumes a fixed range.
+If mapping needs to adapt to the currently playing notes (e.g., map pitch across the *actual* range of active notes), you must calculate this range *before* calling the engine:
 
-```typescript
-// -- Inside MyNewSynth class --
-private _minPitch: number | null = null;
-private _maxPitch: number | null = null;
+1.  In `getObjectsAtTime`, before calling `this.engine.getObjectsAtTime`, iterate through `midiBlocks` to find the min/max pitch of notes active at the current `time`.
+2.  Store these min/max values in private class members (e.g., `this._minPitch`, `this._maxPitch`).
+3.  In your relevant mapper function (e.g., `withPosition`), access these stored min/max values (`this._minPitch`) to perform the dynamic normalization/mapping.
 
-getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
-    // 1. Find min/max pitch from active notes in midiBlocks at 'time'
-    let minP: number | null = null;
-    let maxP: number | null = null;
-    const secondsPerBeat = 60 / bpm;
-    midiBlocks.forEach(block => {
-        const blockStartSec = block.startBeat * secondsPerBeat;
-        block.notes.forEach(note => {
-            const noteStartSec = (block.startBeat + note.startBeat) * secondsPerBeat;
-            const noteEndSec = noteStartSec + (note.duration * secondsPerBeat);
-            const currentSec = time * secondsPerBeat;
-            // Check if note is active at the current time
-            if (currentSec >= noteStartSec && currentSec < noteEndSec) {
-                if (minP === null || note.pitch < minP) minP = note.pitch;
-                if (maxP === null || note.pitch > maxP) maxP = note.pitch;
-            }
-        });
-    });
-    this._minPitch = minP;
-    this._maxPitch = maxP;
-
-    // 2. Call the engine (which will use the updated _minPitch, _maxPitch in mappers)
-    const visualObjects = this.engine.getObjectsAtTime(time, midiBlocks, bpm);
-
-    // 3. Optional: Post-process if needed (like the emissive example)
-    // ...
-
-    return visualObjects; 
-}
-
-// In initializeEngine:
-this.engine.defineObject('someObject')
-    .withPosition((ctx: MappingContext) => {
-        const targetMinY = -5; 
-        const targetMaxY = 5;
-        let yPos = (targetMinY + targetMaxY) / 2; // Default to center
-
-        if (this._minPitch !== null && this._maxPitch !== null && this._minPitch !== this._maxPitch) {
-            const pitch = ctx.note.pitch;
-            const normalizedPitch = (pitch - this._minPitch) / (this._maxPitch - this._minPitch);
-            yPos = targetMinY + normalizedPitch * (targetMaxY - targetMinY);
-        } 
-        // Clamp yPos just in case
-        yPos = Math.max(targetMinY, Math.min(targetMaxY, yPos));
-        
-        return [0, yPos, 0]; 
-    })
-    // ... other mappers ...
-```    
+(See original `SYNTHESIZER_CREATION.md` for a code example of dynamic pitch range calculation if needed).
