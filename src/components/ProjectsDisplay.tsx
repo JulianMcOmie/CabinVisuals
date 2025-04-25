@@ -10,18 +10,45 @@ import {
 } from "@/components/ui/dropdown-menu"
 import styles from '@/app/projects/projects.module.css' // Assuming styles are specific to this display
 import { ProjectMetadata } from '../store/projectSlice'; // Import the type
+import type { User } from '@supabase/supabase-js'; // Import User type
+
+// Define a type for the profile data (adjust fields as needed)
+interface ProfileData {
+  first_name: string | null;
+  last_name: string | null;
+  // Add other profile fields if needed
+}
 
 // Define props interface
 interface ProjectsDisplayProps {
   projects: ProjectMetadata[];
+  user: User | null; // Add user prop
+  profile: ProfileData | null; // Add profile prop
   onCreateProject: () => void; // Add callback for creating new project
   onSelectProject: (projectId: string) => void; // Add callback for selecting a project
 }
 
-export default function ProjectsDisplay({ projects, onCreateProject, onSelectProject }: ProjectsDisplayProps) {
+// Helper function to get initials
+const getInitials = (firstName: string | null | undefined, lastName: string | null | undefined): string => {
+  const firstInitial = firstName?.[0]?.toUpperCase() || '';
+  const lastInitial = lastName?.[0]?.toUpperCase() || '';
+  return firstInitial && lastInitial ? `${firstInitial}${lastInitial}` : (firstInitial || lastInitial || '?'); // Fallback
+};
+
+export default function ProjectsDisplay({ 
+  projects, 
+  user, 
+  profile, 
+  onCreateProject, 
+  onSelectProject 
+}: ProjectsDisplayProps) {
   // Note: The CSS module import might need adjustment if the CSS file isn't moved
   // or if it's intended to be used by the page container.
   // For now, assuming styles are relevant here.
+
+  // Call getInitials with potentially null/undefined values from profile
+  const userInitials = getInitials(profile?.first_name, profile?.last_name);
+
   return (
     <div className={styles.pageContainer}> 
       {/* Animated background blobs - Consider if these belong here or on the page */}
@@ -36,14 +63,22 @@ export default function ProjectsDisplay({ projects, onCreateProject, onSelectPro
         <nav className={styles.headerNav}>
           <DropdownMenu>
             <DropdownMenuTrigger className={styles.dropdownTriggerPlaceholder}>
-              {/* Placeholder - Needs actual user data */}
-              <span className={styles.dropdownTriggerText}>JS</span> 
+              {/* Use calculated initials */}
+              <span className={styles.dropdownTriggerText}>{userInitials}</span> 
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800">
-              <div className="px-3 py-2 text-sm text-white">
-                {/* Placeholder - Needs actual user data */}
-                <p className="text-gray-300">john@example.com</p>
-              </div>
+              {(user || profile) && ( // Only show section if user or profile data is available
+                <div className="px-3 py-2 text-sm text-white">
+                  {/* Display Full Name if profile available */}
+                  {profile && (profile.first_name || profile.last_name) && (
+                     <p className="font-medium truncate">{`${profile.first_name || ''} ${profile.last_name || ''}`.trim()}</p>
+                  )}
+                  {/* Display user email */}
+                  {user && (
+                    <p className="text-gray-300 truncate">{user.email}</p>
+                  )}
+                </div>
+              )}
               <DropdownMenuSeparator className="bg-gray-800" />
               <DropdownMenuItem className="flex items-center cursor-pointer text-white hover:bg-gray-700">
                 <ExternalLink className="h-4 w-4 mr-2" />
@@ -51,6 +86,7 @@ export default function ProjectsDisplay({ projects, onCreateProject, onSelectPro
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-gray-800" />
               <DropdownMenuItem className="flex items-center text-red-400 cursor-pointer">
+                {/* TODO: Implement logout functionality */}
                 <LogOut className="h-4 w-4 mr-2" />
                 <span>Log out</span>
               </DropdownMenuItem>
