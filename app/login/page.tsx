@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Script from 'next/script';
-import { handleSignInWithGoogle, login, signup } from './actions';
+import { handleSignInWithGoogle, login } from './actions';
 
 export default function LoginPage() {
 
@@ -87,18 +87,13 @@ export default function LoginPage() {
           </div>
 
           {/* TODO: Add area to display login/signup errors */}
-          <div className="flex items-center justify-between space-x-4 pt-2">
+          {/* Login Button Only */}
+          <div className="pt-2">
             <button
               formAction={login}
-              className="flex-1 justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="w-full justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               Log in
-            </button>
-            <button
-              formAction={signup}
-              className="flex-1 justify-center rounded-full border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-300 shadow-sm hover:border-gray-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
-            >
-              Sign up
             </button>
           </div>
         </form>
@@ -137,6 +132,16 @@ export default function LoginPage() {
              data-logo_alignment="left"
              // suppressHydrationWarning={true} // May still be needed if timing issues occur
            ></div>
+        </div>
+
+        {/* Link to Sign Up Page */}
+        <div className="mt-6 text-center text-sm">
+          <p className="text-gray-400">
+            Don't have an account?
+            <a href="/signup" className="ml-1 font-medium text-indigo-400 hover:text-indigo-300">
+              Sign up
+            </a>
+          </p>
         </div>
 
       </div>
