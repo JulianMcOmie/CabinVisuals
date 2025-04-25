@@ -62,7 +62,8 @@ class VisualizerManager {
   getVisualObjects(): VisualObject3D[] {
     const time = this.timeManager.getCurrentBeat();
     const bpm = this.timeManager.getBPM();
-    const finalRenderObjects: VisualObject3D[] = [];
+    // Change to let to allow modification by meta-synths
+    let finalRenderObjects: VisualObject3D[] = []; 
     
     this.activeStateKeysThisFrame.clear();
 
@@ -87,16 +88,12 @@ class VisualizerManager {
           this.activeStateKeysThisFrame.add(stateKey);
 
           const previousState = this.objectStates.get(stateKey);
-          // Start with synth properties (including its base position)
           const currentProperties = { ...synthVisObj.properties }; 
 
-          // Restore stateful properties from previous frame if it exists
           if (previousState) {
             currentProperties.velocity = previousState.velocity ?? [0, 0, 0];
             currentProperties.positionOffset = previousState.positionOffset ?? [0, 0, 0];
-            // Restore other stateful props here (e.g., maybe internal effect states?)
           } else {
-            // Ensure defaults if no previous state
             currentProperties.velocity = currentProperties.velocity ?? [0, 0, 0];
             currentProperties.positionOffset = currentProperties.positionOffset ?? [0, 0, 0];
           }
@@ -122,12 +119,10 @@ class VisualizerManager {
 
         const stateKey = finalVisObj.sourceNoteId ? `${track.id}-${finalVisObj.sourceNoteId}` : null;
         
-        // Update state map with the latest full properties
         if (stateKey) {
             this.objectStates.set(stateKey, finalVisObj.properties);
         }
 
-        // Convert to VisualObject3D for rendering
         const props = finalVisObj.properties;
         const basePosition: [number, number, number] = props.position ?? [0, 0, 0];
         const offset: [number, number, number] = props.positionOffset ?? [0, 0, 0];
@@ -147,29 +142,47 @@ class VisualizerManager {
         }
         const clampedOpacity = Math.max(0, Math.min(1, opacity));
 
-        // ---> Extract emissive properties <---
         const emissive = props.emissive;
         const emissiveIntensity = props.emissiveIntensity;
 
         if (clampedOpacity > 0) { 
-           // Ensure unique ID even if multiple objects derive from the same note in one frame
            const renderId = stateKey
-             ? `${stateKey}-${index}` // Append index for uniqueness
+             ? `${stateKey}-${index}`
              : `transient-${track.id}-${finalVisObj.type}-${index}`;
           finalRenderObjects.push({
             id: renderId, 
             type: finalVisObj.type,
-            position: finalPosition, // Use calculated final position
+            position: finalPosition, 
             rotation,
             scale,
             color,
             opacity: clampedOpacity,
-            emissive: emissive,                 // Pass emissive color
-            emissiveIntensity: emissiveIntensity // Pass emissive intensity
+            emissive: emissive,                 
+            emissiveIntensity: emissiveIntensity 
           });
         }
       });
-    }); // End track loop
+    }); // End initial track loop
+
+    // <<<<<<< SIMPLIFIED META-SYNTH PROCESSING >>>>>>>
+    // Apply global modifications from ALL Synths (most will do nothing)
+    this.tracks.forEach(track => {
+      // Determine if this track should apply its global effect based on mute/solo
+      const shouldApplyGlobalMod = isAnyTrackSoloed
+        ? track.isSoloed // Only apply if this track is soloed
+        : !track.isMuted; // Apply if not muted when nothing is soloed
+
+      // Directly call applyGlobalModification only if active and synth exists
+      if (shouldApplyGlobalMod && track.synthesizer) { 
+        finalRenderObjects = track.synthesizer.applyGlobalModification(
+          finalRenderObjects, 
+          time, // Current time in beats
+          track.midiBlocks, // Pass the synth's own MIDI data
+          bpm // Current BPM
+        );
+      }
+    });
+    // <<<<<<< END SIMPLIFIED META-SYNTH PROCESSING >>>>>>>
 
     // Cleanup stale states
     const currentKeys = Array.from(this.objectStates.keys());

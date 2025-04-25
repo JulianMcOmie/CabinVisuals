@@ -1,6 +1,7 @@
 import { MIDIBlock, VisualObject } from './types';
 import { Property } from './properties/Property';
 import VisualObjectEngine from './VisualObjectEngine';
+import { VisualObject3D } from './VisualizerManager';
 
 abstract class Synthesizer {
   // Map to store configurable properties
@@ -27,6 +28,17 @@ abstract class Synthesizer {
   protected getPropertyValue<T>(name: string): T | undefined {
     const property = this.properties.get(name) as Property<T> | undefined;
     return property?.value;
+  }
+
+  // Add default implementation for applyGlobalModification
+  public applyGlobalModification(
+    allVisuals: VisualObject3D[], 
+    time: number, 
+    midiBlocks: MIDIBlock[], // Own MIDI blocks
+    bpm: number
+  ): VisualObject3D[] {
+    // Default behavior: do nothing, pass through the visuals
+    return allVisuals;
   }
 }
 

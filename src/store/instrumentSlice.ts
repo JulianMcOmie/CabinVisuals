@@ -10,6 +10,7 @@ import GlowSynth from '../lib/synthesizers/GlowSynth';
 import GlowingCubeSynth from '../lib/synthesizers/glowingCubeSynth';
 import ConvergingSpheresSynth from '../lib/synthesizers/ConvergingSpheresSynth';
 import SpiralGalaxySynth from '../lib/synthesizers/SpiralGalaxySynth';
+import PulseSynth from '../lib/synthesizers/PulseSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -47,6 +48,9 @@ export const availableInstrumentsData: InstrumentCategories = {
   Background: [
     { id: 'SpiralGalaxySynth', name: 'Spiral Galaxy', constructor: SpiralGalaxySynth },
   ],
+  Utility: [
+    { id: 'PulseSynth', name: 'Global Pulse', constructor: PulseSynth },
+  ]
 };
 
 export const createInstrumentSlice: StateCreator<
