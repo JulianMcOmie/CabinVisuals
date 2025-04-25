@@ -110,7 +110,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center text-sm">
           <p className="text-gray-400">
             Don't have an account?
-            <Link href="/auth/signup" legacyBehavior>
+            <Link href="/signup" legacyBehavior>
                <a className="ml-1 font-medium text-indigo-400 hover:text-indigo-300">Sign up</a>
              </Link>
           </p>

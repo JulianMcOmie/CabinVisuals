@@ -37,15 +37,47 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+  const pathname = request.nextUrl.pathname;
+
+  // Define public paths that don't require authentication
+  const publicPaths = [
+    '/', 
+    '/alpha',
+    '/login',
+    '/signup',
+    '/auth/reset-password',
+    '/auth/update-password',
+    // Add any other public paths like /about, /pricing, etc.
+  ];
+
+  // Define auth-related paths that logged-in users should be redirected away from
+  const authRoutes = [
+    '/login',
+    '/signup',
+    '/auth/reset-password',
+    // Don't usually redirect away from update-password as user needs to be there after clicking link
+  ];
+
+  // Check if the current path starts with any of the public paths
+  const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
+  
+  // Check if the current path starts with any of the auth routes
+  const isAuthRoute = authRoutes.some(path => pathname.startsWith(path));
+
+  // Redirect unauthenticated users from *protected* pages to login
+  if (!user && !isPublicPath) {
+    console.log(`Middleware: Unauthenticated user accessing protected path ${pathname}. Redirecting to login.`);
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  // Redirect authenticated users from auth pages (login, signup, reset) to the main app (/alpha)
+  if (user && isAuthRoute) {
+      console.log(`Middleware: Authenticated user accessing auth route ${pathname}. Redirecting to app.`);
+      const url = request.nextUrl.clone();
+      url.pathname = '/alpha'; // Redirect to the main app page
+      return NextResponse.redirect(url);
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.

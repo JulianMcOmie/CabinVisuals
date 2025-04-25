@@ -109,12 +109,12 @@ export default function AlphaPage() {
              </>
            ) : (
              <>
-               <Link href="/auth/login" legacyBehavior>
+               <Link href="/login" legacyBehavior>
                  <a className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors">
                    Log In
                  </a>
                </Link>
-               <Link href="/auth/signup" legacyBehavior>
+               <Link href="/signup" legacyBehavior>
                  <a className="rounded-full border border-gray-600 px-3 py-1 text-xs font-semibold text-gray-300 shadow-sm hover:border-gray-400 hover:text-white transition-colors">
                    Sign Up
                  </a>
