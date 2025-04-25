@@ -17,6 +17,7 @@ import useStore from '../../src/store/store'; // Adjusted import path
 import { loadAudioFile } from '../../src/lib/idbHelper'; // Adjusted import path
 import { initializeStore } from '../../src/store/store'; // Import the store initializer
 import styles from './alpha.module.css';
+import Link from 'next/link';
 
 // Interface for the panel ref 
 interface PanelRef {
@@ -25,125 +26,26 @@ interface PanelRef {
 }
 
 // Renamed component to reflect the route
-export default function AlphaPage() { 
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
-  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
-
-  // Fetch necessary state and actions from store
-  const isInstrumentSidebarVisible = useStore((state) => state.isInstrumentSidebarVisible);
-  const loadAudioAction = useStore((state) => state.loadAudio);
-
-  // Effect to collapse/expand sidebar based on visibility state
-  useEffect(() => {
-    if (sidebarPanelRef.current) {
-      if (isInstrumentSidebarVisible) {
-        sidebarPanelRef.current.expand();
-      } else {
-        sidebarPanelRef.current.collapse();
-      }
-    }
-  }, [isInstrumentSidebarVisible]);
-
-  // Initialization Effect
-  useEffect(() => {
-    const loadInitialData = async () => {
-      console.log('AlphaPage: Initializing store and loading data...');
-      setIsLoading(true); // Ensure loading state is true initially
-      try {
-        // Initialize the store (loads project based on last ID)
-        await initializeStore(); 
-        
-        // Attempt to load any persisted audio file *after* store init
-        console.log('Attempting to load persisted audio from IndexedDB...');
-        const persistedFile = await loadAudioFile();
-        if (persistedFile) {
-          console.log('Found persisted audio file, attempting to load...');
-          const arrayBuffer = await persistedFile.arrayBuffer();
-          // Get the filename if available (only File objects have name, not Blob)
-          const fileName = persistedFile instanceof File ? persistedFile.name : 'persisted-audio';
-          // Use the action fetched via useStore
-          await loadAudioAction(arrayBuffer, fileName);
-          console.log('Successfully loaded persisted audio file into store.');
-        } else {
-          console.log('No persisted audio file found.');
-        }
-      } catch (error) {
-        console.error('Initialization or audio loading failed:', error);
-        // Handle critical initialization error if needed
-      } finally {
-        setIsLoading(false); // Set loading to false when done
-      }
-    };
-
-    loadInitialData();
-  }, [loadAudioAction]); // Include loadAudioAction in dependency array
-
-  // Loading State Render
-  if (isLoading) {
-      // New loading indicator based on user request
-      return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-black gap-4">
-          {/* Simple spinner */}
-          <div className="w-8 h-8 border-2 border-slate-700 border-t-[#00a8ff] rounded-full animate-spin"></div>
-          {/* Minimal text */}
-          <p className="text-slate-500 text-sm font-light">loading project...</p>
-        </div>
-      )
-  }
-
-  // Main Content Render (only when not loading)
+export default function AlphaPage() {
   return (
-    <main className={styles.mainContainer}>
-      <div className={styles.playbarContainer}>
-        <PlaybarView />
+    <div className="flex min-h-screen flex-col items-center justify-center bg-black text-white">
+      <div className="rounded-lg bg-gray-900/50 p-12 shadow-md border border-gray-800 text-center">
+        <h1 className="mb-8 text-3xl font-bold text-white">
+          Welcome
+        </h1>
+        <div className="space-y-4">
+          <Link href="/login" legacyBehavior>
+            <a className="block w-full rounded-full bg-indigo-600 px-8 py-3 text-lg font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+              Log In
+            </a>
+          </Link>
+          <Link href="/signup" legacyBehavior>
+            <a className="block w-full rounded-full border border-gray-600 px-8 py-3 text-lg font-semibold text-gray-300 shadow-sm hover:border-gray-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500">
+              Sign Up
+            </a>
+          </Link>
+        </div>
       </div>
-      
-      <PanelGroup direction="horizontal" className={styles.contentPanelGroup}>
-        <Panel 
-          ref={sidebarPanelRef}
-          defaultSize={20} 
-          minSize={10} 
-          maxSize={40} 
-          collapsible={true} 
-          collapsedSize={0} 
-          id="sidebar-panel"
-        >
-          <div className={styles.sidebarArea}>
-            <InstrumentSidebar />
-          </div>
-        </Panel>
-        <PanelResizeHandle className={`${styles.resizeHandle} ${styles.horizontalHandle}`} />
-        <Panel id="main-content-panel">
-          <PanelGroup direction="vertical" className={styles.mainContentPanelGroup}>
-            <Panel defaultSize={50} minSize={20} id="top-panel">
-              <PanelGroup direction="horizontal" className={styles.topPanelGroup}>
-                <Panel defaultSize={50} minSize={20} id="detail-panel">
-                  <div className={styles.detailContainer}>
-                    <DetailView />
-                  </div>
-                </Panel>
-                <PanelResizeHandle className={`${styles.resizeHandle} ${styles.horizontalHandle}`} />
-                <Panel minSize={20} id="visualizer-panel">
-                  <div className={styles.visualizerContainer}>
-                    <VisualizerView />
-                  </div>
-                </Panel>
-              </PanelGroup>
-            </Panel>
-            <PanelResizeHandle className={`${styles.resizeHandle} ${styles.verticalHandle}`} />
-            <Panel minSize={20} id="timeline-panel">
-              <div className={styles.bottomSection}>
-                <div className={styles.timelineViewWrapper}>
-                  <TimelineView />
-                </div>
-                <div className={styles.audioLoaderWrapper}>
-                  <AudioLoader />
-                </div>
-              </div>
-            </Panel>
-          </PanelGroup>
-        </Panel>
-      </PanelGroup>
-    </main>
+    </div>
   );
 } 
