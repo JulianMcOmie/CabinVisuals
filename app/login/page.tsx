@@ -114,7 +114,7 @@ export default function LoginPage() {
              data-nonce="" // Optional
              // data-auto_select="true" // Can enable for auto sign-in attempt
              data-itp_support="true"
-             data-use_fedcm_for_prompt="true" // Important
+             data-use_fedcm_for_prompt="false" // Important
              style={{ display: 'none' }} // Hide this config div
            ></div>
 

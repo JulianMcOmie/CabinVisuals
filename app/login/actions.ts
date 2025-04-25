@@ -60,16 +60,27 @@ export async function signup(formData: FormData) {
 //   redirect('/')
 // }
 
-export async function handleSignInWithGoogle(response: any) {
+// Use the correct version that accepts the ID token from GSI
+export async function handleSignInWithGoogle(idToken: string) { // Accept idToken: string
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google'
-  })
 
-  if (error) {
-    redirect('/error')
+  if (!idToken) { // Add check for token
+    console.error("handleSignInWithGoogle called without an ID token!");
+    redirect('/login?message=Google sign-in failed: No token received.');
   }
 
+  console.log("Attempting signInWithIdToken..."); // Add logging
+  const { data, error } = await supabase.auth.signInWithIdToken({
+    provider: 'google',
+    token: idToken, // Use the idToken parameter
+  });
+
+  if (error) {
+    console.error("signInWithIdToken error:", error); // Add logging
+    redirect('/login?message=Could not authenticate with Google.'); // Redirect on error
+  }
+
+  console.log("signInWithIdToken success!"); // Add logging
   revalidatePath('/', 'layout')
-  redirect(data.url)
+  redirect('/') // Redirect on success
 }
