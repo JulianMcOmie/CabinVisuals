@@ -77,13 +77,13 @@ function SetPasswordFormInternal() {
         <form action={handleFormSubmit} className="space-y-4">
           {/* Password field */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300">Password (min. 6 characters):</label>
-            <input id="password" name="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm" placeholder="••••••••" disabled={isSubmitting} />
+            <label htmlFor="password" className="block text-sm font-medium text-gray-300">Create Password (min. 6 characters)</label>
+            <input id="password" name="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm placeholder-gray-500" placeholder="Create password" disabled={isSubmitting} />
           </div>
           {/* Confirm Password field */}
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300">Confirm Password:</label>
-            <input id="confirmPassword" name="confirmPassword" type="password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm" placeholder="••••••••" disabled={isSubmitting} />
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300">Confirm Password</label>
+            <input id="confirmPassword" name="confirmPassword" type="password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm placeholder-gray-500" placeholder="Confirm password" disabled={isSubmitting} />
           </div>
 
           <div className="pt-2">

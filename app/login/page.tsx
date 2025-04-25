@@ -114,15 +114,15 @@ export default function LoginPage() {
               htmlFor="email"
               className="block text-sm font-medium text-gray-300"
             >
-              Email:
+              Email
             </label>
             <input
               id="email"
               name="email"
               type="email"
               required
-              className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-              placeholder="you@example.com"
+              className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm placeholder-gray-500"
+              placeholder="Enter your email address"
             />
           </div>
           <div>
@@ -130,15 +130,15 @@ export default function LoginPage() {
               htmlFor="password"
               className="block text-sm font-medium text-gray-300"
             >
-              Password:
+              Password
             </label>
             <input
               id="password"
               name="password"
               type="password"
               required
-              className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-              placeholder="••••••••"
+              className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm placeholder-gray-500"
+              placeholder="Enter password"
             />
           </div>
 

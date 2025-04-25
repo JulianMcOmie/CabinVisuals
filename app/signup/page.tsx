@@ -102,18 +102,18 @@ export default function SignupPage() {
           {/* First/Last Name Row */}
           <div className="flex space-x-4">
             <div className="flex-1">
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-300">First Name:</label>
-              <input id="firstName" name="firstName" type="text" required className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm" placeholder="Ada" />
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-300">First Name</label>
+              <input id="firstName" name="firstName" type="text" required className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm placeholder-gray-500" placeholder="Your first name" />
             </div>
             <div className="flex-1">
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-300">Last Name:</label>
-              <input id="lastName" name="lastName" type="text" required className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm" placeholder="Lovelace" />
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-300">Last Name</label>
+              <input id="lastName" name="lastName" type="text" required className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm placeholder-gray-500" placeholder="Your last name" />
             </div>
           </div>
           {/* Email Row */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300">Email:</label>
-            <input id="email" name="email" type="email" required className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm" placeholder="you@example.com" />
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300">Email</label>
+            <input id="email" name="email" type="email" required className="mt-1 block w-full rounded-full border border-gray-700 bg-black/50 px-4 py-3 text-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm placeholder-gray-500" placeholder="Enter your email address" />
           </div>
           {/* Continue Button */}
           <div className="pt-2">
