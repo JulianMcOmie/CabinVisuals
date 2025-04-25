@@ -54,7 +54,7 @@ function SetPasswordFormInternal() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-black text-white">
       <div className="w-full max-w-md rounded-lg bg-gray-900/50 p-8 shadow-md border border-gray-800">
-        <h1 className="mb-2 text-center text-2xl font-bold text-white">Create Account - Step 2 of 2</h1>
+        <h1 className="mb-2 text-center text-2xl font-bold text-white">Sign Up</h1>
         <p className="mb-6 text-center text-sm text-gray-400">Setting password for: {email}</p>
         {errorMessage && ( <div className="mb-4 rounded border border-red-600 bg-red-900/30 p-3 text-center text-sm text-red-300">{errorMessage}</div> )}
         <form action={handleFormSubmit} className="space-y-4">
@@ -74,7 +74,7 @@ function SetPasswordFormInternal() {
         </form>
         <div className="mt-6 text-center text-sm">
            <Link href="/auth/signup" legacyBehavior>
-             <a className="font-medium text-indigo-400 hover:text-indigo-300">Back to Step 1</a>
+             <a className="font-medium text-indigo-400 hover:text-indigo-300">&lt; Back</a>
            </Link>
         </div>
       </div>

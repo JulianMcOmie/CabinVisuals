@@ -62,7 +62,7 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-black text-white">
       <div className="w-full max-w-md rounded-lg bg-gray-900/50 p-8 shadow-md border border-gray-800">
         <h1 className="mb-6 text-center text-2xl font-bold text-white">
-          Create Account - Step 1 of 2
+          Sign Up
         </h1>
         {errorMessage && ( <div className="mb-4 rounded border border-red-600 bg-red-900/30 p-3 text-center text-sm text-red-300">{errorMessage}</div> )}
         <form action={initiateSignup} className="space-y-4">
