@@ -18,11 +18,13 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
-    redirect('/error')
+    console.error("Login Error:", error.message); // Log error
+    // Redirect back to login with an error message
+    return redirect('/login?error=Could not authenticate user');
   }
 
-  revalidatePath('/', 'layout')
-  redirect('/')
+  revalidatePath('/', 'layout') // Or specific path like '/alpha'
+  redirect('/'); // Redirect to main app page (e.g., '/' or '/alpha')
 }
 
 export async function signup(formData: FormData) {
@@ -61,26 +63,28 @@ export async function signup(formData: FormData) {
 // }
 
 // Use the correct version that accepts the ID token from GSI
-export async function handleSignInWithGoogle(idToken: string) { // Accept idToken: string
+export async function handleSignInWithGoogle(idToken: string) {
   const supabase = await createClient()
 
-  if (!idToken) { // Add check for token
+  if (!idToken) {
     console.error("handleSignInWithGoogle called without an ID token!");
-    redirect('/login?message=Google sign-in failed: No token received.');
+    // Redirect back to login with an error message
+    return redirect('/login?error=Google sign-in failed: No token received.');
   }
 
-  console.log("Attempting signInWithIdToken..."); // Add logging
+  console.log("Attempting signInWithIdToken...");
   const { data, error } = await supabase.auth.signInWithIdToken({
     provider: 'google',
-    token: idToken, // Use the idToken parameter
+    token: idToken,
   });
 
   if (error) {
-    console.error("signInWithIdToken error:", error); // Add logging
-    redirect('/login?message=Could not authenticate with Google.'); // Redirect on error
+    console.error("signInWithIdToken error:", error);
+    // Redirect back to login with an error message
+    return redirect('/login?error=Could not authenticate with Google.');
   }
 
-  console.log("signInWithIdToken success!"); // Add logging
-  revalidatePath('/', 'layout')
-  redirect('/') // Redirect on success
+  console.log("signInWithIdToken success!");
+  revalidatePath('/', 'layout') // Or specific path like '/alpha'
+  redirect('/'); // Redirect to main app page (e.g., '/' or '/alpha')
 }

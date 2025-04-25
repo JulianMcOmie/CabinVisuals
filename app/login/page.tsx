@@ -2,40 +2,51 @@
 
 import { useEffect } from 'react';
 import Script from 'next/script';
-import { handleSignInWithGoogle, login, signup } from './actions';
+import { handleSignInWithGoogle, login } from './actions'; // Removed signup import
+import Link from 'next/link'; // Import Link
+import { useSearchParams } from 'next/navigation'; // Import useSearchParams
+import { useState } from 'react'; // Import useState
 
 export default function LoginPage() {
+
+  // --- Handle Messages --- 
+  const searchParams = useSearchParams();
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const msg = searchParams.get('message');
+    const errMsg = searchParams.get('error'); // Check for error param too
+    if (msg) setMessage(msg);
+    if (errMsg) setError(errMsg);
+    // Optional: Clear params from URL
+    // window.history.replaceState({}, document.title, window.location.pathname);
+  }, [searchParams]);
 
   // Client-side callback function for Google Sign-In
   async function handleGoogleSignInCallback(response: any) {
     console.log("Google Sign-In CredentialResponse:", response);
     if (response.credential) {
       try {
-        // Call the server action to handle the token
         await handleSignInWithGoogle(response.credential);
-        // Server action might handle redirect internally (e.g., using next/navigation redirect)
-        // Or you can handle redirect client-side if needed:
-        // window.location.href = '/dashboard';
+        // Redirect happens in server action
       } catch (error) {
         console.error("Error calling handleSignInWithGoogle server action:", error);
-        // TODO: Display error message to the user
+        setError('Could not authenticate with Google.');
       }
     } else {
       console.error("Google Sign-In failed: No credential received.");
-      // TODO: Display error message to the user
+      setError('Google Sign-In failed. Please try again.');
     }
   }
 
   useEffect(() => {
     // Attach the callback function to the window object
-    // so Google's library can find it.
     (window as any).handleGoogleSignInCallback = handleGoogleSignInCallback;
-
-    // Cleanup function to remove it from window when the component unmounts
     return () => {
       delete (window as any).handleGoogleSignInCallback;
     };
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []); // Separate useEffect for Google callback setup
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black text-white">
@@ -44,8 +55,20 @@ export default function LoginPage() {
           Sign In
         </h1>
 
+        {/* Display Success/Error Messages */} 
+        {message && (
+          <div className="mb-4 rounded border border-green-600 bg-green-900/30 p-3 text-center text-sm text-green-300">
+            {message}
+          </div>
+        )}
+        {error && (
+          <div className="mb-4 rounded border border-red-600 bg-red-900/30 p-3 text-center text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
         {/* Email/Password Form */}
-        <form className="space-y-4">
+        <form action={login} className="space-y-4">
           <div>
             <label
               htmlFor="email"
@@ -79,26 +102,22 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Forgot Password Link - Moved and Centered */}
-          <div className="text-center text-sm py-2"> {/* Added py-2 for vertical padding */}
-            <a href="/reset-password" className="font-medium text-indigo-400 hover:text-indigo-300">
-              Forgot password?
-            </a>
+          {/* Forgot Password Link */} 
+          <div className="text-center text-sm py-2">
+            <Link href="/reset-password" legacyBehavior>
+               <a className="font-medium text-indigo-400 hover:text-indigo-300">
+                 Forgot password?
+               </a>
+            </Link>
           </div>
 
-          {/* TODO: Add area to display login/signup errors */}
-          <div className="flex items-center justify-between space-x-4 pt-2">
+          {/* Login Button Only */}
+          <div className="pt-2">
             <button
-              formAction={login}
-              className="flex-1 justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              type="submit" // Use type=submit as action is on the form
+              className="w-full justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               Log in
-            </button>
-            <button
-              formAction={signup}
-              className="flex-1 justify-center rounded-full border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-300 shadow-sm hover:border-gray-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
-            >
-              Sign up
             </button>
           </div>
         </form>
@@ -110,23 +129,19 @@ export default function LoginPage() {
           <div className="flex-grow border-t border-gray-700"></div>
         </div>
 
-        {/* Google Sign-In */}
+        {/* Google Sign-In Button */}
         <div className="flex flex-col items-center space-y-3">
-           {/* Google Sign-In Configuration Div - hidden but needed */}
            <div
              id="g_id_onload"
-             data-client_id={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID} // Use env var
+             data-client_id={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}
              data-context="signin"
              data-ux_mode="popup"
-             data-callback="handleGoogleSignInCallback" // Matches the function defined above
-             data-nonce="" // Optional
-             // data-auto_select="true" // Can enable for auto sign-in attempt
+             data-callback="handleGoogleSignInCallback"
+             data-nonce=""
              data-itp_support="true"
-             data-use_fedcm_for_prompt="false" // Keep FedCM off for now based on previous errors
-             style={{ display: 'none' }} // Hide this config div
+             data-use_fedcm_for_prompt="false"
+             style={{ display: 'none' }}
            ></div>
-
-           {/* Google Sign-In Button Rendering Div */}
            <div
              className="g_id_signin"
              data-type="standard"
@@ -135,13 +150,22 @@ export default function LoginPage() {
              data-text="signin_with"
              data-size="large"
              data-logo_alignment="left"
-             // suppressHydrationWarning={true} // May still be needed if timing issues occur
            ></div>
         </div>
 
-      </div>
+        {/* Link to Sign Up Page */}
+        <div className="mt-6 text-center text-sm">
+          <p className="text-gray-400">
+            Don't have an account?
+            <Link href="/signup" legacyBehavior>
+               <a className="ml-1 font-medium text-indigo-400 hover:text-indigo-300">
+                 Sign up
+               </a>
+             </Link>
+          </p>
+        </div>
 
-       {/* Load Google Client Library using next/script */}
+      </div>
        <Script src="https://accounts.google.com/gsi/client" async defer strategy="afterInteractive"></Script>
     </div>
   );
