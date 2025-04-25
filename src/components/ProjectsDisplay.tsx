@@ -11,6 +11,8 @@ import {
 import styles from '@/app/projects/projects.module.css' // Assuming styles are specific to this display
 import { ProjectMetadata } from '../store/projectSlice'; // Import the type
 import type { User } from '@supabase/supabase-js'; // Import User type
+import { logout } from "@/app/auth/logout/actions"; // Import the logout action
+import { useState } from "react"; // Import useState
 
 // Define a type for the profile data (adjust fields as needed)
 interface ProfileData {
@@ -46,8 +48,23 @@ export default function ProjectsDisplay({
   // or if it's intended to be used by the page container.
   // For now, assuming styles are relevant here.
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false); // Add loading state
+
   // Call getInitials with potentially null/undefined values from profile
   const userInitials = getInitials(profile?.first_name, profile?.last_name);
+
+  // Define the async handler for logout
+  const handleLogout = async () => {
+    if (isLoggingOut) return; // Prevent double-clicks
+    setIsLoggingOut(true); // Set loading state
+    try {
+      await logout();
+      // Redirect happens in server action, no need to reset state here usually
+    } catch (error) {
+      console.error("Logout failed:", error);
+      setIsLoggingOut(false); // Reset state on explicit failure if redirect doesn't happen
+    }
+  };
 
   return (
     <div className={styles.pageContainer}> 
@@ -62,7 +79,7 @@ export default function ProjectsDisplay({
         <h1 className={`${styles.headerTitle} font-extrabold`}>Projects</h1>
         <nav className={styles.headerNav}>
           <DropdownMenu>
-            <DropdownMenuTrigger className={styles.dropdownTriggerPlaceholder}>
+            <DropdownMenuTrigger className={styles.dropdownTriggerPlaceholder} disabled={isLoggingOut}>
               {/* Use calculated initials */}
               <span className={styles.dropdownTriggerText}>{userInitials}</span> 
             </DropdownMenuTrigger>
@@ -85,10 +102,18 @@ export default function ProjectsDisplay({
                 <span>Discord Community</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-gray-800" />
-              <DropdownMenuItem className="flex items-center text-red-400 cursor-pointer">
-                {/* TODO: Implement logout functionality */}
+              {/* Logout Item with Loading State */}
+              <DropdownMenuItem
+                className={`flex items-center w-full text-red-400 cursor-pointer hover:bg-gray-700 rounded-sm text-sm p-1.5 focus:bg-gray-700 focus:text-red-400 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isLoggingOut} // Disable when logging out
+                onSelect={(event) => {
+                  event.preventDefault();
+                  handleLogout();
+                }}
+              >
                 <LogOut className="h-4 w-4 mr-2" />
-                <span>Log out</span>
+                {/* Change text when loading */}
+                <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
