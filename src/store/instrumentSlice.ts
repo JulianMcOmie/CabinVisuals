@@ -11,6 +11,7 @@ import GlowingCubeSynth from '../lib/synthesizers/glowingCubeSynth';
 import ConvergingSpheresSynth from '../lib/synthesizers/ConvergingSpheresSynth';
 import SpiralGalaxySynth from '../lib/synthesizers/SpiralGalaxySynth';
 import PulseSynth from '../lib/synthesizers/PulseSynth';
+import ColorPulseSynth from '../lib/synthesizers/ColorPulseSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -50,6 +51,7 @@ export const availableInstrumentsData: InstrumentCategories = {
   ],
   Utility: [
     { id: 'PulseSynth', name: 'Global Pulse', constructor: PulseSynth },
+    { id: 'ColorPulseSynth', name: 'Color Pulse', constructor: ColorPulseSynth },
   ]
 };
 
