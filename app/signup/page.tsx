@@ -2,13 +2,22 @@
 
 import { initiateSignup } from './actions';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Script from 'next/script';
 import { handleSignInWithGoogle } from '../login/actions'; // Use same Google handler
 
+// Define type for Google Identity Services library
+declare global {
+  interface Window {
+    google?: typeof import('google-one-tap');
+    handleGoogleSignInCallback?: (response: any) => void;
+  }
+}
+
 export default function SignupPage() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // --- Google Sign-In Callback --- 
@@ -28,17 +37,52 @@ export default function SignupPage() {
     }
   }
 
+  // Effect for handling URL messages
   useEffect(() => {
-    // Handle messages from redirects
     const message = searchParams.get('message');
-    if (message) setErrorMessage(message);
+    if (message) {
+        setErrorMessage(message);
+        // Optional: Clear message from URL
+        // const currentParams = new URLSearchParams(window.location.search);
+        // currentParams.delete('message');
+        // window.history.replaceState({}, '', `${window.location.pathname}?${currentParams.toString()}`);
+    }
+  }, [searchParams]); // Only depends on searchParams
 
+  // Effect for Google Sign-In setup and rendering
+  useEffect(() => {
     // Attach Google callback
-    (window as any).handleGoogleSignInCallback = handleGoogleSignInCallback;
+    window.handleGoogleSignInCallback = handleGoogleSignInCallback;
+
+    // --- Manual Button Rendering --- 
+    if (window.google?.accounts?.id) {
+        const buttonContainer = document.getElementById('google-signin-button-container');
+        if (buttonContainer) {
+             if (buttonContainer.childElementCount === 0) { 
+                console.log('Rendering Google Sign-In button (Signup Page)');
+                window.google.accounts.id.renderButton(
+                    buttonContainer,
+                    { 
+                        theme: "outline", 
+                        size: "large",
+                        type: "standard",
+                        text: "signup_with", // Use signup text
+                        shape: "rectangular",
+                        logo_alignment: "left"
+                    }
+                );
+             }
+        } else {
+             console.error('Google Sign-In button container not found');
+        }
+    }
+
+    // Cleanup function for the callback
     return () => {
-      delete (window as any).handleGoogleSignInCallback;
+      delete window.handleGoogleSignInCallback;
     };
-  }, [searchParams]);
+    // Re-run this effect only if the pathname changes (forcing button re-render on nav)
+  }, [pathname]); 
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black text-white">
@@ -84,10 +128,24 @@ export default function SignupPage() {
           <div className="flex-grow border-t border-gray-700"></div>
         </div>
 
-        {/* Google Sign-In Button */}
+        {/* Google Sign-In Button Container */}
         <div className="flex flex-col items-center space-y-3">
-           <div id="g_id_onload" data-client_id={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID} data-context="signup" data-ux_mode="popup" data-callback="handleGoogleSignInCallback" data-nonce="" data-itp_support="true" data-use_fedcm_for_prompt="false" style={{ display: 'none' }}></div>
-           <div className="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signup_with" data-size="large" data-logo_alignment="left"></div>
+           <div 
+              id="g_id_onload" 
+              data-client_id={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID} 
+              data-context="signup" 
+              data-ux_mode="popup" 
+              data-callback="handleGoogleSignInCallback" 
+              data-nonce="" 
+              data-itp_support="true" 
+              data-use_fedcm_for_prompt="false" 
+              style={{ display: 'none' }}
+            ></div>
+           {/* Add ID and remove rendering attributes */}
+           <div 
+             id="google-signin-button-container" // Added unique ID
+             className="g_id_signin"
+            ></div>
         </div>
 
         {/* Link back to Login */}
@@ -101,7 +159,13 @@ export default function SignupPage() {
         </div>
 
       </div>
-       <Script src="https://accounts.google.com/gsi/client" async defer strategy="afterInteractive"></Script>
+       <Script 
+         src="https://accounts.google.com/gsi/client" 
+         async 
+         defer 
+         strategy="afterInteractive" 
+         onLoad={() => console.log('Google GSI script loaded.')}
+       ></Script>
     </div>
   );
 } 

@@ -1,16 +1,24 @@
 'use client'; // Required for useEffect and client-side Google Sign-In callback
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Script from 'next/script';
 import { handleSignInWithGoogle, login } from './actions'; // Removed signup import
 import Link from 'next/link'; // Import Link
-import { useSearchParams } from 'next/navigation'; // Import useSearchParams
-import { useState } from 'react'; // Import useState
+import { useSearchParams, usePathname } from 'next/navigation'; // Import useSearchParams and usePathname
+
+// Define type for Google Identity Services library (optional but good practice)
+declare global {
+  interface Window {
+    google?: typeof import('google-one-tap');
+    handleGoogleSignInCallback?: (response: any) => void;
+  }
+}
 
 export default function LoginPage() {
 
-  // --- Handle Messages --- 
+  // --- Handle Messages & Pathname --- 
   const searchParams = useSearchParams();
+  const pathname = usePathname(); // Get current path
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,11 +50,43 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Attach the callback function to the window object
-    (window as any).handleGoogleSignInCallback = handleGoogleSignInCallback;
+    window.handleGoogleSignInCallback = handleGoogleSignInCallback;
+
+    // --- Manual Button Rendering --- 
+    if (window.google?.accounts?.id) {
+        const buttonContainer = document.getElementById('google-signin-button-container');
+        if (buttonContainer) {
+             // Check if button isn't already rendered (simple check: look for iframe)
+             if (buttonContainer.childElementCount === 0) { 
+                console.log('Rendering Google Sign-In button (Login Page)');
+                window.google.accounts.id.renderButton(
+                    buttonContainer,
+                    { 
+                        theme: "outline", 
+                        size: "large",
+                        type: "standard",
+                        text: "signin_with",
+                        shape: "rectangular",
+                        logo_alignment: "left"
+                        // Add other customizations as needed
+                    }
+                );
+            }
+        } else {
+             console.error('Google Sign-In button container not found');
+        }
+        // Optionally, prompt one-tap UI if needed, but renderButton is key here
+        // window.google.accounts.id.prompt(); 
+    }
+
+    // Cleanup function
     return () => {
-      delete (window as any).handleGoogleSignInCallback;
+      delete window.handleGoogleSignInCallback;
+       // It might be good practice to also hide any prompts if used
+       // window.google?.accounts?.id?.cancel(); 
     };
-  }, []); // Separate useEffect for Google callback setup
+    // Re-run this effect if the pathname changes
+  }, [pathname, searchParams]); 
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black text-white">
@@ -129,7 +169,7 @@ export default function LoginPage() {
           <div className="flex-grow border-t border-gray-700"></div>
         </div>
 
-        {/* Google Sign-In Button */}
+        {/* Google Sign-In Button Container */}
         <div className="flex flex-col items-center space-y-3">
            <div
              id="g_id_onload"
@@ -143,13 +183,8 @@ export default function LoginPage() {
              style={{ display: 'none' }}
            ></div>
            <div
+             id="google-signin-button-container"
              className="g_id_signin"
-             data-type="standard"
-             data-shape="rectangular"
-             data-theme="outline"
-             data-text="signin_with"
-             data-size="large"
-             data-logo_alignment="left"
            ></div>
         </div>
 
@@ -166,7 +201,13 @@ export default function LoginPage() {
         </div>
 
       </div>
-       <Script src="https://accounts.google.com/gsi/client" async defer strategy="afterInteractive"></Script>
+       <Script 
+         src="https://accounts.google.com/gsi/client" 
+         async 
+         defer 
+         strategy="afterInteractive"
+         onLoad={() => console.log('Google GSI script loaded.')}
+        ></Script>
     </div>
   );
 }
