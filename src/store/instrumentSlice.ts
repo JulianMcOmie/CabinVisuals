@@ -14,6 +14,8 @@ import PulseSynth from '../lib/synthesizers/PulseSynth';
 import ColorPulseSynth from '../lib/synthesizers/ColorPulseSynth';
 import VelocityRotateSynth from '../lib/synthesizers/VelocityRotateSynth';
 import RadialDuplicateGlowSynth from '../lib/synthesizers/RadialDuplicateGlowSynth';
+import VelocityOffsetDuplicateSynth from '../lib/synthesizers/VelocityOffsetDuplicateSynth';
+import PositionPulseSynth from '../lib/synthesizers/PositionPulseSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -56,6 +58,8 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'PulseSynth', name: 'Global Pulse', constructor: PulseSynth },
     { id: 'ColorPulseSynth', name: 'Color Pulse', constructor: ColorPulseSynth },
     { id: 'VelocityRotateSynth', name: 'Velocity Rotate', constructor: VelocityRotateSynth },
+    { id: 'VelocityOffsetDuplicateSynth', name: 'Velocity Duplicate', constructor: VelocityOffsetDuplicateSynth },
+    { id: 'PositionPulseSynth', name: 'Position Pulse', constructor: PositionPulseSynth },
   ]
 };
 

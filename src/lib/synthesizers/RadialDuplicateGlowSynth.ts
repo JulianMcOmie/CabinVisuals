@@ -45,21 +45,12 @@ class RadialDuplicateGlowSynth extends Synthesizer {
             'gravity', 9.8, { label: 'Gravity Strength', uiType: 'slider', min: 0, max: 50, step: 0.1 }
         ));
 
-        // Radial Duplicates (Pitch Controlled)
-        this.properties.set('minRadialDuplicates', new Property<number>(
-            'minRadialDuplicates', 1, { label: 'Min Radial Dups (Low Pitch)', uiType: 'slider', min: 1, max: 10, step: 1 }
-        ));
-        this.properties.set('maxRadialDuplicates', new Property<number>(
-            'maxRadialDuplicates', 8, { label: 'Max Radial Dups (High Pitch)', uiType: 'slider', min: 1, max: 24, step: 1 }
-        ));
-        this.properties.set('minRadius', new Property<number>(
-            'minRadius', 1.0, { label: 'Min Radius (Low Pitch)', uiType: 'slider', min: 0.1, max: 10, step: 0.1 }
-        ));
-        this.properties.set('maxRadius', new Property<number>(
-            'maxRadius', 10.0, { label: 'Max Radius (High Pitch)', uiType: 'slider', min: 1, max: 30, step: 0.1 }
+        // --- ADD HEIGHT MAPPING PROPERTY ---
+        this.properties.set('maxYHeight', new Property<number>(
+            'maxYHeight', 15.0, { label: 'Max Y Height (High Pitch)', uiType: 'slider', min: 1, max: 50, step: 0.5 }
         ));
 
-        // ADSR (Instant Attack/Release defaults)
+        // ADSR (Increased Release default)
         this.properties.set('attackTime', new Property<number>(
             'attackTime', 0.01, { label: 'Fade Attack (s)', uiType: 'slider', min: 0.0, max: 1.0, step: 0.01 }
         ));
@@ -83,61 +74,31 @@ class RadialDuplicateGlowSynth extends Synthesizer {
         });
 
         this.engine.defineObject('sphere')
-            // --- LEVEL 1: Radial Duplication --- 
-            .forEachInstance((noteLevelCtx: MappingContext): InstanceData[] => {
-                const minDups = this.getPropertyValue<number>('minRadialDuplicates') ?? 1;
-                const maxDups = this.getPropertyValue<number>('maxRadialDuplicates') ?? 8;
-                const minRad = this.getPropertyValue<number>('minRadius') ?? 1.0;
-                const maxRad = this.getPropertyValue<number>('maxRadius') ?? 10.0;
-
-                // Map pitch within a 2-octave (24 semitone) range to number of duplicates and radius
-                const pitchMod24 = noteLevelCtx.note.pitch % 24;
-                const normalizedPitch = pitchMod24 / 23.0; // Normalize 0-23 to 0-1
-                const numRadialDuplicates = Math.round(MappingUtils.mapValue(normalizedPitch, 0, 1, minDups, maxDups));
-                const radius = MappingUtils.mapValue(normalizedPitch, 0, 1, minRad, maxRad);
-                
-                const radialInstances: InstanceData[] = [];
-                for (let i = 0; i < numRadialDuplicates; i++) {
-                    radialInstances.push({
-                        angle: (i / numRadialDuplicates) * Math.PI * 2,
-                        radius: radius
-                    });
-                }
-                return radialInstances;
-            })
-            // // --- Apply Color and ADSR to each falling radial instance --- 
-            // .withColor((ctx: MappingContext) => { // Color based on original note pitch
-            //     const range = this.getPropertyValue<ColorRange>('hueRange') ?? { startHue: 0, endHue: 360 };
-            //     const pitchClass = ctx.note.pitch % 12;
-            //     const normalizedPitchClass = pitchClass / 11.0; // 0 to 1
-            //     let hue: number;
-            //     const rangeSize = range.endHue - range.startHue;
-            //     hue = range.startHue + normalizedPitchClass * rangeSize;
-            //     hue = ((hue % 360) + 360) % 360; // Wrap hue
-            //     return `hsl(${hue.toFixed(0)}, 100%, 50%)`;
-            // })
+            // --- Apply ADSR to the single falling sphere --- 
             .applyADSR(adsrConfigFn) // ADSR for opacity fade
-            // --- Final Mappers (Apply to each falling sphere) ---
+            
+            // --- Final Mappers (Apply to the single falling sphere) ---
             .withPosition((ctx: MappingContext): Vec3Tuple => {
-                // Context from Level 1 (Radial Duplication) is in instanceData now (since no level 2)
-                const radialAngle = ctx.instanceData?.angle as number ?? 0;
-                const radialRadius = ctx.instanceData?.radius as number ?? 0;
+                // No instanceData from radial duplication anymore
                 
-                // Gravity calculation
+                // Map pitch to Y height
+                const maxY = this.getPropertyValue<number>('maxYHeight') ?? 15.0;
+                const yPos = MappingUtils.mapPitchToRange(ctx.note.pitch, 0, maxY);
+
+                // Gravity calculation for Z
                 const gravity = this.getPropertyValue<number>('gravity') ?? 9.8;
                 const timeSinceStart = ctx.timeSinceNoteStart ?? 0;
                 const zPos = -0.5 * gravity * Math.pow(timeSinceStart, 2);
 
-                // Position on XY plane based on angle/radius, use gravity calc for Z
-                const x = Math.cos(radialAngle) * radialRadius;
-                const y = Math.sin(radialAngle) * radialRadius; 
+                // Position: X=0, Y=pitch-mapped, Z=gravity-calculated
+                const x = 0;
+                const y = yPos; 
                 const z = zPos;
 
                 return [x, y, z];
             })
             .withScale((ctx: MappingContext): Vec3Tuple => {
                 const baseSize = this.getPropertyValue<number>('baseSize') ?? 0.8;
-                // No Z scale multiplier anymore
                 return [baseSize, baseSize, baseSize];
             })
             .withOpacity((ctx: MappingContext): number => {
@@ -146,23 +107,25 @@ class RadialDuplicateGlowSynth extends Synthesizer {
             });
     }
 
-    // Override for Glow Effect
+    // Override for Glow Effect (Still applies if base color isn't white)
     getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
         const baseObjects = this.engine.getObjectsAtTime(time, midiBlocks, bpm);
         const glowIntensity = this.getPropertyValue<number>('glowIntensity') ?? 1.2;
 
         const processedObjects = baseObjects.map(obj => {
-            if (!obj.properties || obj.properties.opacity === undefined || !obj.properties.color) {
+            if (!obj.properties || obj.properties.opacity === undefined) { // Removed color check as user removed color mapping
                 return obj; 
             }
             const effectiveOpacity = Math.max(0, obj.properties.opacity);
+            // Use white as base emissive color since mapping was removed
+            const emissiveColor = obj.properties.color ?? '#ffffff'; // Default to white if no color mapper
             const intensity = glowIntensity * effectiveOpacity;
 
             return {
                 ...obj,
                 properties: {
                     ...obj.properties,
-                    emissive: obj.properties.color, 
+                    emissive: emissiveColor, 
                     emissiveIntensity: intensity 
                 }
             };
