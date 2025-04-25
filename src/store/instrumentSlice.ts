@@ -12,6 +12,8 @@ import ConvergingSpheresSynth from '../lib/synthesizers/ConvergingSpheresSynth';
 import SpiralGalaxySynth from '../lib/synthesizers/SpiralGalaxySynth';
 import PulseSynth from '../lib/synthesizers/PulseSynth';
 import ColorPulseSynth from '../lib/synthesizers/ColorPulseSynth';
+import VelocityRotateSynth from '../lib/synthesizers/VelocityRotateSynth';
+import RadialDuplicateGlowSynth from '../lib/synthesizers/RadialDuplicateGlowSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -42,6 +44,7 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'SymmetricResonanceSynth', name: 'Symmetric Resonance', constructor: SymmetricResonanceSynth },
     { id: 'GlowSynth', name: 'Glow Synth', constructor: GlowSynth },
     { id: 'GlowingCubeSynth', name: 'Glowing Cube', constructor: GlowingCubeSynth },
+    { id: 'RadialDuplicateGlowSynth', name: 'Radial Glow Dup', constructor: RadialDuplicateGlowSynth },
   ],
   Percussive: [
     { id: 'ConvergingSpheresSynth', name: 'Converging Spheres', constructor: ConvergingSpheresSynth },
@@ -52,6 +55,7 @@ export const availableInstrumentsData: InstrumentCategories = {
   Utility: [
     { id: 'PulseSynth', name: 'Global Pulse', constructor: PulseSynth },
     { id: 'ColorPulseSynth', name: 'Color Pulse', constructor: ColorPulseSynth },
+    { id: 'VelocityRotateSynth', name: 'Velocity Rotate', constructor: VelocityRotateSynth },
   ]
 };
 

@@ -307,11 +307,23 @@ class VisualObjectEngine {
                             }
                         }
 
-                        // Check if the note is currently active (standard behavior)
-                        const isActiveNote = currentTimeSec >= noteStartSec && currentTimeSec < noteEndSec;
+                        // Determine max release time needed for this note based on all levels
+                        let maxReleaseTime = 0;
+                        definition.levels.forEach(levelConfig => {
+                            if (levelConfig.adsrConfig) {
+                                const config = typeof levelConfig.adsrConfig === 'function'
+                                    ? levelConfig.adsrConfig.call(this.synthesizer, noteCtx)
+                                    : levelConfig.adsrConfig;
+                                maxReleaseTime = Math.max(maxReleaseTime, config.release ?? 0);
+                            }
+                        });
 
-                        // Proceed if either in approach phase or active phase
-                        if (isDuringApproach || isActiveNote) {
+                        // Check if the note is active OR if we are within the release window
+                        const isActiveNote = currentTimeSec >= noteStartSec && currentTimeSec < noteEndSec;
+                        const isDuringRelease = currentTimeSec >= noteEndSec && currentTimeSec < (noteEndSec + maxReleaseTime);
+
+                        // Proceed if in approach, active, or release phase
+                        if (isDuringApproach || isActiveNote || isDuringRelease) {
                         // --- END MODIFIED ---
 
                             // Recursive function to process levels (Mostly unchanged, but context creation needs update)
@@ -492,7 +504,7 @@ class VisualObjectEngine {
                                 processLevel(level1Config);
                             }
 
-                        } // End if (isDuringApproach || isActiveNote)
+                        } // End if (isDuringApproach || isActiveNote || isDuringRelease)
                     } // End if conditionFn matches
                 }); // End forEach note
             }); // End forEach block
