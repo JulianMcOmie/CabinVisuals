@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import useStore from '../../store/store';
+import useStore from '../../../store/store';
+import styles from './MeasuresHeader.module.css'; // Import CSS Module
 
 // Helper function for quantization (adjust as needed)
 const quantizeBeat = (beat: number): number => {
@@ -595,38 +596,26 @@ function MeasuresHeader({
   return (
     <div
       ref={containerRef}
-      className="measures-header"
+      className={styles.measuresHeaderContainer} // Apply class from module
       style={{
-        display: 'flex',
         height: `${HEADER_HEIGHT}px`,
-        borderBottom: '1px solid #ccc',
-        backgroundColor: 'black',
-        position: 'relative', // Needed for absolute canvas positioning
-        overflow: 'hidden', // Hide canvas overflow
-        width: `${effectivePixelsPerBeat * totalRenderBeats}px` // Use render beats for width
+        width: `${effectivePixelsPerBeat * totalRenderBeats}px`
       }}
     >
       <canvas
         ref={canvasRef}
+        className={styles.measuresCanvas} // Apply class from module
         style={{
-            position: 'absolute', // Style width/height set in useEffect for DPR
-            top: 0,
-            left: 0,
         }}
       />
       <div
         ref={overlayRef}
+        className={styles.measuresOverlay} // Apply class from module
         onMouseDown={handleMouseDown}
         onMouseMove={handleOverlayMouseMove} // Add mouse move for cursor updates
         onMouseLeave={() => {if (!isResizingProject && !loopDragState.type && !isSeeking) setCursorStyle('pointer')}} // Reset cursor only if not dragging
         style={{
-          position: 'absolute', // Overlay covers canvas
-          width: '100%',
-          height: '100%',
-          top: 0,
-          left: 0,
-          zIndex: 1,
-          cursor: cursorStyle // Use dynamic cursor state
+          cursor: cursorStyle
         }}
       />
     </div>

@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import useStore from '../../store/store';
 import InstrumentsView from './InstrumentsView/InstrumentsView';
 import TrackTimelineView, { TrackTimelineViewHandle } from './TrackTimelineView';
-import MeasuresHeader from './MeasuresHeader';
+import MeasuresHeader from './MeasuresHeader/MeasuresHeader';
 import BasicSynthesizer from '../../lib/synthesizers/BasicSynthesizer';
 import { Track } from '../../lib/types';
 import styles from './TimelineView.module.css'; // Import the CSS module
