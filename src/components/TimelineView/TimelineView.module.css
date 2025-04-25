@@ -5,6 +5,7 @@
   display: flex;
   flex-direction: column;
   position: relative; /* Needed for absolute positioning of outline */
+  background-color: var(--border); /* Set background color */
 }
 
 .timelineContainer {
@@ -23,8 +24,8 @@
   justify-content: space-between;
   padding: 0 10px;
   font-weight: bold;
-  border-bottom: 1px solid #333;
-  border-right: 1px solid #333;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   background-color: var(--surface); /* Corresponds to SIDEBAR_BG_COLOR */
   z-index: 3;
   color: white;
@@ -72,7 +73,7 @@
   top: 0;
   padding-left: 200px; /* Corresponds to SIDEBAR_WIDTH */
   z-index: 2;
-  background-color: black; /* Corresponds to HEADER_BG_COLOR */
+  background-color: var(--surface); /* Match component background */
 }
 
 .combinedContentArea {
@@ -88,8 +89,8 @@
   left: 0;
   width: 200px; /* Corresponds to SIDEBAR_WIDTH */
   z-index: 1;
-  background-color: #1a1a1a; /* Corresponds to SIDEBAR_BG_COLOR */
-  border-right: 1px solid #333;
+  background-color: var(--background); /* Corresponds to SIDEBAR_BG_COLOR */
+  border-right: 1px solid var(--border);
   height: 100%;
 }
 
@@ -104,10 +105,10 @@
 .playhead {
   position: absolute;
   top: 40px; /* Corresponds to HEADER_HEIGHT */
-  /* left: dynamic */
-  width: 3px;
+  /* left: dynamic - set in component */
+  width: 2px; /* Make slightly thinner */
   height: calc(100% - 40px);
-  background-color: red;
+  background-color: #cccccc; /* Change to white-gray */
   z-index: 10;
   cursor: ew-resize;
   pointer-events: auto;

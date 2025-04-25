@@ -16,6 +16,7 @@ const SIDEBAR_WIDTH = 200; // Define sidebar width as a constant
 const MIN_VIEWPORT_MEASURES = 8; // Minimum measures to allow zooming out to see
 const EXTRA_RENDER_MEASURES = 8; // Render this many extra measures beyond content or min viewport
 const HEADER_HEIGHT = 40; // Define header height as a constant
+const PLAYHEAD_WIDTH = 2; // Width of the playhead line in pixels (must match CSS)
 
 function TimelineView() {
   const { 
@@ -65,7 +66,7 @@ function TimelineView() {
   
   // Calculate playhead position based on beat, zoom AND scroll
   const basePlayheadOffset = currentBeat * effectivePixelsPerBeat; // Use effective value
-  const playheadLeftStyle = SIDEBAR_WIDTH + basePlayheadOffset - scrollLeft;
+  const playheadLeftStyle = SIDEBAR_WIDTH + basePlayheadOffset - scrollLeft - (PLAYHEAD_WIDTH / 2); // Center the line
 
   // Mouse move handler for dragging - needs to account for scroll and zoom
   const handleMouseMove = useCallback((event: MouseEvent) => {
