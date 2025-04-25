@@ -25,8 +25,11 @@ const PROJECT_RESIZE_HANDLE_GAP = 3; // Gap between last measure line and handle
 const MIN_PROJECT_BEATS = BEATS_PER_MEASURE; // Minimum project length in beats (e.g., 1 measure)
 
 // --- Canvas Drawing Colors ---
-const LOOP_REGION_ENABLED_BG_COLOR = 'rgba(80, 120, 255, 0.5)';
-const LOOP_REGION_DISABLED_BG_COLOR = 'rgba(150, 150, 150, 0.5)';
+// const LOOP_REGION_ENABLED_BG_COLOR = 'rgba(80, 120, 255, 0.5)'; // Old blue
+const LOOP_REGION_ENABLED_BG_COLOR = 'rgba(166, 134, 30, 0.8)'; // Highlight color (#c8a45b) with 50% alpha
+// const LOOP_REGION_DISABLED_BG_COLOR = ; // Old gray
+const LOOP_REGION_DISABLED_BG_COLOR = 'rgba(150, 150, 150, 0.5)'; // Highlight color with 25% alpha
+// Loop handle colors removed
 const LABEL_TEXT_COLOR = 'white';
 const LABEL_TEXT_DISABLED_COLOR = '#666';
 const PLAYHEAD_TRIANGLE_WIDTH = 16; // Made wider again

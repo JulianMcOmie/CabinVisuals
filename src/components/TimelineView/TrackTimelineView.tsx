@@ -12,6 +12,7 @@ const BLOCK_CORNER_RADIUS = 4; // Added for rounded corners (keep fixed pixels?)
 const DISABLED_AREA_COLOR = 'rgba(0, 0, 0, 0.3)'; // Color for dimming extra measures (same as header)
 const DRAGGED_BLOCK_OPACITY = 0.5; // Opacity for the original block being dragged AND the ghost block
 const VIEWPORT_BUFFER_BEATS = 8; // Draw this many extra beats on each side of the viewport
+const BASE_FONT_SIZE = 10; // Smaller font size for block text
 
 interface TrackTimelineViewProps {
   tracks: Track[];
@@ -184,6 +185,7 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
     trackTopY: number,
     isSelected: boolean,
     alpha: number,
+    blockBaseColor: string // Added parameter for base color
   ) => {
       const leftPosition = blockData.startBeat * effectivePixelsPerBeat;
       const blockWidth = (blockData.endBeat - blockData.startBeat) * effectivePixelsPerBeat;
@@ -192,7 +194,7 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
       ctx.save();
       ctx.globalAlpha = alpha;
       drawRoundedRect(ctx, leftPosition, blockTopY, blockWidth, effectiveBlockHeight, BLOCK_CORNER_RADIUS);
-      ctx.fillStyle = '#4a90e2';
+      ctx.fillStyle = blockBaseColor; // Use passed-in color
       ctx.fill();
       if (isSelected) {
         ctx.strokeStyle = 'white';
@@ -201,8 +203,7 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
         ctx.stroke();
       }
       ctx.fillStyle = 'white';
-      const baseFontSize = 12;
-      ctx.font = `bold ${baseFontSize * (window.devicePixelRatio || 1)}px sans-serif`;
+      ctx.font = `bold ${BASE_FONT_SIZE * (window.devicePixelRatio || 1)}px sans-serif`; // Use new constant
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       const text = `${blockData.notes.length} notes`;
@@ -213,7 +214,7 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
       ctx.clip();
       ctx.fillText(text, textX, textY);
       ctx.restore();
-  }, [effectivePixelsPerBeat, effectiveTrackHeight, effectiveBlockVerticalPadding, effectiveBlockHeight]);
+  }, [effectivePixelsPerBeat, effectiveTrackHeight, effectiveBlockVerticalPadding, effectiveBlockHeight, BASE_FONT_SIZE]);
 
 
   // Canvas Drawing Logic (keep as is)
@@ -221,6 +222,11 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
     const canvas = internalCanvasRef.current;
     const context = canvas?.getContext('2d');
     if (!canvas || !context || timelineVisibleWidth <= 0 || timelineVisibleHeight <= 0) return;
+
+    // Get computed styles
+    const computedStyle = getComputedStyle(canvas);
+    const backgroundColor = computedStyle.getPropertyValue('--background').trim() || '#222'; // Fallback
+    const electricBlueColor = '#4a90e2'; // Fallback
 
     const dpr = window.devicePixelRatio || 1;
     const canvasWidth = timelineVisibleWidth;
@@ -240,7 +246,7 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
     const endTrackIndex = Math.min(tracks.length -1, Math.ceil((scrollTop + canvasHeight) / effectiveTrackHeight));
 
     context.save();
-    context.fillStyle = '#222';
+    context.fillStyle = backgroundColor; // Use computed background color
     context.fillRect(0, 0, canvasWidth, canvasHeight);
     context.translate(-scrollLeft, -scrollTop);
 
@@ -280,7 +286,7 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
             if (isBeingDragged) {
                 alpha = isCopyDrag ? 1 : DRAGGED_BLOCK_OPACITY;
             }
-            drawMidiBlock(context, block, trackTopY, isSelected, alpha);
+            drawMidiBlock(context, block, trackTopY, isSelected, alpha, electricBlueColor);
         });
 
         context.strokeStyle = '#333';
@@ -310,7 +316,7 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
             const targetTrackIndex = tracks.findIndex(t => t.id === pendingTargetTrackId);
             if (targetTrackIndex !== -1) {
                 const targetTrackTopY = targetTrackIndex * effectiveTrackHeight;
-                drawMidiBlock(context, pendingUpdateBlock, targetTrackTopY, false, DRAGGED_BLOCK_OPACITY);
+                drawMidiBlock(context, pendingUpdateBlock, targetTrackTopY, false, DRAGGED_BLOCK_OPACITY, electricBlueColor);
             }
         }
     }

@@ -109,7 +109,7 @@
   width: 2px; /* Make slightly thinner */
   height: calc(100% - 40px);
   background-color: #cccccc; /* Change to white-gray */
-  z-index: 10;
+  z-index: 0; /* Render behind instrumentsColumn (z-index: 1) */
   cursor: ew-resize;
   pointer-events: auto;
 }
