@@ -1,29 +1,22 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 3%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 3%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 70%;
-    --accent: 195 100% 50%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 195 100% 50%;
-    --radius: 0.5rem;
-    --electric-blue: 195 100% 50%;
-  }
+/* Basic Global Colors - Defined outside Tailwind layers */
+:root {
+  --text: #ffffff;
+  --accent: #5a8ea3;
+  --highlight: #c8a45b;
+  --green: #6a9955;
+  --background: #1e1e1e;
+  --surface: #252525;
+  --lightSurface: #333333;
+  --lightSurfaceHover: #444444;
+  --border: #3a3a3a;
+  --activeBg: #2d3540;
+  --electricBlue: #00c3ff;
+  --selectedBlue: #e0f7ff;
+  --brightGreen: #00e676;
+  --brightYellow: #ffdd00;
+  --windowSelectionColor: rgb(59, 99, 146); /* Selection highlight color */
 }
 
 /* Blob animations */

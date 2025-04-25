@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import useStore from '../../store/store';
+import useStore from '../../../store/store';
+import styles from './MeasuresHeader.module.css'; // Import CSS Module
 
 // Helper function for quantization (adjust as needed)
 const quantizeBeat = (beat: number): number => {
@@ -23,6 +24,19 @@ const PROJECT_RESIZE_AREA_PIXELS = 10; // Clickable pixel threshold around the h
 const PROJECT_RESIZE_HANDLE_GAP = 3; // Gap between last measure line and handle
 const MIN_PROJECT_BEATS = BEATS_PER_MEASURE; // Minimum project length in beats (e.g., 1 measure)
 
+// --- Canvas Drawing Colors ---
+// const LOOP_REGION_ENABLED_BG_COLOR = 'rgba(80, 120, 255, 0.5)'; // Old blue
+const LOOP_REGION_ENABLED_BG_COLOR = 'rgba(166, 134, 30, 0.8)'; // Highlight color (#c8a45b) with 50% alpha
+// const LOOP_REGION_DISABLED_BG_COLOR = ; // Old gray
+const LOOP_REGION_DISABLED_BG_COLOR = 'rgba(150, 150, 150, 0.5)'; // Highlight color with 25% alpha
+// Loop handle colors removed
+const LABEL_TEXT_COLOR = 'white';
+const LABEL_TEXT_DISABLED_COLOR = '#666';
+const PLAYHEAD_TRIANGLE_WIDTH = 16; // Made wider again
+const PLAYHEAD_COLOR = '#cccccc'; // white-gray
+const PLAYHEAD_CORNER_RADIUS = 3; // Radius for rounded corners
+const PLAYHEAD_VERTICAL_OFFSET = 1; // Pixels to shift triangle down
+
 interface MeasuresHeaderProps {
   horizontalZoom: number;
   pixelsPerBeatBase: number;
@@ -44,6 +58,7 @@ function MeasuresHeader({
     setLoopRange,
     toggleLoop,
     setNumMeasures,
+    currentBeat, // Get currentBeat from store
   } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -385,6 +400,12 @@ function MeasuresHeader({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Get computed styles for colors dependent on CSS variables
+    const computedStyle = getComputedStyle(canvas); // Use canvas element
+    const borderColor = computedStyle.getPropertyValue('--border').trim();
+    const gridColor = borderColor; // Use border color for grid lines
+    const gridColorDisabled = computedStyle.getPropertyValue('--lightSurface').trim() || gridColor; // Fallback for disabled
+
     const dpr = window.devicePixelRatio || 1;
     const logicalWidth = effectivePixelsPerBeat * totalRenderBeats; // Use render beats
     const logicalHeight = HEADER_HEIGHT;
@@ -423,13 +444,8 @@ function MeasuresHeader({
       const loopEndX = beatToX(loopEndBeat);
       const loopWidth = loopEndX - loopStartX;
 
-      ctx.fillStyle = loopEnabled ? 'rgba(80, 120, 255, 0.5)' : 'rgba(150, 150, 150, 0.5)';
+      ctx.fillStyle = loopEnabled ? LOOP_REGION_ENABLED_BG_COLOR : LOOP_REGION_DISABLED_BG_COLOR;
       ctx.fillRect(loopStartX, 0, Math.max(0, loopWidth), TOP_SECTION_HEIGHT); // Ensure width isn't negative
-
-      const handleIndicatorWidth = 4;
-      ctx.fillStyle = loopEnabled ? 'rgba(50, 80, 200, 0.8)' : 'rgba(100, 100, 100, 0.8)';
-      ctx.fillRect(loopStartX - handleIndicatorWidth / 2, 0, handleIndicatorWidth, TOP_SECTION_HEIGHT);
-      ctx.fillRect(loopEndX - handleIndicatorWidth / 2, 0, handleIndicatorWidth, TOP_SECTION_HEIGHT);
     }
 
     // --- Draw Project Resize Handle (Top Half) ---
@@ -457,7 +473,7 @@ function MeasuresHeader({
     ctx.beginPath();
     ctx.moveTo(0, TOP_SECTION_HEIGHT + 0.5); // +0.5 for sharpness
     ctx.lineTo(logicalWidth, TOP_SECTION_HEIGHT + 0.5);
-    ctx.strokeStyle = '#aaa';
+    ctx.strokeStyle = borderColor; // Use computed border color
     ctx.lineWidth = 1;
     ctx.stroke();
 
@@ -485,8 +501,8 @@ function MeasuresHeader({
         beatStep = BEATS_PER_MEASURE * 4; // Show every 4 measures
     }
 
-    ctx.fillStyle = 'white';
-    ctx.font = 'bold 11px sans-serif'; // Slightly smaller font
+    ctx.fillStyle = LABEL_TEXT_COLOR;
+    ctx.font = 'bold 11px Inter, sans-serif'; // Use Inter font
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
 
@@ -501,9 +517,9 @@ function MeasuresHeader({
         let lineLength = 5; // Default shortest line (sub-beat)
         let lineWidth = 0.5;
         // Dimmer colors for lines beyond the song length
-        let baseStrokeStyle = isBeyondSong ? '#333' : '#444'; // Base style lighter for active area
-        let measureStrokeStyle = isBeyondSong ? '#555' : '#888';
-        let beatStrokeStyle = isBeyondSong ? '#444' : '#666';
+        let baseStrokeStyle = isBeyondSong ? gridColorDisabled : gridColor;
+        let measureStrokeStyle = isBeyondSong ? gridColorDisabled : gridColor; // Measures use same color
+        let beatStrokeStyle = isBeyondSong ? gridColorDisabled : gridColor; // Beats use same color
         let strokeStyle = baseStrokeStyle;
         let drawLabel = false;
 
@@ -561,7 +577,7 @@ function MeasuresHeader({
 
         if (drawLabel) {
             // Dimmer color for labels beyond the song length
-            ctx.fillStyle = isBeyondSong ? '#666' : 'white';
+            ctx.fillStyle = isBeyondSong ? LABEL_TEXT_DISABLED_COLOR : LABEL_TEXT_COLOR;
             let label = '';
             if (subdivisionLevel === 'sub_beat') {
                 const beatInMeasure = beat % BEATS_PER_MEASURE;
@@ -577,6 +593,38 @@ function MeasuresHeader({
         }
     }
 
+    // --- Draw Playhead Triangle (Bottom Half - ON TOP) ---
+    const playheadX = beatToX(currentBeat) + 0.5; // Add 0.5 for centering alignment with grid lines
+    if (playheadX >= 0 && playheadX <= logicalWidth) { // Only draw if within canvas bounds
+        const triangleBaseY = TOP_SECTION_HEIGHT + PLAYHEAD_VERTICAL_OFFSET; // Shift down
+        const triangleHeight = (HEADER_HEIGHT - TOP_SECTION_HEIGHT) * 0.8; // Make shorter
+        const triangleTipY = triangleBaseY + triangleHeight;
+        const triangleHalfWidth = PLAYHEAD_TRIANGLE_WIDTH / 2;
+        const radius = PLAYHEAD_CORNER_RADIUS;
+        const slopeFactor = radius * (triangleHalfWidth / triangleHeight); // Factor to keep rounding consistent on sloped sides
+
+        ctx.fillStyle = PLAYHEAD_COLOR;
+        ctx.beginPath();
+
+        // Start near top-left corner
+        ctx.moveTo(playheadX - triangleHalfWidth + radius, triangleBaseY);
+        // Line to near top-right corner
+        ctx.lineTo(playheadX + triangleHalfWidth - radius, triangleBaseY);
+        // Top-right curve
+        ctx.quadraticCurveTo(playheadX + triangleHalfWidth, triangleBaseY, playheadX + triangleHalfWidth, triangleBaseY + radius);
+        // Line to near bottom tip (right side)
+        ctx.lineTo(playheadX + radius, triangleTipY - slopeFactor); // Line end adjusted for curve start
+        // Bottom tip curve - Adjusted control point for a rounder bottom
+        ctx.quadraticCurveTo(playheadX, triangleTipY + radius, playheadX - radius, triangleTipY - slopeFactor); // Pull control point down slightly
+        // Line to near top-left corner (left side)
+        ctx.lineTo(playheadX - triangleHalfWidth, triangleBaseY + radius);
+        // Top-left curve
+        ctx.quadraticCurveTo(playheadX - triangleHalfWidth, triangleBaseY, playheadX - triangleHalfWidth + radius, triangleBaseY);
+
+        ctx.closePath();
+        ctx.fill();
+    }
+
   }, [
       // Include new props in dependencies
       numMeasures,
@@ -588,45 +636,34 @@ function MeasuresHeader({
       beatToX,
       effectivePixelsPerBeat,
       actualSongBeats, // Derived from numMeasures
-      totalRenderBeats // Derived from renderMeasures
+      totalRenderBeats, // Derived from renderMeasures
+      currentBeat // Add currentBeat dependency
   ]);
 
   // --- Component Render ---
   return (
     <div
       ref={containerRef}
-      className="measures-header"
+      className={styles.measuresHeaderContainer} // Apply class from module
       style={{
-        display: 'flex',
         height: `${HEADER_HEIGHT}px`,
-        borderBottom: '1px solid #ccc',
-        backgroundColor: 'black',
-        position: 'relative', // Needed for absolute canvas positioning
-        overflow: 'hidden', // Hide canvas overflow
-        width: `${effectivePixelsPerBeat * totalRenderBeats}px` // Use render beats for width
+        width: `${effectivePixelsPerBeat * totalRenderBeats}px`
       }}
     >
       <canvas
         ref={canvasRef}
+        className={styles.measuresCanvas} // Apply class from module
         style={{
-            position: 'absolute', // Style width/height set in useEffect for DPR
-            top: 0,
-            left: 0,
         }}
       />
       <div
         ref={overlayRef}
+        className={styles.measuresOverlay} // Apply class from module
         onMouseDown={handleMouseDown}
         onMouseMove={handleOverlayMouseMove} // Add mouse move for cursor updates
         onMouseLeave={() => {if (!isResizingProject && !loopDragState.type && !isSeeking) setCursorStyle('pointer')}} // Reset cursor only if not dragging
         style={{
-          position: 'absolute', // Overlay covers canvas
-          width: '100%',
-          height: '100%',
-          top: 0,
-          left: 0,
-          zIndex: 1,
-          cursor: cursorStyle // Use dynamic cursor state
+          cursor: cursorStyle
         }}
       />
     </div>

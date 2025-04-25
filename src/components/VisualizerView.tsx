@@ -4,11 +4,14 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { Button } from './ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Maximize2 } from 'lucide-react';
 import useStore from '../store/store';
 import VisualizerManager, { VisualObject3D } from '../lib/VisualizerManager';
 
 // Scene component that handles animation and object rendering
-function Scene({ visualizerManager, currentBeat }: { visualizerManager: VisualizerManager, currentBeat: number }) {
+function Scene({ visualizerManager }: { visualizerManager: VisualizerManager }) {
   const [objects, setObjects] = useState<VisualObject3D[]>([]);
   
   // Update objects on each frame
@@ -64,7 +67,7 @@ function VisualObject({ object }: { object: VisualObject3D }) {
 
 // Main VisualizerView component
 function VisualizerView() {
-  const { timeManager, currentBeat, tracks, setSelectedWindow } = useStore();
+  const { timeManager, tracks, currentBeat } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -78,7 +81,7 @@ function VisualizerView() {
       if (containerRef.current) {
         setDimensions({
           width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight - 40 // Account for header
+          height: containerRef.current.offsetHeight
         });
       }
     };
@@ -118,28 +121,17 @@ function VisualizerView() {
       }
     }
   };
-
-  const handleVisualizerClick = () => {
-    setSelectedWindow(null);
-  };
   
   return (
     <div 
       className="visualizer-view" 
       ref={containerRef} 
-      onClick={handleVisualizerClick} 
       style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', flexShrink: 0 }}>
-        <h2 style={{ margin: 0 }}>Visualizer View (Beat: {currentBeat.toFixed(2)})</h2>
-        <button onClick={toggleFullscreen} style={{ padding: '5px 10px' }}>
-          {isFullscreen ? 'Exit Fullscreen' : 'Expand'}
-        </button>
-      </div>
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {dimensions.width > 0 && dimensions.height > 0 && (
           <Canvas style={{ background: '#000' }} camera={{ position: [0, 0, 15] }}>
-            <Scene visualizerManager={visualizerManager} currentBeat={currentBeat} />
+            <Scene visualizerManager={visualizerManager} />
             <EffectComposer>
               <Bloom 
                 intensity={1.0}
@@ -150,6 +142,38 @@ function VisualizerView() {
             </EffectComposer>
           </Canvas>
         )}
+        {/* Beat indicator overlay - styled like page.tsx */}
+        <div
+          className="absolute top-3 left-3 px-3 py-1 rounded-md border text-xs text-gray-300"
+          style={{
+            backgroundColor: "rgba(40, 40, 40, 0.7)",
+            borderColor: "rgba(80, 80, 80, 0.5)",
+          }}
+        >
+          Beat: {currentBeat.toFixed(2)}
+        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleFullscreen}
+                className="absolute top-3 right-3 rounded-md transition-all border hover:bg-[#444]"
+                style={{
+                  backgroundColor: "rgba(40, 40, 40, 0.7)",
+                  borderColor: "rgba(80, 80, 80, 0.5)",
+                  color: "rgba(255, 255, 255, 0.7)",
+                }}
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{isFullscreen ? 'Exit Fullscreen' : 'Expand Visualizer'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );

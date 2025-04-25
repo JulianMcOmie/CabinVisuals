@@ -21,6 +21,7 @@ import GlowSynth from '../lib/synthesizers/GlowSynth';
 import OscillatingGlowRowSynth from '../lib/synthesizers/OscillatingGlowRowSynth';
 import OscillatingCubeRowSynth from '../lib/synthesizers/OscillatingCubeRowSynth';
 import FireworkSynth from '../lib/synthesizers/FireworkSynth';
+import GlowingCubeSynth from '../lib/synthesizers/glowingCubeSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -56,6 +57,7 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'GlowSynth', name: 'Glow Synth', constructor: GlowSynth },
     { id: 'OscillatingGlowRowSynth', name: 'Oscillating Glow Row', constructor: OscillatingGlowRowSynth },
     { id: 'OscillatingCubeRowSynth', name: 'Oscillating Cube Row', constructor: OscillatingCubeRowSynth },
+    { id: 'GlowingCubeSynth', name: 'Glowing Cube', constructor: GlowingCubeSynth },
   ],
   Percussive: [
     { id: 'KickDrumSynth', name: 'Kick Drum', constructor: KickDrumSynth },

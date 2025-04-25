@@ -1,28 +1,48 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Panel,
   PanelGroup,
   PanelResizeHandle,
+  ImperativePanelHandle
 } from 'react-resizable-panels';
-import TimelineView from '../../src/components/TimelineView'; // Adjusted import path
+import TimelineView from '../../src/components/TimelineView/TimelineView'; // Adjusted import path
 import VisualizerView from '../../src/components/VisualizerView'; // Adjusted import path
-import PlaybarView from '../../src/components/PlaybarView'; // Adjusted import path
-import DetailView from '../../src/components/DetailView'; // Adjusted import path
-import AudioLoader from '../../src/components/AudioLoader'; // Adjusted import path
+import PlaybarView from '../../src/components/PlaybarView/PlaybarView'; // Adjusted import path
+import DetailView from '../../src/components/DetailView/DetailView'; // Import from folder
+import AudioLoader from '../../src/components/AudioLoader/AudioLoader'; // Adjusted import path
 import InstrumentSidebar from '../../src/components/InstrumentSidebar/InstrumentSidebar'; // Adjusted import path
 import useStore from '../../src/store/store'; // Adjusted import path
 import { loadAudioFile } from '../../src/lib/idbHelper'; // Adjusted import path
 import { initializeStore } from '../../src/store/store'; // Import the store initializer
+import styles from './alpha.module.css';
+
+// Interface for the panel ref 
+interface PanelRef {
+  collapse: () => void;
+  expand: () => void;
+}
 
 // Renamed component to reflect the route
 export default function AlphaPage() { 
   const [isLoading, setIsLoading] = useState(true); // Add loading state
+  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
 
   // Fetch necessary state and actions from store
   const isInstrumentSidebarVisible = useStore((state) => state.isInstrumentSidebarVisible);
   const loadAudioAction = useStore((state) => state.loadAudio);
+
+  // Effect to collapse/expand sidebar based on visibility state
+  useEffect(() => {
+    if (sidebarPanelRef.current) {
+      if (isInstrumentSidebarVisible) {
+        sidebarPanelRef.current.expand();
+      } else {
+        sidebarPanelRef.current.collapse();
+      }
+    }
+  }, [isInstrumentSidebarVisible]);
 
   // Initialization Effect
   useEffect(() => {
@@ -39,8 +59,10 @@ export default function AlphaPage() {
         if (persistedFile) {
           console.log('Found persisted audio file, attempting to load...');
           const arrayBuffer = await persistedFile.arrayBuffer();
+          // Get the filename if available (only File objects have name, not Blob)
+          const fileName = persistedFile instanceof File ? persistedFile.name : 'persisted-audio';
           // Use the action fetched via useStore
-          await loadAudioAction(arrayBuffer);
+          await loadAudioAction(arrayBuffer, fileName);
           console.log('Successfully loaded persisted audio file into store.');
         } else {
           console.log('No persisted audio file found.');
@@ -58,153 +80,70 @@ export default function AlphaPage() {
 
   // Loading State Render
   if (isLoading) {
-      // TODO: Implement a more sophisticated loading screen
-      return <div style={{ padding: '20px', textAlign: 'center', fontSize: '1.2em' }}>Loading Project...</div>;
+      // New loading indicator based on user request
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-black gap-4">
+          {/* Simple spinner */}
+          <div className="w-8 h-8 border-2 border-slate-700 border-t-[#00a8ff] rounded-full animate-spin"></div>
+          {/* Minimal text */}
+          <p className="text-slate-500 text-sm font-light">loading project...</p>
+        </div>
+      )
   }
 
   // Main Content Render (only when not loading)
   return (
-    <main className="main-container">
-      <div className="playbar-container">
+    <main className={styles.mainContainer}>
+      <div className={styles.playbarContainer}>
         <PlaybarView />
       </div>
       
-      <PanelGroup direction="horizontal" className="content-panel-group">
-        {isInstrumentSidebarVisible && (
-          <>
-            <Panel defaultSize={20} minSize={10} maxSize={40} collapsible={true} collapsedSize={0} id="sidebar-panel">
-              <div className="sidebar-area">
-                <InstrumentSidebar />
-              </div>
-            </Panel>
-            <PanelResizeHandle className="resize-handle horizontal-handle" />
-          </>
-        )}
+      <PanelGroup direction="horizontal" className={styles.contentPanelGroup}>
+        <Panel 
+          ref={sidebarPanelRef}
+          defaultSize={20} 
+          minSize={10} 
+          maxSize={40} 
+          collapsible={true} 
+          collapsedSize={0} 
+          id="sidebar-panel"
+        >
+          <div className={styles.sidebarArea}>
+            <InstrumentSidebar />
+          </div>
+        </Panel>
+        <PanelResizeHandle className={`${styles.resizeHandle} ${styles.horizontalHandle}`} />
         <Panel id="main-content-panel">
-          <PanelGroup direction="vertical" className="main-content-panel-group">
+          <PanelGroup direction="vertical" className={styles.mainContentPanelGroup}>
             <Panel defaultSize={50} minSize={20} id="top-panel">
-              <PanelGroup direction="horizontal" className="top-panel-group">
+              <PanelGroup direction="horizontal" className={styles.topPanelGroup}>
                 <Panel defaultSize={50} minSize={20} id="detail-panel">
-                  <div className="detail-container">
+                  <div className={styles.detailContainer}>
                     <DetailView />
                   </div>
                 </Panel>
-                <PanelResizeHandle className="resize-handle horizontal-handle" />
+                <PanelResizeHandle className={`${styles.resizeHandle} ${styles.horizontalHandle}`} />
                 <Panel minSize={20} id="visualizer-panel">
-                  <div className="visualizer-container">
+                  <div className={styles.visualizerContainer}>
                     <VisualizerView />
                   </div>
                 </Panel>
               </PanelGroup>
             </Panel>
-            <PanelResizeHandle className="resize-handle vertical-handle" />
+            <PanelResizeHandle className={`${styles.resizeHandle} ${styles.verticalHandle}`} />
             <Panel minSize={20} id="timeline-panel">
-              <div className="bottom-section">
-                <TimelineView />
+              <div className={styles.bottomSection}>
+                <div className={styles.timelineViewWrapper}>
+                  <TimelineView />
+                </div>
+                <div className={styles.audioLoaderWrapper}>
+                  <AudioLoader />
+                </div>
               </div>
             </Panel>
           </PanelGroup>
         </Panel>
       </PanelGroup>
-
-      <div className="audio-loader-container">
-        <AudioLoader />
-      </div>
-      
-      <style jsx>{`
-        /* Container styles */
-        .main-container {
-          display: flex;
-          flex-direction: column;
-          height: 100vh;
-          width: 100vw;
-          position: fixed;
-          overflow: hidden;
-          padding-bottom: 50px; /* Add padding for the audio loader */
-          box-sizing: border-box; /* Ensure padding is included in height */
-        }
-        
-        .playbar-container {
-          height: 80px; /* Fixed height */
-          width: 100%;
-          border-bottom: 1px solid #ccc;
-          flex-shrink: 0; /* Prevent shrinking */
-          display: flex;
-          align-items: center;
-          padding: 0 10px;
-          box-sizing: border-box;
-        }
-
-        /* Panel Group Styles */
-        .content-panel-group,
-        .main-content-panel-group,
-        .top-panel-group {
-          height: 100%; /* Ensure groups fill their parent */
-          width: 100%;
-        }
-        .content-panel-group {
-           flex: 1; /* Allow this group to take remaining height */
-           overflow: hidden; /* Prevent content overflow issues */
-        }
-
-        /* Area Styles (make them fill their panels) */
-        .sidebar-area,
-        .detail-container,
-        .visualizer-container,
-        .bottom-section {
-          height: 100%;
-          width: 100%;
-          overflow: hidden; /* Contain content */
-          display: flex; /* Ensure children can fill */
-          flex-direction: column; /* Or row, depending on content */
-        }
-        
-        /* Remove conflicting styles previously used for layout */
-        /* .content-container { ... } */
-        /* .sidebar-area { width: 250px; flex: 0 0 250px; ... } */
-        /* .main-content-area { ... } */
-        /* .top-section { ... } */
-        /* .detail-container { border-right: 1px solid #ccc; flex: 1 1 50%; ... } */
-        /* .visualizer-container { flex: 1 1 50%; ... } */
-        /* .bottom-section { border-top: 1px solid #ccc; flex: 1 1 50%; ... } */
-
-        /* Resize Handle Styles */
-        .resize-handle {
-          background-color: #e0e0e0; /* Light gray */
-          border: 1px solid #ccc;
-          box-sizing: border-box;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .resize-handle:hover {
-          background-color: #d0d0d0; /* Darker gray on hover */
-        }
-        .resize-handle.horizontal-handle {
-          width: 5px;
-          cursor: col-resize;
-        }
-        .resize-handle.vertical-handle {
-          height: 5px;
-          cursor: row-resize;
-        }
-        
-        .audio-loader-container {
-          position: fixed; /* Keep it fixed */
-          bottom: 0;
-          left: 0;
-          width: 100%;
-          height: 50px; /* Fixed height */
-          background-color: #f0f0f0;
-          border-top: 1px solid #ccc;
-          z-index: 10;
-          display: flex;
-          align-items: center;
-          padding: 0 10px;
-          box-sizing: border-box;
-          flex-shrink: 0; /* Prevent shrinking */
-        }
-      `}</style>
     </main>
   );
 } 

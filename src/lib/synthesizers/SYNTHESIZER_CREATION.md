@@ -81,6 +81,8 @@ This guide outlines the steps to create a new visual synthesizer for the applica
     *   Mapper functions receive a `MappingContext` (import from `../VisualObjectEngine`) and return the calculated value for the property. They run with the `Synthesizer` instance as `this`.
     *   Access utility functions via `MappingUtils` (import from `../VisualObjectEngine`).
 
+    * ALWAYS USE VisualObjectEngine to implement getObjectsAtTime, NEVER try to do it yourself*
+
     ```typescript
     // Inside initializeEngine method:
     this.engine.defineObject('sphere')

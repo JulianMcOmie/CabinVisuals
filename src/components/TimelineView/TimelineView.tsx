@@ -4,9 +4,10 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import useStore from '../../store/store';
 import InstrumentsView from './InstrumentsView/InstrumentsView';
 import TrackTimelineView, { TrackTimelineViewHandle } from './TrackTimelineView';
-import MeasuresHeader from './MeasuresHeader';
+import MeasuresHeader from './MeasuresHeader/MeasuresHeader';
 import BasicSynthesizer from '../../lib/synthesizers/BasicSynthesizer';
 import { Track } from '../../lib/types';
+import styles from './TimelineView.module.css'; // Import the CSS module
 
 // Fixed height for each track
 const TRACK_HEIGHT_BASE = 50; // Renamed base height
@@ -15,10 +16,7 @@ const SIDEBAR_WIDTH = 200; // Define sidebar width as a constant
 const MIN_VIEWPORT_MEASURES = 8; // Minimum measures to allow zooming out to see
 const EXTRA_RENDER_MEASURES = 8; // Render this many extra measures beyond content or min viewport
 const HEADER_HEIGHT = 40; // Define header height as a constant
-
-// Color constants
-const SIDEBAR_BG_COLOR = '#1a1a1a';
-const HEADER_BG_COLOR = 'black';
+const PLAYHEAD_WIDTH = 2; // Width of the playhead line in pixels (must match CSS)
 
 function TimelineView() {
   const { 
@@ -68,7 +66,7 @@ function TimelineView() {
   
   // Calculate playhead position based on beat, zoom AND scroll
   const basePlayheadOffset = currentBeat * effectivePixelsPerBeat; // Use effective value
-  const playheadLeftStyle = SIDEBAR_WIDTH + basePlayheadOffset - scrollLeft;
+  const playheadLeftStyle = SIDEBAR_WIDTH + basePlayheadOffset - scrollLeft - (PLAYHEAD_WIDTH / 2); // Center the line
 
   // Mouse move handler for dragging - needs to account for scroll and zoom
   const handleMouseMove = useCallback((event: MouseEvent) => {
@@ -305,201 +303,132 @@ function TimelineView() {
     if (playheadRef.current && playheadRef.current.contains(e.target as Node)) {
         return;
     }
+    // When clicking outside the timeline content (e.g., on padding), set the selected window
+    if (timelineContentRef.current && !timelineContentRef.current.contains(e.target as Node) && !instrumentsColumnRef.current?.contains(e.target as Node)) {
+      setSelectedWindow('timelineView');
+    }
   };
 
   return (
-    <div 
-      className="timeline-view" 
+    <div
+      className={`${styles.timelineView} ${selectedWindow === 'timelineView' ? styles.timelineViewSelected : ''}`}
       onClick={handleTimelineClick}
-      style={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        boxSizing: 'border-box',
-        border: selectedWindow === 'timelineView' 
-          ? '2px solid rgba(255, 255, 255, 0.3)'
-          : '2px solid transparent'
-      }}
     >
-      {/* Timeline container */}
-      <div className="timeline-container" style={{ 
-        display: 'flex', 
-        flex: 1, 
-        overflow: 'hidden',
-        position: 'relative' // Added for absolute positioning of playhead
-      }}>
-        {/* Tracks header - fixed at top-left */}
-        <div style={{
-          position: 'absolute',
-          width: '200px',
-          height: '40px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 10px',
-          fontWeight: 'bold',
-          borderBottom: '1px solid #333',
-          borderRight: '1px solid #333',
-          backgroundColor: SIDEBAR_BG_COLOR,
-          zIndex: 3,
-          color: 'white',
-          boxSizing: 'border-box'
-        }}>
-          <span>Tracks</span>
-          <button 
-            onClick={(e) => { e.stopPropagation(); handleAddTrack(); }}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '20px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              color: 'white'
-            }}
-            title="Add new track"
-          >
-            +
-          </button>
-        </div>
+      {/* Conditionally render the overlay outline */}
+      {selectedWindow === 'timelineView' && (
+        <div className={styles.selectionOutline} />
+      )}
 
-        {/* Single TrackTimelineView for all tracks */}
-        <div 
-              className="timelines-column"
-              style={{
-                flex: 1,
-                position: 'absolute',
-                left: `${SIDEBAR_WIDTH}px`,
-                top: '40px',
-                height: '100%'
-              }}
+      {/* Original Content Wrapper */}
+      <div className={styles.timelineContentWrapper}>
+        {/* Timeline container */}
+        <div className={styles.timelineContainer}>
+          {/* Tracks header - fixed at top-left */}
+          <div className={styles.tracksHeader}>
+            <span>Tracks</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleAddTrack(); }}
+              className={styles.addTrackButton}
+              title="Add new track"
             >
-              <TrackTimelineView
-                ref={trackTimelineViewRef}
-                tracks={tracks}
+              +
+            </button>
+          </div>
+
+          {/* Single TrackTimelineView for all tracks */}
+          <div
+                className={styles.timelinesColumn}
+                style={{
+                  left: `${SIDEBAR_WIDTH}px`,
+                }}
+              >
+                <TrackTimelineView
+                  ref={trackTimelineViewRef}
+                  tracks={tracks}
+                  horizontalZoom={horizontalZoom}
+                  verticalZoom={verticalZoom}
+                  pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
+                  trackHeightBase={TRACK_HEIGHT_BASE}
+                  numMeasures={numMeasures}
+                  renderMeasures={renderMeasures}
+                  scrollLeft={scrollLeft}
+                  timelineVisibleWidth={timelineVisibleWidth > 0 ? timelineVisibleWidth : 0}
+                  scrollTop={scrollTop}
+                  timelineVisibleHeight={timelineVisibleHeight > 0 ? timelineVisibleHeight : 0}
+                />
+              </div>
+          
+          {/* Main scrollable area */}
+          <div
+            ref={timelineContentRef}
+            className={styles.timelineContent}
+            onScroll={handleScroll}
+            onMouseDown={handleContentMouseDown}
+            onMouseMove={handleContentMouseMove}
+            onDoubleClick={handleContentDoubleClick}
+            onContextMenu={handleContentContextMenu}
+            onMouseLeave={handleContentMouseLeave}
+          >
+            {/* Fixed sidebar background that extends full height */}
+            <div className={styles.sidebarBackground} />
+            
+            {/* Measures header - sticky at top */}
+            <div className={styles.measuresHeaderContainer}>
+              <MeasuresHeader
                 horizontalZoom={horizontalZoom}
-                verticalZoom={verticalZoom}
                 pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
-                trackHeightBase={TRACK_HEIGHT_BASE}
                 numMeasures={numMeasures}
                 renderMeasures={renderMeasures}
-                scrollLeft={scrollLeft}
-                timelineVisibleWidth={timelineVisibleWidth > 0 ? timelineVisibleWidth : 0}
-                scrollTop={scrollTop}
-                timelineVisibleHeight={timelineVisibleHeight > 0 ? timelineVisibleHeight : 0}
               />
             </div>
-        
-        {/* Main scrollable area */}
-        <div 
-          ref={timelineContentRef}
-          className="timeline-content" 
-          onScroll={handleScroll}
-          onMouseDown={handleContentMouseDown}
-          onMouseMove={handleContentMouseMove}
-          onDoubleClick={handleContentDoubleClick}
-          onContextMenu={handleContentContextMenu}
-          onMouseLeave={handleContentMouseLeave}
-          style={{ 
-            flex: 1, 
-            overflowY: 'auto',
-            overflowX: 'auto',
-            position: 'relative',
-            backgroundColor: 'transparent'
-          }}
-        >
-          {/* Fixed sidebar background that extends full height */}
-          <div style={{
-            position: 'absolute',
-            left: 0,
-            top: '40px',
-            bottom: 0,
-            width: '200px',
-            backgroundColor: SIDEBAR_BG_COLOR,
-            borderRight: '1px solid #333',
-            zIndex: 0
-          }} />
-          
-          {/* Measures header - sticky at top */}
-          <div style={{
-            position: 'sticky',
-            top: 0,
-            paddingLeft: '200px',
-            zIndex: 2,
-            backgroundColor: HEADER_BG_COLOR
-          }}>
-            <MeasuresHeader
-              horizontalZoom={horizontalZoom}
-              pixelsPerBeatBase={PIXELS_PER_BEAT_BASE}
-              numMeasures={numMeasures}
-              renderMeasures={renderMeasures}
-            />
-          </div>
-          
-          {/* Combined content area for instruments and timelines */}
-          <div style={{
-            width: `${(renderMeasures * 4 * effectivePixelsPerBeat)}px`,
-            minHeight: '100%',
-            position: 'relative',
-            display: 'flex',
-            height: `${totalTracksHeight}px`
-          }}>
-            {/* Instrument Views Column - sticky */}
+            
+            {/* Combined content area for instruments and timelines */}
             <div
-              ref={instrumentsColumnRef}
-              className="instruments-column"
+              className={styles.combinedContentArea}
               style={{
-                position: 'sticky',
-                left: 0,
-                width: `${SIDEBAR_WIDTH}px`,
-                zIndex: 1,
-                backgroundColor: SIDEBAR_BG_COLOR,
-                borderRight: '1px solid #333',
-                height: '100%'
+                width: `${(renderMeasures * 4 * effectivePixelsPerBeat)}px`,
+                height: `${totalTracksHeight}px`,
               }}
             >
-              {/* Map over tracks to render InstrumentView */}
-              <InstrumentsView 
-                tracks={tracks}
-                effectiveTrackHeight={effectiveTrackHeight}
-              />
+              {/* Instrument Views Column - sticky */}
+              <div
+                ref={instrumentsColumnRef}
+                className={styles.instrumentsColumn}
+              >
+                {/* Map over tracks to render InstrumentView */}
+                <InstrumentsView 
+                  tracks={tracks}
+                  effectiveTrackHeight={effectiveTrackHeight}
+                />
+              </div>
             </div>
+            
+            {/* Message when no tracks exist */}
+            {tracks.length === 0 && (
+              <div
+                className={styles.noTracksMessage}
+                style={{
+                  left: `${SIDEBAR_WIDTH + 20}px`,
+                }}
+              >
+                Click the + button to add a track
+              </div>
+            )}
           </div>
+
           
-          {/* Message when no tracks exist */}
-          {tracks.length === 0 && (
-            <div style={{ 
-              position: 'absolute', 
-              top: '60px',
-              left: `${SIDEBAR_WIDTH + 20}px`,
-              color: 'white', 
-              fontStyle: 'italic' 
-            }}>
-              Click the + button to add a track
-            </div>
-          )}
+
+          {/* Playhead */} 
+          <div
+            ref={playheadRef}
+            className={styles.playhead}
+            onMouseDown={handlePlayheadMouseDown}
+            style={{
+              left: `${playheadLeftStyle}px`,
+            }}
+          />
         </div>
-
-        
-
-        {/* Playhead */} 
-        <div 
-          ref={playheadRef}
-          className="playhead"
-          onMouseDown={handlePlayheadMouseDown}
-          style={{
-            position: 'absolute',
-            top: '40px',
-            left: `${playheadLeftStyle}px`,
-            width: '3px',
-            height: 'calc(100% - 40px)',
-            backgroundColor: 'red',
-            zIndex: 10,
-            cursor: 'ew-resize',
-            pointerEvents: 'auto'
-          }}
-        />
       </div>
-    
     </div>
   );
 }

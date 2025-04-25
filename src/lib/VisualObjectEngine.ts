@@ -23,6 +23,14 @@ interface InstanceData {
   [key: string]: any;
 }
 
+// --- NEW: Approach Envelope Config ---
+interface ApproachEnvelopeConfig {
+    lookaheadTime: number; // Seconds before note start to begin appearing
+    // We don't need approachSpeed here, it will be handled by the mapper using timeUntilNoteStart
+}
+type ApproachEnvelopeConfigFn = (noteCtx: NoteContext) => ApproachEnvelopeConfig;
+// --- END NEW ---
+
 // Define the physics envelope configuration
 interface PhysicsEnvelopeConfig {
   tension?: number; // Spring stiffness
@@ -37,8 +45,8 @@ interface MappingContext {
   time: number; // Current global time (beats)
   bpm: number;
   noteAbsoluteStartBeat: number; // Absolute start beat of the triggering note
-  timeSinceNoteStart: number; // Seconds
-  noteProgressPercent: number; // 0-1
+  timeSinceNoteStart: number; // Seconds (>= 0 during note, < 0 during approach)
+  noteProgressPercent: number; // 0-1 (only valid >= 0)
   noteDurationSeconds: number;
   level: number; // Nesting depth (1 = initial)
   instanceData: InstanceData; // Data from .forEachInstance generator
@@ -47,6 +55,7 @@ interface MappingContext {
   adsrPhase?: 'attack' | 'decay' | 'sustain' | 'release' | 'idle'; // Current ADSR phase
   physicsValue?: number; // Current value from physics envelope
   calculatedProperties?: VisualObjectProperties; // Read-only view of properties calculated so far
+  timeUntilNoteStart?: number; // --- NEW: Seconds until the note starts (only present during approach phase) ---
   // synthesizer: Synthesizer; // Direct access might be complex due to `this` binding
 }
 
@@ -99,6 +108,7 @@ interface DefinitionLevel {
     opacityMapper?: MapperFn<number>;
     adsrConfig?: ADSRConfig | ADSRConfigFn; // ADSR for this level
     physicsEnvelopeConfig?: PhysicsEnvelopeConfig | PhysicsEnvelopeConfigFn; // Physics envelope for this level
+    approachEnvelopeConfig?: ApproachEnvelopeConfig | ApproachEnvelopeConfigFn; // --- NEW: Approach envelope for this level ---
 }
 
 
@@ -110,6 +120,10 @@ class ObjectDefinition {
     initialType: string;
     conditionFn: ConditionFn = () => true; // Default: always execute
     levels: DefinitionLevel[] = []; // Stores config for each nesting level
+    // --- NEW: Add top-level approach config storage ---
+    // This applies *before* the first level processing starts
+    approachEnvelopeConfig?: ApproachEnvelopeConfig | ApproachEnvelopeConfigFn; 
+    // --- END NEW ---
 
     constructor(engine: VisualObjectEngine, synthesizer: Synthesizer, initialType: string) {
         this.engine = engine;
@@ -129,6 +143,16 @@ class ObjectDefinition {
 
     when(conditionFn: ConditionFn): this {
         this.conditionFn = conditionFn;
+        return this;
+    }
+
+    applyApproachEnvelope(config: ApproachEnvelopeConfig | ApproachEnvelopeConfigFn): this {
+        // Store it at the top level of the definition
+        this.approachEnvelopeConfig = config; 
+        // We could potentially also store it on the *current level* like other modifiers,
+        // but applying it globally to the trigger seems more intuitive for this feature.
+        // If level-specific approach timing is needed later, this could be revisited.
+        // this.getCurrentLevelConfig().approachEnvelopeConfig = config;
         return this;
     }
 
@@ -242,8 +266,8 @@ class VisualObjectEngine {
     getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
         const allVisualObjects: VisualObject[] = [];
         const secondsPerBeat = 60 / bpm;
+        const currentTimeSec = time * secondsPerBeat;
 
-        // Default values for physics parameters
         const DEFAULT_TENSION = 100;
         const DEFAULT_FRICTION = 10;
         const DEFAULT_INITIAL_VELOCITY = 1;
@@ -256,209 +280,219 @@ class VisualObjectEngine {
                     const noteAbsoluteStartBeat = blockAbsoluteStartBeat + note.startBeat;
                     const noteAbsoluteEndBeat = noteAbsoluteStartBeat + note.duration;
                     const noteDurationSeconds = note.duration * secondsPerBeat;
+                    const noteStartSec = noteAbsoluteStartBeat * secondsPerBeat;
+                    const noteEndSec = noteAbsoluteEndBeat * secondsPerBeat;
 
                     const noteCtx: NoteContext = { note };
 
-                    // Check if the note triggers this definition chain (using synthesizer context via closure)
+                    // --- MODIFIED: Check condition and approach/active state ---
                     if (definition.conditionFn.call(this.synthesizer, noteCtx)) {
 
-                        // Recursive function to process levels
-                        const processLevel = (
-                            levelConfig: DefinitionLevel,
-                            parentContext?: MappingContext,
-                            parentInstanceData?: InstanceData // Data from parent's generator for this specific instance
-                        ): void => {
-                            const instancesData: InstanceData[] = [];
+                        let isDuringApproach = false;
+                        let timeUntilNoteStart: number | undefined = undefined;
+                        let currentApproachConfig: ApproachEnvelopeConfig | undefined = undefined;
 
-                            if (levelConfig.level === 1) {
-                                // Level 1 instances: Assume a single instance unless a generator is explicitly added *before* any modifiers for level 1 (not standard use)
-                                // We pass a default object to represent the single implicit instance.
-                                instancesData.push(parentInstanceData ?? {}); // Use passed data if available (e.g. future root generator)
-                            } else if (levelConfig.generatorFn && parentContext) {
-                                // Levels > 1: Generate instance data based on parent
-                                const generatedData = levelConfig.generatorFn.call(this.synthesizer, parentContext);
-                                instancesData.push(...generatedData);
-                            } else if (!parentContext && levelConfig.level > 1) {
-                                console.warn("Generator function called without parent context for level > 1");
-                                return; // Cannot generate instances without parent context
-                            } else {
-                                 // Level > 1 but no generator? This implies the chain ended or was misconfigured.
-                                 return;
+                        // Check for Approach Envelope first
+                        if (definition.approachEnvelopeConfig) {
+                            currentApproachConfig = typeof definition.approachEnvelopeConfig === 'function'
+                                ? definition.approachEnvelopeConfig.call(this.synthesizer, noteCtx)
+                                : definition.approachEnvelopeConfig;
+                            
+                            const lookaheadTime = currentApproachConfig.lookaheadTime ?? 0;
+                            const approachStartSec = noteStartSec - lookaheadTime;
+
+                            if (lookaheadTime > 0 && currentTimeSec >= approachStartSec && currentTimeSec < noteStartSec) {
+                                isDuringApproach = true;
+                                timeUntilNoteStart = noteStartSec - currentTimeSec;
                             }
-
-
-                            instancesData.forEach(instanceData => {
-                                const timeSinceNoteStart = Math.max(0, (time - noteAbsoluteStartBeat) * secondsPerBeat);
-                                const noteProgressPercent = noteDurationSeconds > 0 ? Math.min(1, Math.max(0, timeSinceNoteStart / noteDurationSeconds)) : 1;
-
-                                // --- ADSR Calculation for this Level ---
-                                let adsrAmplitude: number | undefined = undefined;
-                                let adsrPhase: 'attack' | 'decay' | 'sustain' | 'release' | 'idle' | undefined = undefined;
-                                let currentAdsrConfig: ADSRConfig | undefined = undefined;
-
-                                if (levelConfig.adsrConfig) {
-                                    currentAdsrConfig = typeof levelConfig.adsrConfig === 'function'
-                                        ? levelConfig.adsrConfig.call(this.synthesizer, noteCtx)
-                                        : levelConfig.adsrConfig;
-
-                                    // Calculate ADSR based on the *note's* timing relative to current time
-                                    const adsrResult = this.calculateADSR(time, noteAbsoluteStartBeat, noteAbsoluteEndBeat, bpm, currentAdsrConfig);
-                                    adsrAmplitude = adsrResult.amplitude;
-                                    adsrPhase = adsrResult.phase;
-
-                                    // Optimization: If amplitude is zero (and not in release needing processing), could skip, but physics might still run
-                                    // Consider skipping only if *both* ADSR is idle AND physics is inactive/settled
-                                }
-
-                                // --- Physics Envelope Calculation (Cumulative) ---
-                                let cumulativePhysicsValue: number = 0; // Initialize to 0 upfront
-
-                                if (levelConfig.physicsEnvelopeConfig) {
-                                    const physicsConfigProvider = levelConfig.physicsEnvelopeConfig;
-
-                                    // Iterate through ALL blocks and notes to find contributing past notes
-                                    midiBlocks.forEach(block => {
-                                        const blockAbsoluteStartBeat = block.startBeat;
-
-                                        block.notes.forEach(contributingNote => {
-                                            const contributingNoteCtx: NoteContext = { note: contributingNote };
-
-                                            // Check if this past/present note *would have triggered* the base definition
-                                            if (definition.conditionFn.call(this.synthesizer, contributingNoteCtx)) {
-                                                const contributingNoteAbsoluteStartBeat = blockAbsoluteStartBeat + contributingNote.startBeat;
-
-                                                // Only consider notes that started at or before the current time
-                                                if (contributingNoteAbsoluteStartBeat <= time) {
-                                                    const timeSinceContributingNoteStart = Math.max(0, (time - contributingNoteAbsoluteStartBeat) * secondsPerBeat);
-
-                                                    // Get physics parameters for THIS level, potentially evaluated using the contributing note's context
-                                                    const currentPhysicsConfig = typeof physicsConfigProvider === 'function'
-                                                        ? physicsConfigProvider.call(this.synthesizer, contributingNoteCtx)
-                                                        : physicsConfigProvider;
-
-                                                    const tension = currentPhysicsConfig?.tension ?? DEFAULT_TENSION;
-                                                    const friction = currentPhysicsConfig?.friction ?? DEFAULT_FRICTION;
-                                                    let initialVelocity = currentPhysicsConfig?.initialVelocity ?? DEFAULT_INITIAL_VELOCITY;
-
-                                                    // --- Example: Scale initial velocity by contributing note's velocity --- 
-                                                    const scaleVelocity = true; // Replace with property lookup if needed
-                                                    if (scaleVelocity && contributingNote.velocity !== undefined) { 
-                                                       initialVelocity *= MappingUtils.mapValue(contributingNote.velocity, 0, 127, 0.2, 1.8); 
-                                                    }
-                                                    // ---------------------------------------------------------------------
-
-                                                    // Skip calculation if time is zero and velocity is zero (no contribution)
-                                                    if (timeSinceContributingNoteStart <= 0 && initialVelocity === 0) return; 
-
-                                                    const contribution = PhysicsUtils.calculateDampedOscillator(
-                                                        timeSinceContributingNoteStart,
-                                                        tension,
-                                                        friction,
-                                                        initialVelocity
-                                                    );
-                                                    cumulativePhysicsValue += contribution; // Safe now, it's initialized
-                                                }
-                                            }
-                                        }); // end loop over contributing notes in block
-                                    }); // end loop over midiBlocks
-                                } // end if physicsEnvelopeConfig
-
-                                // Assign the calculated cumulative value (already a number)
-                                const physicsValue = cumulativePhysicsValue;
-
-                                // Early exit optimization (use the definite physicsValue)
-                                const isAdsrIdle = adsrAmplitude !== undefined && adsrAmplitude <= 0 && adsrPhase === 'idle';
-                                const isPhysicsSettled = Math.abs(physicsValue) < 0.001;
-
-                                // If ADSR is defined and idle, AND physics is defined and settled, skip instance
-                                if (levelConfig.adsrConfig && isAdsrIdle && levelConfig.physicsEnvelopeConfig && isPhysicsSettled) {
-                                    return;
-                                }
-                                // If ONLY ADSR is defined and it's idle, skip instance
-                                if (levelConfig.adsrConfig && !levelConfig.physicsEnvelopeConfig && isAdsrIdle) {
-                                    return;
-                                }
-
-
-                                // --- Create Mapping Context for this Instance ---
-                                const currentContext: MappingContext = {
-                                    note: note, 
-                                    time: time,
-                                    bpm: bpm,
-                                    noteAbsoluteStartBeat: noteAbsoluteStartBeat,
-                                    timeSinceNoteStart: timeSinceNoteStart, 
-                                    noteProgressPercent: noteProgressPercent,
-                                    noteDurationSeconds: noteDurationSeconds,
-                                    level: levelConfig.level,
-                                    instanceData: instanceData,
-                                    parentContext: parentContext,
-                                    adsrAmplitude: adsrAmplitude,
-                                    adsrPhase: adsrPhase,
-                                    physicsValue: physicsValue, // Use the cumulative physics value
-                                    // calculatedProperties will be filled below
-                                };
-
-                                // --- Apply Mappers ---
-                                const calculatedProps: VisualObjectProperties = {};
-                                // Important: Access synthesizer properties using .call(this.synthesizer, ...)
-                                if (levelConfig.positionMapper) calculatedProps.position = levelConfig.positionMapper.call(this.synthesizer, currentContext);
-                                if (levelConfig.scaleMapper) calculatedProps.scale = levelConfig.scaleMapper.call(this.synthesizer, currentContext);
-                                if (levelConfig.rotationMapper) calculatedProps.rotation = levelConfig.rotationMapper.call(this.synthesizer, currentContext);
-                                if (levelConfig.colorMapper) calculatedProps.color = levelConfig.colorMapper.call(this.synthesizer, currentContext);
-                                if (levelConfig.opacityMapper) calculatedProps.opacity = levelConfig.opacityMapper.call(this.synthesizer, currentContext);
-
-                                // Add calculated properties to the context (read-only view for children)
-                                currentContext.calculatedProperties = calculatedProps;
-
-
-                                // Determine the object type for this instance
-                                const objectType = levelConfig.type ?? (parentContext?.calculatedProperties as any)?.type ?? definition.initialType; // Cascade type down
-
-                                // --- Create Visual Object ---
-                                // Only create an object if essential properties are likely defined (e.g., position/scale often needed)
-                                // Add more robust checks or defaults as needed
-                                if (calculatedProps.position || calculatedProps.scale) {
-                                     const visualObject: VisualObject = {
-                                         type: objectType,
-                                         properties: {
-                                             position: calculatedProps.position ?? [0, 0, 0], // Default position
-                                             scale: typeof calculatedProps.scale === 'number'
-                                                       ? [calculatedProps.scale, calculatedProps.scale, calculatedProps.scale]
-                                                       : calculatedProps.scale ?? [1, 1, 1], // Default scale array
-                                             rotation: calculatedProps.rotation ?? [0, 0, 0], // Default rotation
-                                             color: calculatedProps.color ?? '#ffffff', // Default color
-                                             opacity: calculatedProps.opacity ?? 1, // Default opacity
-                                             // Include ADSR info if needed for rendering/debugging
-                                             // _adsrAmplitude: adsrAmplitude,
-                                             // _adsrPhase: adsrPhase,
-                                             // _instanceData: instanceData, // For debugging
-                                             // _level: levelConfig.level, // For debugging
-                                         },
-                                         sourceNoteId: note.id // ** Automatically add sourceNoteId **
-                                     };
-                                     allVisualObjects.push(visualObject);
-                                }
-
-
-                                // --- Recurse for Next Level ---
-                                const nextLevelIndex = definition.levels.findIndex(l => l.level === levelConfig.level + 1);
-                                if (nextLevelIndex !== -1) {
-                                    const nextLevelConfig = definition.levels[nextLevelIndex];
-                                     // Pass the *current* context as the parent context for the next level
-                                     // Pass the instanceData generated *for this instance* by the parent's generator
-                                    processLevel(nextLevelConfig, currentContext, instanceData);
-                                }
-                            }); // End forEach instanceData
-                        }; // End processLevel function
-
-
-                        // Start processing from Level 1
-                        const level1Config = definition.levels[0];
-                        if (level1Config) {
-                             // Call processLevel for the root level. No parent context or instance data needed initially.
-                            processLevel(level1Config);
                         }
 
+                        // Check if the note is currently active (standard behavior)
+                        const isActiveNote = currentTimeSec >= noteStartSec && currentTimeSec < noteEndSec;
+
+                        // Proceed if either in approach phase or active phase
+                        if (isDuringApproach || isActiveNote) {
+                        // --- END MODIFIED ---
+
+                            // Recursive function to process levels (Mostly unchanged, but context creation needs update)
+                            const processLevel = (
+                                levelConfig: DefinitionLevel,
+                                parentContext?: MappingContext,
+                                parentInstanceData?: InstanceData
+                            ): void => {
+                                const instancesData: InstanceData[] = [];
+                                if (levelConfig.level === 1) {
+                                    instancesData.push(parentInstanceData ?? {}); 
+                                } else if (levelConfig.generatorFn && parentContext) {
+                                    const generatedData = levelConfig.generatorFn.call(this.synthesizer, parentContext);
+                                    instancesData.push(...generatedData);
+                                } else if (!parentContext && levelConfig.level > 1) {
+                                    console.warn("Generator function called without parent context for level > 1");
+                                    return; 
+                                } else {
+                                     return;
+                                }
+
+
+                                instancesData.forEach(instanceData => {
+                                    // --- MODIFIED: Calculate time context ---
+                                    // timeSinceNoteStart is now potentially negative during approach
+                                    const timeSinceNoteStart = currentTimeSec - noteStartSec; 
+                                    // noteProgressPercent is only valid during the actual note duration
+                                    const noteProgressPercent = isActiveNote && noteDurationSeconds > 0 
+                                        ? Math.min(1, Math.max(0, timeSinceNoteStart / noteDurationSeconds)) 
+                                        : (isDuringApproach ? 0 : 1); // 0 before note, 1 after note (if duration is 0)
+                                    // --- END MODIFIED ---
+
+                                    // --- ADSR Calculation --- 
+                                    // (Needs adjustment? ADSR usually starts at note time, not during approach)
+                                    // Current logic calculates based on noteStartSec, so it should naturally be 0 amplitude during approach.
+                                    let adsrAmplitude: number | undefined = undefined;
+                                    let adsrPhase: 'attack' | 'decay' | 'sustain' | 'release' | 'idle' | undefined = undefined;
+                                    if (levelConfig.adsrConfig) {
+                                        const currentAdsrConfig = typeof levelConfig.adsrConfig === 'function'
+                                            ? levelConfig.adsrConfig.call(this.synthesizer, noteCtx)
+                                            : levelConfig.adsrConfig;
+                                        const adsrResult = this.calculateADSR(time, noteAbsoluteStartBeat, noteAbsoluteEndBeat, bpm, currentAdsrConfig);
+                                        adsrAmplitude = adsrResult.amplitude;
+                                        adsrPhase = adsrResult.phase;
+                                    }
+
+                                    // --- Physics Envelope Calculation ---
+                                    // (Current logic iterates all past notes, should be fine?)
+                                    // Physics is based on time *since* the contributing note started, so approach phase shouldn't affect it directly.
+                                    let cumulativePhysicsValue: number = 0;
+                                    if (levelConfig.physicsEnvelopeConfig) {
+                                        const physicsConfigProvider = levelConfig.physicsEnvelopeConfig;
+                                        midiBlocks.forEach(blockP => {
+                                            const blockAbsStartBeatP = blockP.startBeat;
+                                            blockP.notes.forEach(contributingNote => {
+                                                const contributingNoteCtx: NoteContext = { note: contributingNote };
+                                                if (definition.conditionFn.call(this.synthesizer, contributingNoteCtx)) {
+                                                    const contribNoteAbsStartBeat = blockAbsStartBeatP + contributingNote.startBeat;
+                                                    if (contribNoteAbsStartBeat <= time) { // Only past/present notes
+                                                        const timeSinceContribNoteStart = Math.max(0, (time - contribNoteAbsStartBeat) * secondsPerBeat);
+                                                        const currentPhysicsConfig = typeof physicsConfigProvider === 'function'
+                                                            ? physicsConfigProvider.call(this.synthesizer, contributingNoteCtx)
+                                                            : physicsConfigProvider;
+
+                                                        const tension = currentPhysicsConfig?.tension ?? DEFAULT_TENSION;
+                                                        const friction = currentPhysicsConfig?.friction ?? DEFAULT_FRICTION;
+                                                        let initialVelocity = currentPhysicsConfig?.initialVelocity ?? DEFAULT_INITIAL_VELOCITY;
+                                                       
+                                                        const scaleVelocity = true; 
+                                                        if (scaleVelocity && contributingNote.velocity !== undefined) { 
+                                                           initialVelocity *= MappingUtils.mapValue(contributingNote.velocity, 0, 127, 0.2, 1.8); 
+                                                        }
+                                                        
+                                                        if (!(timeSinceContribNoteStart <= 0 && initialVelocity === 0)) {
+                                                            const contribution = PhysicsUtils.calculateDampedOscillator(
+                                                                timeSinceContribNoteStart, tension, friction, initialVelocity
+                                                            );
+                                                            cumulativePhysicsValue += contribution;
+                                                        }
+                                                    }
+                                                }
+                                            }); 
+                                        }); 
+                                    }
+                                    const physicsValue = cumulativePhysicsValue;
+
+
+                                    // --- MODIFIED: Early exit needs to consider approach phase ---
+                                    // If we are in the approach phase, we generally don't want to exit early,
+                                    // unless specifically designed (e.g., opacity mapper maps to 0).
+                                    // Let's disable early exit during the approach phase for now.
+                                    // A more nuanced approach might be needed later.
+                                    if (!isDuringApproach) {
+                                        const isAdsrIdle = adsrAmplitude !== undefined && adsrAmplitude <= 0 && adsrPhase === 'idle';
+                                        const isPhysicsSettled = Math.abs(physicsValue) < 0.001; 
+                                        if (levelConfig.adsrConfig && isAdsrIdle && levelConfig.physicsEnvelopeConfig && isPhysicsSettled) {
+                                            return; 
+                                        }
+                                        if (levelConfig.adsrConfig && !levelConfig.physicsEnvelopeConfig && isAdsrIdle) {
+                                            return; 
+                                        }
+                                    }
+                                    // --- END MODIFIED ---
+
+
+                                    // --- MODIFIED: Create Mapping Context ---
+                                    const currentContext: MappingContext = {
+                                        note: note,
+                                        time: time,
+                                        bpm: bpm,
+                                        noteAbsoluteStartBeat: noteAbsoluteStartBeat,
+                                        timeSinceNoteStart: timeSinceNoteStart, // Can be negative now
+                                        noteProgressPercent: noteProgressPercent, // 0 during approach
+                                        noteDurationSeconds: noteDurationSeconds,
+                                        level: levelConfig.level,
+                                        instanceData: instanceData,
+                                        parentContext: parentContext,
+                                        adsrAmplitude: adsrAmplitude,
+                                        adsrPhase: adsrPhase,
+                                        physicsValue: physicsValue,
+                                        timeUntilNoteStart: timeUntilNoteStart // Add the new property
+                                        // calculatedProperties filled below
+                                    };
+                                    // --- END MODIFIED ---
+
+                                    // --- Apply Mappers (Unchanged) ---
+                                    const calculatedProps: VisualObjectProperties = {};
+                                    if (levelConfig.positionMapper) calculatedProps.position = levelConfig.positionMapper.call(this.synthesizer, currentContext);
+                                    if (levelConfig.scaleMapper) calculatedProps.scale = levelConfig.scaleMapper.call(this.synthesizer, currentContext);
+                                    if (levelConfig.rotationMapper) calculatedProps.rotation = levelConfig.rotationMapper.call(this.synthesizer, currentContext);
+                                    if (levelConfig.colorMapper) calculatedProps.color = levelConfig.colorMapper.call(this.synthesizer, currentContext);
+                                    if (levelConfig.opacityMapper) calculatedProps.opacity = levelConfig.opacityMapper.call(this.synthesizer, currentContext);
+
+
+                                    currentContext.calculatedProperties = calculatedProps;
+
+                                    const objectType = levelConfig.type ?? (parentContext?.calculatedProperties as any)?.type ?? definition.initialType;
+
+                                    // --- Create Visual Object (Unchanged structure, but check opacity) ---
+                                    // Add a check: if opacity is effectively zero, maybe don't create the object?
+                                    const finalOpacity = calculatedProps.opacity ?? 1; 
+                                    if (finalOpacity > 0.001 && (calculatedProps.position || calculatedProps.scale)) { // Only create if visible and has geometry
+                                         const visualObject: VisualObject = {
+                                             type: objectType,
+                                             properties: {
+                                                 position: calculatedProps.position ?? [0, 0, 0],
+                                                 scale: typeof calculatedProps.scale === 'number'
+                                                           ? [calculatedProps.scale, calculatedProps.scale, calculatedProps.scale]
+                                                           : calculatedProps.scale ?? [1, 1, 1],
+                                                 rotation: calculatedProps.rotation ?? [0, 0, 0],
+                                                 color: calculatedProps.color ?? '#ffffff',
+                                                 opacity: finalOpacity, // Use potentially calculated opacity
+                                             },
+                                             // id: `${block.id}-${note.id}-${note.pitch}-${levelConfig.level}-${isDuringApproach ? 'approach' : 'active'}` // REMOVED id property
+                                             // sourceNoteId is added conditionally below
+                                         };
+                                         // Add sourceNoteId if note has an id
+                                         if (note.id) {
+                                            visualObject.sourceNoteId = note.id;
+                                         }
+                                         allVisualObjects.push(visualObject);
+                                    }
+
+
+                                    // --- Recurse for Next Level (Unchanged) ---
+                                    const nextLevelIndex = definition.levels.findIndex(l => l.level === levelConfig.level + 1);
+                                    if (nextLevelIndex !== -1) {
+                                        const nextLevelConfig = definition.levels[nextLevelIndex];
+                                        processLevel(nextLevelConfig, currentContext, instanceData);
+                                    }
+                                }); // End forEach instanceData
+                            }; // End processLevel function
+
+
+                            // Start processing from Level 1
+                            const level1Config = definition.levels[0];
+                            if (level1Config) {
+                                processLevel(level1Config);
+                            }
+
+                        } // End if (isDuringApproach || isActiveNote)
                     } // End if conditionFn matches
                 }); // End forEach note
             }); // End forEach block
@@ -469,5 +503,5 @@ class VisualObjectEngine {
 }
 
 export default VisualObjectEngine;
-export type { MappingContext, NoteContext, InstanceData, ADSRConfig, ADSRConfigFn, PhysicsEnvelopeConfig, PhysicsEnvelopeConfigFn };
+export type { MappingContext, NoteContext, InstanceData, ADSRConfig, ADSRConfigFn, PhysicsEnvelopeConfig, PhysicsEnvelopeConfigFn, ApproachEnvelopeConfig, ApproachEnvelopeConfigFn }; // Export new types
 export { MappingUtils, ObjectDefinition }; 

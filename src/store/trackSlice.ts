@@ -33,7 +33,7 @@ export interface TrackActions {
   addEffectToTrack: (trackId: string, effectToAdd: Effect) => void;
   removeEffectFromTrack: (trackId: string, effectIndex: number) => void;
   updateEffectPropertyOnTrack: (trackId: string, effectIndex: number, propertyName: string, value: any) => void;
-  // reorderEffectsOnTrack: (trackId: string, draggedIndex: number, targetIndex: number) => void; // Reordering skipped
+  reorderEffectsOnTrack: (trackId: string, draggedIndex: number, targetIndex: number) => void;
   splitMidiBlock: (trackId: string, blockId: string, splitBeat: number) => void; // Added for splitting
 }
 
@@ -82,6 +82,15 @@ export const createTrackSlice: StateCreator<
             selectedNotes: null
         };
       });
+      
+      // Set detail view mode to instrument only when selecting a track (no block)
+      // and current mode is midi
+      if (trackId) {
+        const currentDetailViewMode = get().detailViewMode;
+        if (currentDetailViewMode === "midi") {
+          get().setDetailViewMode("instrument");
+        }
+      }
     },
     selectBlock: (blockId: string | null) => {
       set((state: TrackState & { tracks: Track[] }) => {
@@ -114,6 +123,11 @@ export const createTrackSlice: StateCreator<
               selectedNotes: null
           };
       });
+      
+      // Set detail view mode to midi when selecting a block
+      if (blockId) {
+        get().setDetailViewMode("midi");
+      }
     },
     addTrack: (track: Track) => {
       set((state: TrackState & { tracks: Track[] }) => {
@@ -475,6 +489,43 @@ export const createTrackSlice: StateCreator<
       });
       // Call persistence function after state update
       PersistFns.persistUpdateEffectPropertyOnTrack(get, trackId, effectIndex);
+    },
+    reorderEffectsOnTrack: (trackId: string, draggedIndex: number, targetIndex: number) => {
+      set((state) => {
+          const newTracks = state.tracks.map(track => {
+              if (track.id === trackId) {
+                  const currentEffects = [...(track.effects || [])]; // Create a mutable copy
+
+                  // Validate indices - targetIndex can be equal to length for appending
+                  if (draggedIndex >= 0 && draggedIndex < currentEffects.length &&
+                      targetIndex >= 0 && targetIndex <= currentEffects.length) {
+
+                      const [draggedEffect] = currentEffects.splice(draggedIndex, 1); // Remove the dragged effect
+                      currentEffects.splice(targetIndex, 0, draggedEffect); // Insert at the target index
+
+                      return { ...track, effects: currentEffects }; // Return updated track
+
+                  } else {
+                      console.warn(`reorderEffectsOnTrack: Invalid indices (dragged: ${draggedIndex}, target: ${targetIndex}) for track ${trackId}.`);
+                      // Return the track unchanged if indices are invalid
+                      return track;
+                  }
+              }
+              // Return other tracks unchanged
+              return track;
+          });
+
+          // Selections don't change, but get updated references
+          const selections = getUpdatedSelections(newTracks, state.selectedTrackId, state.selectedBlockId);
+
+          return {
+              tracks: newTracks,
+              selectedTrack: selections.selectedTrack,
+              selectedBlock: selections.selectedBlock
+          };
+      });
+      // Call persistence function after state update
+      PersistFns.persistReorderEffectsOnTrack(get, trackId);
     },
     splitMidiBlock: (trackId: string, blockId: string, splitBeat: number) => {
       let newBlockId2: string | null = null; // Need to capture the ID of the second block generated

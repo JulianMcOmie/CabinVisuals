@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import useStore from '../store/store';
-import { Track } from '../lib/types';
-import SynthesizerDetailView from './SynthesizerDetailView'; // Import the new Synthesizer view
-import EffectsDetailView from './EffectsDetailView'; // Import the new Effects view
+import useStore from '../../store/store';
+import { Track } from '../../lib/types';
+import SynthesizerDetailView from '../SynthesizerDetailView';
+import styles from './InstrumentDetailView.module.css';
 
 interface InstrumentDetailViewProps {
   track: Track;
@@ -29,25 +29,24 @@ function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
 
   return (
     <div 
-      style={{
-        padding: '20px', 
-        color: '#ddd',
-      }} 
+      className={styles.container}
       onClick={handleViewClick} // Attach click handler to the main div
     >
-      <h3>Track Settings: {track.name}</h3>
-      
-      {/* Render Synthesizer Settings */}
-      <SynthesizerDetailView track={track} />
+      <div className={styles.contentPanel}>
+        <h3 className={styles.heading}>
+          {track.synthesizer.constructor.name}
+        </h3>
+        
+        {/* Render Synthesizer Settings */}
+        <div className={styles.settingsContainer}>
+          <SynthesizerDetailView track={track} />
+        </div>
+      </div>
 
       {/* Separator */}
-      <hr style={{ border: 'none', borderTop: '1px solid #444', margin: '20px 0' }} />
-
-      {/* Render Effects Chain Settings */}
-      <EffectsDetailView track={track} />
-
+      <div className={styles.separator}></div>
     </div>
   );
 }
 
-export default InstrumentDetailView;
+export default InstrumentDetailView; 

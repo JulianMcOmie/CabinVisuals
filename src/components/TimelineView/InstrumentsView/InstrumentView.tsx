@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import useStore from '../../../store/store';
 import { Track } from '../../../lib/types';
+import './InstrumentsView.css'; // Import the CSS file
 
 interface InstrumentViewProps {
   track: Track;
@@ -149,9 +150,32 @@ function InstrumentView({
     }
   };
 
+  const instrumentViewClasses = [
+    'instrumentView',
+    isSelected ? 'selected' : '',
+    isDragging ? 'dragging' : '',
+  ].filter(Boolean).join(' ');
+
+  const trackNameDisplayClasses = [
+    'trackNameDisplay',
+    isDragging ? 'dragging' : '',
+  ].filter(Boolean).join(' ');
+
+  const muteButtonClasses = [
+    'controlButton',
+    'mute',
+    track.isMuted ? 'active' : '',
+  ].filter(Boolean).join(' ');
+
+  const soloButtonClasses = [
+    'controlButton',
+    'solo',
+    track.isSoloed ? 'active' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <div
-      className="instrument-view"
+      className={instrumentViewClasses}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onMouseDown={onDragStart ? handleMouseDown : undefined}
@@ -159,22 +183,8 @@ function InstrumentView({
       onMouseUp={onDragStart ? handleMouseUp : undefined}
       onMouseLeave={onDragStart ? handleMouseLeave: undefined}
       onMouseEnter={handleMouseEnter}
-      style={{
-        padding: '0 10px',
-        height: '100%',
-        borderBottom: '1px solid #333',
-        display: 'flex',
-        alignItems: 'center',
-        color: '#ddd',
-        backgroundColor: isSelected && !isDragging ? '#333' : '#1a1a1a',
-        transition: 'background-color 0.1s ease, opacity 0.1s ease',
-        minWidth: '150px',
-        boxSizing: 'border-box',
-        opacity: isDragging ? 0.8 : 1,
-        userSelect: 'none',
-      }}
     >
-      <div style={{ flexGrow: 1, marginRight: '8px' }}>
+      <div className="trackNameContainer">
         {isEditing ? (
           <input
             ref={inputRef}
@@ -184,38 +194,23 @@ function InstrumentView({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              padding: '0',
-              margin: '0',
-              border: 'none',
-              background: 'transparent',
-              color: 'inherit',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              boxSizing: 'border-box'
-            }}
+            className="trackNameInput"
           />
         ) : (
-          <div onDoubleClick={handleDoubleClick} style={{ width: '100%', pointerEvents: isDragging ? 'none' : 'auto' }}>
+          <div
+            onDoubleClick={handleDoubleClick}
+            className={trackNameDisplayClasses}
+          >
             {track.name || 'Untitled Track'}
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+      <div className="controlsContainer">
         <button
           onMouseDown={handleMuteMouseDown}
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
-          style={{
-            padding: '2px 5px',
-            border: `1px solid ${track.isMuted ? '#4A90E2' : '#555'}`,
-            borderRadius: '3px',
-            backgroundColor: track.isMuted ? '#4A90E2' : '#444',
-            color: track.isMuted ? '#fff' : '#ddd',
-            minWidth: '25px',
-            textAlign: 'center'
-          }}
+          className={muteButtonClasses}
           title="Mute Track (M)"
         >
           M
@@ -224,15 +219,7 @@ function InstrumentView({
           onMouseDown={handleSoloMouseDown}
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
-          style={{
-            padding: '2px 5px',
-            border: `1px solid ${track.isSoloed ? '#FFD700' : '#555'}`,
-            borderRadius: '3px',
-            backgroundColor: track.isSoloed ? '#FFD700' : '#444',
-            color: track.isSoloed ? '#000' : '#ddd',
-            minWidth: '25px',
-            textAlign: 'center'
-          }}
+          className={soloButtonClasses}
           title="Solo Track (S)"
         >
           S
@@ -242,4 +229,4 @@ function InstrumentView({
   );
 }
 
-export default InstrumentView; 
+export default InstrumentView;

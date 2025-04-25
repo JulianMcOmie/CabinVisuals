@@ -44,11 +44,6 @@ function SynthesizerDetailView({ track }: SynthesizerDetailViewProps) {
     updateTrack(track.id, { synthesizer: newSynth });
   };
 
-  // Determine the current synthesizer ID for the dropdown
-  const currentSynthId = allInstrumentDefinitions.find(def => 
-    synthesizer instanceof def.constructor
-  )?.id || ''; // Get the ID or empty string
-
   // --- Function to render the correct control for a property ---
   const renderPropertyControl = (property: Property<any>) => {
     const key = `${track.id}-synth-prop-${property.name}`;
@@ -112,31 +107,6 @@ function SynthesizerDetailView({ track }: SynthesizerDetailViewProps) {
 
   return (
     <div style={{ marginBottom: '30px' }}>
-      <h4>Synthesizer</h4>
-      
-      {/* Synthesizer Type Selector */}
-      <div style={{ marginBottom: '20px' }}>
-        <label htmlFor="synthesizer-select" style={{ marginRight: '10px' }}>Type:</label>
-        <select 
-          id="synthesizer-select"
-          value={currentSynthId}
-          onChange={handleSynthesizerChange}
-          style={{
-            padding: '5px',
-            backgroundColor: '#333',
-            color: '#ddd',
-            border: '1px solid #555'
-          }}
-        >
-          <option value="" disabled>-- Select Synthesizer --</option> {/* Add a default option */}
-          {allInstrumentDefinitions.map((def) => (
-            <option key={def.id} value={def.id}>
-              {def.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Dynamically Rendered Property Controls */}
       <div>
         <h5>Parameters:</h5>
