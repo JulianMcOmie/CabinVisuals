@@ -72,11 +72,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users from auth pages (login, signup, reset) to the main app (/alpha)
+  // Redirect authenticated users from auth pages (login, signup, reset) to the projects page
   if (user && isAuthRoute) {
-      console.log(`Middleware: Authenticated user accessing auth route ${pathname}. Redirecting to app.`);
+      console.log(`Middleware: Authenticated user accessing auth route ${pathname}. Redirecting to projects.`);
       const url = request.nextUrl.clone();
-      url.pathname = '/alpha'; // Redirect to the main app page
+      url.pathname = '/projects'; // Changed from /alpha
       return NextResponse.redirect(url);
   }
 

@@ -53,6 +53,7 @@ export async function completeSignup(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  // Redirect to new login path on success
-  return redirect('/auth/login?message=Account created! Please check your email to confirm your account.');
+  // Redirect to the projects page after successful account creation
+  // We might want to add a success message query param later
+  redirect('/projects');
 } 
