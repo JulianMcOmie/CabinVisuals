@@ -1,4 +1,4 @@
-import Synthesizer from '../Synthesizer';
+import Synthesizer, { ProcessedTrackVisuals } from '../Synthesizer';
 import { MIDIBlock, VisualObject, MIDINote } from '../types';
 import { Property } from '../properties/Property';
 import { VisualObject3D } from '../VisualizerManager'; // Import the type for applyGlobalModification
@@ -82,7 +82,7 @@ class PulseSynth extends Synthesizer {
             'pulseTargetScale', 0.5, { label: 'Pulse Target Scale', uiType: 'slider', min: 0.0, max: 2.0, step: 0.05 }
         ));
         this.properties.set('baseScale', new Property<number>(
-            'baseScale', 1.5, { label: 'Base Scale Multiplier', uiType: 'slider', min: 0.0, max: 2.0, step: 0.01 }
+            'baseScale', 1.0, { label: 'Base Scale Multiplier', uiType: 'slider', min: 0.0, max: 2.0, step: 0.01 }
         ));
         this.properties.set('attackTime', new Property<number>(
             'attackTime', 0.05, { label: 'Pulse Attack (s)', uiType: 'slider', min: 0.0, max: 1.0, step: 0.01 }
@@ -96,6 +96,11 @@ class PulseSynth extends Synthesizer {
         this.properties.set('releaseTime', new Property<number>(
             'releaseTime', 0.3, { label: 'Pulse Release (s)', uiType: 'slider', min: 0.0, max: 3.0, step: 0.01 }
         ));
+        this.properties.set('targetTrackIds', new Property<string[]>(
+            'targetTrackIds', 
+            [],
+            { label: 'Target Tracks', uiType: 'trackSelector' }
+        ));
     }
 
     // This synth doesn't produce its own visuals directly
@@ -104,7 +109,12 @@ class PulseSynth extends Synthesizer {
     }
 
     // The core logic: applies modification to all visuals based on this track's MIDI
-    applyGlobalModification(allVisuals: VisualObject3D[], time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject3D[] {
+    applyGlobalModification(
+        processedTracks: ProcessedTrackVisuals[], 
+        time: number, 
+        midiBlocks: MIDIBlock[], 
+        bpm: number
+    ): ProcessedTrackVisuals[] {
         const adsrParams: ADSRParams = {
             attack: this.getPropertyValue<number>('attackTime') ?? 0.05,
             decay: this.getPropertyValue<number>('decayTime') ?? 0.1,
@@ -114,6 +124,10 @@ class PulseSynth extends Synthesizer {
         const pulseTargetScale = this.getPropertyValue<number>('pulseTargetScale') ?? 0.5;
         const baseScale = this.getPropertyValue<number>('baseScale') ?? 1.0;
         
+        // Get target track IDs array
+        const targetIds = this.getPropertyValue<string[]>('targetTrackIds') ?? [];
+        const targetAll = targetIds.length === 0;
+
         const secondsPerBeat = 60 / bpm;
         const currentTimeSec = time * secondsPerBeat;
         
@@ -144,17 +158,27 @@ class PulseSynth extends Synthesizer {
         // This formula correctly moves from baseScale towards pulseTargetScale based on amplitude
         const targetScaleMult = baseScale + (pulseTargetScale - baseScale) * combinedAmplitude;
 
-        // Apply the scale modification to all incoming visuals
-        const modifiedVisuals = allVisuals.map(visual => {
-            // Apply multiplicative scale
-            const newScale = vec3Scale(visual.scale, targetScaleMult);
-            return {
-                ...visual,
-                scale: newScale
-            };
+        // Apply modification only to targeted tracks
+        const modifiedProcessedTracks = processedTracks.map(trackData => {
+            // Check if this track is targeted
+            if (targetAll || targetIds.includes(trackData.trackId)) {
+                // Apply scale modification to visuals of this track
+                const modifiedVisuals = trackData.visuals.map(visual => {
+                    const newScale = vec3Scale(visual.scale, targetScaleMult);
+                    return {
+                        ...visual,
+                        scale: newScale
+                    };
+                });
+                // Return track data with modified visuals
+                return { ...trackData, visuals: modifiedVisuals };
+            } else {
+                // Return unmodified track data
+                return trackData;
+            }
         });
 
-        return modifiedVisuals;
+        return modifiedProcessedTracks;
     }
 }
 

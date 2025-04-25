@@ -6,6 +6,7 @@ import { VisualObject, Track, VisualObjectProperties, MIDINote } from './types';
 export interface VisualObject3D {
   id: string; // Changed: This will now be the persistent stateKey
   type: string;
+  sourceTrackId?: string; // <-- Add optional source track ID
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -62,18 +63,22 @@ class VisualizerManager {
   getVisualObjects(): VisualObject3D[] {
     const time = this.timeManager.getCurrentBeat();
     const bpm = this.timeManager.getBPM();
-    // Change to let to allow modification by meta-synths
-    let finalRenderObjects: VisualObject3D[] = []; 
+    // Use a map to store visuals per track initially
+    const processedTrackVisuals: Map<string, VisualObject3D[]> = new Map();
     
     this.activeStateKeysThisFrame.clear();
-
     const isAnyTrackSoloed = this.tracks.some(track => track.isSoloed);
 
+    // ------ PASS 1: Generate visuals per track ------
     this.tracks.forEach(track => {
+      if (!processedTrackVisuals.has(track.id)) {
+        processedTrackVisuals.set(track.id, []); // Ensure entry for track
+      }
+
       const shouldIncludeTrack = isAnyTrackSoloed
         ? track.isSoloed
         : !track.isMuted;
-      if (!shouldIncludeTrack || !track.synthesizer) return;
+      if (!shouldIncludeTrack || !track.synthesizer) return; // Skip processing if muted/not soloed
       
       const synthVisuals: VisualObject[] = track.synthesizer.getObjectsAtTime(
         time,
@@ -86,10 +91,8 @@ class VisualizerManager {
         if (synthVisObj.sourceNoteId) {
           const stateKey = `${track.id}-${synthVisObj.sourceNoteId}`;
           this.activeStateKeysThisFrame.add(stateKey);
-
           const previousState = this.objectStates.get(stateKey);
           const currentProperties = { ...synthVisObj.properties }; 
-
           if (previousState) {
             currentProperties.velocity = previousState.velocity ?? [0, 0, 0];
             currentProperties.positionOffset = previousState.positionOffset ?? [0, 0, 0];
@@ -97,13 +100,15 @@ class VisualizerManager {
             currentProperties.velocity = currentProperties.velocity ?? [0, 0, 0];
             currentProperties.positionOffset = currentProperties.positionOffset ?? [0, 0, 0];
           }
-          
           statefulVisualsForEffects.push({ 
             ...synthVisObj, 
             properties: currentProperties 
           });
         } else {
+           // If no sourceNoteId, maybe it's a transient effect - handle differently?
+           // For now, let's allow it through effects but not store state
            console.warn('VisualObject missing sourceNoteId, skipping state tracking.');
+           statefulVisualsForEffects.push(synthVisObj); // Pass it to effects
         }
       });
 
@@ -114,34 +119,30 @@ class VisualizerManager {
         }
       }
 
+      // Add processed visuals to the map, converting to VisualObject3D
+      const trackVisualsList = processedTrackVisuals.get(track.id) || [];
       finalVisualsAfterEffects.forEach((finalVisObj, index) => {
         if (!finalVisObj || !finalVisObj.properties) return; 
-
         const stateKey = finalVisObj.sourceNoteId ? `${track.id}-${finalVisObj.sourceNoteId}` : null;
-        
         if (stateKey) {
             this.objectStates.set(stateKey, finalVisObj.properties);
         }
-
         const props = finalVisObj.properties;
-        const basePosition: [number, number, number] = props.position ?? [0, 0, 0];
-        const offset: [number, number, number] = props.positionOffset ?? [0, 0, 0];
-        const finalPosition: [number, number, number] = [
+        // Ensure defaults result in valid Vec3Tuple type
+        const basePosition = props.position ?? [0, 0, 0] as [number, number, number]; 
+        const offset = props.positionOffset ?? [0, 0, 0] as [number, number, number];
+        const finalPosition = [
           basePosition[0] + offset[0],
           basePosition[1] + offset[1],
           basePosition[2] + offset[2]
-        ];
-
-        const rotation: [number, number, number] = props.rotation ?? [0, 0, 0];
-        let scale: [number, number, number] = props.scale ?? [1, 1, 1];
-        const color: string = props.color ?? '#ffffff';
-        const opacity: number = props.opacity ?? 1.0;
-
-        if (props.size !== undefined && !props.scale) {
-          scale = [props.size, props.size, props.size];
-        }
+        ] as [number, number, number]; // Explicit cast for safety
+        const rotation = props.rotation ?? [0, 0, 0] as [number, number, number];
+        let scale = typeof props.scale === 'number' 
+                        ? [props.scale, props.scale, props.scale] as [number, number, number] 
+                        : props.scale ?? [1, 1, 1] as [number, number, number];
+        const color = props.color ?? '#ffffff';
+        const opacity = props.opacity ?? 1.0;
         const clampedOpacity = Math.max(0, Math.min(1, opacity));
-
         const emissive = props.emissive;
         const emissiveIntensity = props.emissiveIntensity;
 
@@ -149,9 +150,11 @@ class VisualizerManager {
            const renderId = stateKey
              ? `${stateKey}-${index}`
              : `transient-${track.id}-${finalVisObj.type}-${index}`;
-          finalRenderObjects.push({
+           // Add the sourceTrackId here
+           trackVisualsList.push({
             id: renderId, 
             type: finalVisObj.type,
+            sourceTrackId: track.id, // Add source track ID
             position: finalPosition, 
             rotation,
             scale,
@@ -162,27 +165,32 @@ class VisualizerManager {
           });
         }
       });
+      processedTrackVisuals.set(track.id, trackVisualsList);
     }); // End initial track loop
 
-    // <<<<<<< SIMPLIFIED META-SYNTH PROCESSING >>>>>>>
-    // Apply global modifications from ALL Synths (most will do nothing)
-    this.tracks.forEach(track => {
-      // Determine if this track should apply its global effect based on mute/solo
-      const shouldApplyGlobalMod = isAnyTrackSoloed
-        ? track.isSoloed // Only apply if this track is soloed
-        : !track.isMuted; // Apply if not muted when nothing is soloed
+    // Convert map to array format for global modifications
+    let finalProcessedTracks: { trackId: string; visuals: VisualObject3D[] }[] = 
+        Array.from(processedTrackVisuals.entries()).map(([trackId, visuals]) => ({ trackId, visuals }));
 
-      // Directly call applyGlobalModification only if active and synth exists
+    // ------ PASS 2: Apply global modifications ------
+    this.tracks.forEach(track => {
+      const shouldApplyGlobalMod = isAnyTrackSoloed
+        ? track.isSoloed
+        : !track.isMuted;
+
       if (shouldApplyGlobalMod && track.synthesizer) { 
-        finalRenderObjects = track.synthesizer.applyGlobalModification(
-          finalRenderObjects, 
-          time, // Current time in beats
-          track.midiBlocks, // Pass the synth's own MIDI data
-          bpm // Current BPM
+        // Pass the structured data, get modified structure back
+        finalProcessedTracks = track.synthesizer.applyGlobalModification(
+          finalProcessedTracks, 
+          time, 
+          track.midiBlocks, 
+          bpm 
         );
       }
     });
-    // <<<<<<< END SIMPLIFIED META-SYNTH PROCESSING >>>>>>>
+    
+    // ------ FINAL: Flatten the result ------
+    const finalRenderObjects: VisualObject3D[] = finalProcessedTracks.flatMap(trackData => trackData.visuals);
 
     // Cleanup stale states
     const currentKeys = Array.from(this.objectStates.keys());

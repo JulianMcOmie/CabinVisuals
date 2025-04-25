@@ -14,6 +14,7 @@ import ColorPropertyControl from './properties/ColorPropertyControl';
 import ColorRangePropertyControl from './properties/ColorRangePropertyControl'; // Import the new control
 import { InstrumentDefinition } from '../store/instrumentSlice'; // Import InstrumentDefinition
 import { ColorRange } from '../lib/types'; // Import ColorRange type
+import TrackSelectorPropertyControl from './properties/TrackSelectorPropertyControl'; // Import the new track selector control
 
 interface SynthesizerDetailViewProps {
   track: Track;
@@ -46,14 +47,16 @@ function SynthesizerDetailView({ track }: SynthesizerDetailViewProps) {
 
   // --- Function to render the correct control for a property ---
   const renderPropertyControl = (property: Property<any>) => {
-    const key = `${track.id}-synth-prop-${property.name}`;
+    // Use property name for the base key
+    const baseKey = `${track.id}-synth-prop-${property.name}`;
     let control: React.ReactNode = null;
 
-    switch (property.metadata.uiType) { // Use metadata.uiType
+    const currentValue = property.value;
+
+    switch (property.metadata.uiType) {
       case 'slider':
         control = (
           <SliderPropertyControl 
-            key={key}
             property={property as Property<number>} 
             onChange={(value) => handlePropertyChange(property.name, value)} 
           />
@@ -62,7 +65,6 @@ function SynthesizerDetailView({ track }: SynthesizerDetailViewProps) {
       case 'numberInput':
         control = (
           <NumberInputPropertyControl 
-            key={key}
             property={property as Property<number>} 
             onChange={(value) => handlePropertyChange(property.name, value)} 
           />
@@ -71,7 +73,6 @@ function SynthesizerDetailView({ track }: SynthesizerDetailViewProps) {
       case 'dropdown':
         control = (
           <DropdownPropertyControl
-            key={key}
             property={property as Property<unknown>} 
             onChange={(value) => handlePropertyChange(property.name, value)} 
           />
@@ -80,7 +81,6 @@ function SynthesizerDetailView({ track }: SynthesizerDetailViewProps) {
       case 'color':
         control = (
           <ColorPropertyControl
-            key={key}
             property={property as Property<string>} 
             onChange={(value) => handlePropertyChange(property.name, value)} 
           />
@@ -89,17 +89,28 @@ function SynthesizerDetailView({ track }: SynthesizerDetailViewProps) {
       case 'colorRange': 
         control = (
           <ColorRangePropertyControl
-            key={key}
             property={property as Property<ColorRange>}
             onChange={(value) => handlePropertyChange(property.name, value)}
           />
         );
         break;
+      case 'trackSelector':
+        control = (
+          <TrackSelectorPropertyControl
+            property={property as Property<string[]>}
+            value={currentValue as string[]}
+            onChange={(value) => handlePropertyChange(property.name, value)}
+          />
+        );
+        break;
       default:
-        // Cast metadata to any to display the uiType in the error message
-        control = <div key={key}>Unsupported property type: {(property.metadata as any).uiType}</div>;
+        control = <div>Unsupported property type: {(property.metadata as any).uiType}</div>;
     }
-    return control;
+    return (
+       <div key={baseKey} className="property-control-wrapper" style={{ marginBottom: '8px' }}>
+         {control}
+       </div>
+    );
   };
 
   // --- Render the list of properties ---

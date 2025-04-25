@@ -3,6 +3,12 @@ import { Property } from './properties/Property';
 import VisualObjectEngine from './VisualObjectEngine';
 import { VisualObject3D } from './VisualizerManager';
 
+// Data structure for passing track-specific visuals to global modification
+export interface ProcessedTrackVisuals {
+  trackId: string;
+  visuals: VisualObject3D[];
+}
+
 abstract class Synthesizer {
   // Map to store configurable properties
   public properties: Map<string, Property<any>> = new Map();
@@ -30,15 +36,15 @@ abstract class Synthesizer {
     return property?.value;
   }
 
-  // Add default implementation for applyGlobalModification
+  // Update signature and default implementation for applyGlobalModification
   public applyGlobalModification(
-    allVisuals: VisualObject3D[], 
+    processedTracks: ProcessedTrackVisuals[], 
     time: number, 
     midiBlocks: MIDIBlock[], // Own MIDI blocks
     bpm: number
-  ): VisualObject3D[] {
-    // Default behavior: do nothing, pass through the visuals
-    return allVisuals;
+  ): ProcessedTrackVisuals[] { // Return the same type
+    // Default behavior: do nothing, pass through the track visuals data
+    return processedTracks;
   }
 }
 
