@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useStore from '../../store/store';
 import styles from './PlaybarView.module.css';
 import { Repeat, Upload } from 'lucide-react';
@@ -23,7 +23,8 @@ const PlaybarView: React.FC = () => {
     isInstrumentSidebarVisible,
     toggleInstrumentSidebar,
     setSelectedWindow,
-    tracks
+    tracks,
+    timeManager
   } = useStore();
 
   const [exportButtonHover, setExportButtonHover] = useState(false);
@@ -32,6 +33,9 @@ const PlaybarView: React.FC = () => {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatusMessage, setExportStatusMessage] = useState('Preparing export...');
   const [exportCompleted, setExportCompleted] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportJobId, setExportJobId] = useState<string | null>(null);
+  const [exportUrl, setExportUrl] = useState<string | null>(null);
 
   const handlePlaybarClick = () => {
     setSelectedWindow(null);
@@ -43,6 +47,9 @@ const PlaybarView: React.FC = () => {
     setExportCompleted(false);
     setExportProgress(0);
     setExportStatusMessage('Configure export settings.');
+    setExportError(null);
+    setExportJobId(null);
+    setExportUrl(null);
     setShowExportModal(true);
   };
 
@@ -50,53 +57,106 @@ const PlaybarView: React.FC = () => {
     setIsExporting(true);
     setExportCompleted(false);
     setExportProgress(0);
-    setExportStatusMessage('Initializing export...');
+    setExportStatusMessage('Sending request to server...');
+    setExportError(null);
+    setExportJobId(null);
+    setExportUrl(null);
 
     console.log('Starting export with settings:', settings);
+
+    const estimatedDuration = 30;
+
     const payload = {
-        width: settings.resolution === "720p" ? 1280 : 
-               settings.resolution === "1080p" ? 1920 : 
+        width: settings.resolution === "720p" ? 1280 :
+               settings.resolution === "1080p" ? 1920 :
                settings.resolution === "1440p" ? 2560 : 3840,
-        height: settings.resolution === "720p" ? 720 : 
-                settings.resolution === "1080p" ? 1080 : 
+        height: settings.resolution === "720p" ? 720 :
+                settings.resolution === "1080p" ? 1080 :
                 settings.resolution === "1440p" ? 1440 : 2160,
-        fps: parseInt(settings.fps),
-        startTime: 0,
-        endTime: 10,
+        fps: parseInt(settings.fps, 10),
+        durationSeconds: estimatedDuration,
         bpm: bpm,
         tracks: tracks,
+        bloomParams: {
+            strength: 1.0,
+            threshold: 0.1,
+            radius: 0.2
+        }
     };
-    console.log('Sending payload:', payload);
+    console.log('Sending payload to /api/export:', payload);
 
     try {
-      console.log('Export process started (simulation)');
-      for (let i = 0; i <= 100; i += 5) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setExportProgress(i);
-        setExportStatusMessage(`Rendering frame ${Math.round(i * (payload.endTime - payload.startTime) * payload.fps / 100)}...`);
-        if (i > 95) setExportStatusMessage('Encoding video...');
-      }
-      
-      setExportStatusMessage('Export complete! File ready for download.'); 
-      setExportCompleted(true);
-      setIsExporting(false);
+        const response = await fetch('/api/export', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Server error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Export request accepted:', result);
+        setExportJobId(result.jobId);
+        setExportStatusMessage('Export process started on server. Waiting for progress...');
 
     } catch (error) {
-      console.error("Export failed:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      setExportStatusMessage(`Export failed: ${errorMessage}`);
-      setIsExporting(false);
-      setExportCompleted(false);
+        console.error("Export failed:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        setExportStatusMessage(`Export failed: ${errorMessage}`);
+        setExportError(errorMessage);
+        setIsExporting(false);
+        setExportCompleted(false);
+        setExportJobId(null);
     }
   };
 
   const handleCloseOrCancel = () => {
     if (isExporting) {
-        console.log("Cancel requested during export (not implemented)");
+        console.log("Cancel requested during export (not fully implemented - needs API)");
     } else {
         setShowExportModal(false);
     }
   };
+
+  useEffect(() => {
+    if (!exportJobId || exportCompleted || exportError) return;
+
+    const intervalId = setInterval(async () => {
+        try {
+            const response = await fetch(`/api/export?jobId=${exportJobId}`);
+            if (!response.ok) {
+                console.warn(`Polling failed: ${response.status}`);
+                return;
+            }
+            const status = await response.json();
+            setExportProgress(status.percent || 0);
+            setExportStatusMessage(status.message || 'Polling for status...');
+
+            if (status.status === 'complete') {
+                setExportCompleted(true);
+                setIsExporting(false);
+                setExportUrl(status.url);
+                clearInterval(intervalId);
+                console.log('Polling: Export complete', status);
+            } else if (status.status === 'failed') {
+                setExportError(status.error || 'Unknown error from server');
+                setIsExporting(false);
+                clearInterval(intervalId);
+                console.error('Polling: Export failed', status);
+            }
+        } catch (err) {
+            console.error("Polling error:", err);
+        }
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+
+  }, [exportJobId, exportCompleted, exportError]);
 
   return (
     <div
@@ -195,6 +255,8 @@ const PlaybarView: React.FC = () => {
           statusMessage={exportStatusMessage}
           isExporting={isExporting}
           exportCompleted={exportCompleted}
+          exportError={exportError}
+          downloadUrl={exportUrl}
           onExportStart={handleStartExport}
           onCancel={handleCloseOrCancel}
         />

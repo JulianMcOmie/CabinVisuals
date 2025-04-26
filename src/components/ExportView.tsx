@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import { Download, FileAudio, Video, Check, Info, Share } from "lucide-react"
-import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog"
-import { Button } from "../components/ui/button"
-import { Progress } from "../components/ui/progress"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
-import { Label } from "../components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/src/components/ui/dialog"
+import { Button } from "@/src/components/ui/button"
+import { Progress } from "@/src/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
+import { Label } from "@/src/components/ui/label"
 
 // Define the colors to match the app's aesthetic
 const COLORS = {
@@ -31,15 +31,14 @@ interface ExportViewProps {
   exportCompleted: boolean;
   onExportStart: (settings: ExportSettings) => void; // Callback to start export
   onCancel: () => void; // Callback for cancel
-  // Potentially add outputFilename if needed for download link
-  // outputFilename?: string;
+  exportError?: string | null;
+  downloadUrl?: string | null;
 }
 
 // --- Export Settings Interface --- 
 export interface ExportSettings {
     resolution: string; // e.g., "1080p"
-    fps: "30" | "60";
-    audioFormat: "mp3" | "wav";
+    fps: string;
 }
 
 // --- Renamed component to ExportView ---
@@ -52,12 +51,12 @@ export function ExportView({
     exportCompleted,
     onExportStart, 
     onCancel, 
-    // outputFilename = "project_export.mp4"
+    exportError,
+    downloadUrl,
 }: ExportViewProps) {
   // State for the settings within the modal itself
-  const [audioFormat, setAudioFormat] = useState<"mp3" | "wav">("mp3");
   const [resolution, setResolution] = useState("1080p");
-  const [fps, setFps] = useState<"30" | "60">("60"); // Default to 60
+  const [fps, setFps] = useState("60");
 
   // We control the open state from the parent (PlaybarView)
   const handleOpenChange = (open: boolean) => {
@@ -67,15 +66,22 @@ export function ExportView({
   };
 
   const handleInitiateExport = () => {
-    onExportStart({ resolution, fps, audioFormat });
+    onExportStart({ resolution, fps });
   };
 
-  const resolutionOptions = {
+  // Determine current state for rendering logic
+  const showSettings = !isExporting && !exportCompleted && !exportError;
+  const showProgress = isExporting;
+  const showCompletion = exportCompleted && !exportError;
+  const showError = !!exportError;
+
+  // Resolution options map
+  const resolutionOptions: { [key: string]: string } = {
     "720p": "1280x720",
     "1080p": "1920x1080",
     "1440p": "2560x1440",
-    "4K": "3840x2160",
-  }
+    "4k": "3840x2160",
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -89,252 +95,98 @@ export function ExportView({
              if (isExporting) e.preventDefault(); // Prevent closing during export
         }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: COLORS.border }}>
-          <div className="flex items-center">
-            <div
-              className="h-8 w-8 rounded-md flex items-center justify-center mr-3"
-              style={{ backgroundColor: COLORS.electricBlue }}
-            >
-              <Share className="h-4 w-4 text-white" />
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold text-white">
+            Export Project
+          </DialogTitle>
+          {!showError && (
+             <DialogDescription>
+                {showSettings ? 'Configure the settings for your video export.' : 
+                 showProgress ? 'Your video is being rendered...' : 
+                 showCompletion ? 'Your video is ready!' : ''}
+             </DialogDescription>
+          )}
+        </DialogHeader>
+
+        {/* Display Error if present */} 
+        {showError && (
+            <div className="my-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                <p className="font-bold">Export Failed</p>
+                <p>{exportError}</p>
             </div>
-            <div>
-              <DialogTitle className="text-lg font-semibold text-white">
-                Export Project
-              </DialogTitle>
-              <p className="text-sm text-gray-400">Create shareable video from your project</p>
+        )}
+
+        {/* Settings Form (Hidden during/after export) */} 
+        {showSettings && (
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="resolution" className="text-right">
+                Resolution
+              </Label>
+              <Select value={resolution} onValueChange={setResolution}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select resolution" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(resolutionOptions).map(([key, value]) => (
+                    <SelectItem key={key} value={key} className="text-white focus:bg-[#444] focus:text-white">
+                      {key} ({value})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="fps" className="text-right">
+                FPS
+              </Label>
+              <Select value={fps} onValueChange={setFps}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select FPS" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30 FPS</SelectItem>
+                  <SelectItem value="60">60 FPS</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Content */}
-        <div className="p-6">
-          {exportCompleted ? (
-            <div className="space-y-6">
-              <div className="flex items-center justify-center flex-col">
-                <div
-                  className="h-16 w-16 rounded-full flex items-center justify-center mb-4"
-                  style={{ backgroundColor: "rgba(0, 195, 255, 0.15)" }}
-                >
-                  <Check className="h-8 w-8" style={{ color: COLORS.electricBlue }} />
-                </div>
-                <h3 className="text-xl font-medium text-white mb-2">Export Complete</h3>
-                <p className="text-gray-400 text-center max-w-md">
-                   {/* Use statusMessage from props for final message */}
-                   {statusMessage}
-                </p>
-              </div>
+        {/* Progress Bar and Status (Shown during export) */} 
+        {showProgress && (
+          <div className="my-4">
+            <Progress value={progress} className="w-full" />
+            <p className="text-sm text-muted-foreground mt-2 text-center">{statusMessage}</p>
+          </div>
+        )}
 
-              {/* --- TODO: Actual Download Button --- */}
-              {/* This needs the actual filename/URL from the backend */}
-              <div
-                className="rounded-md border p-4 flex items-center justify-between"
-                style={{ borderColor: COLORS.border, backgroundColor: COLORS.surface }}
-              >
-                <div className="flex items-center">
-                  <Video className="h-5 w-5" />
-                  <span className="ml-2 text-white">{/* outputFilename */}</span>
-                </div>
-                <Button
-                  className="flex items-center hover:shadow-[0_0_15px_rgba(0,195,255,0.5)] transform hover:-translate-y-0.5 transition-all"
-                  style={{
-                    backgroundColor: COLORS.electricBlue,
-                    borderColor: COLORS.electricBlue,
-                    color: "white",
-                  }}
-                  // onClick={() => { /* TODO: Trigger download */ }}
-                >
-                  <Download className="h-3 w-3 mr-1" />
-                  Download
-                </Button>
-              </div>
+        {/* Completion Message and Download Link */} 
+        {showCompletion && (
+            <div className="my-4 text-center">
+                <p className="text-green-600 font-semibold mb-3">{statusMessage || 'Export Complete!'}</p>
+                {downloadUrl ? (
+                    <Button asChild className="w-full"> 
+                        <a href={downloadUrl} download={`cabin_export_${resolution}_${fps}fps.mp4`}>
+                            <Download className="mr-2 h-4 w-4" /> Download Video
+                        </a>
+                    </Button>
+                ) : (
+                    <p className="text-sm text-muted-foreground mt-1">Download link will appear shortly.</p>
+                )}
             </div>
-          ) : isExporting ? (
-            <div className="space-y-6">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-white font-medium">{statusMessage}</h3> {/* Use status message from props */} 
-                  <span className="text-sm text-gray-400">{progress.toFixed(0)}%</span>
-                </div>
-                <Progress value={progress} className="h-2" />
-              </div>
+        )}
 
-              {/* More detailed status (could be derived from statusMessage) */}
-              <div className="space-y-2">
-                 {/* Example: Show stages based on progress */} 
-                 <div className="flex items-center text-sm">
-                   <Check className="h-4 w-4 mr-2 text-green-500" /> 
-                   <span className="text-gray-300">Preparing export...</span>
-                 </div>
-                 <div className="flex items-center text-sm">
-                   {progress > 5 ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <div className="h-4 w-4 mr-2 rounded-full border-2 border-gray-600" />} 
-                   <span className="text-gray-300">Rendering frames...</span>
-                 </div>
-                 <div className="flex items-center text-sm">
-                   {progress > 95 ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <div className="h-4 w-4 mr-2 rounded-full border-2 border-gray-600" />} 
-                   <span className="text-gray-300">Encoding video...</span>
-                 </div>
-              </div>
-
-              <div className="flex justify-end pt-4 border-t" style={{ borderColor: COLORS.border }}>
-                <Button
-                  variant="outline"
-                  onClick={onCancel} 
-                  className="hover:bg-[#555] transition-colors" 
-                  style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}
-                  disabled // Disable for now unless backend supports cancel
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              {/* Side-by-side layout */}
-              <div className="flex gap-5">
-                {/* Preview - Left side */}
-                <div className="w-2/5">
-                  <div
-                    className="aspect-video rounded-md overflow-hidden border flex items-center justify-center"
-                    style={{ borderColor: COLORS.border, backgroundColor: "#111" }}
-                  >
-                    <div className="text-center">
-                      <div className="flex justify-center mb-1">
-                        <Video className="h-6 w-6 text-gray-500" />
-                      </div>
-                      <p className="text-xs text-gray-400">Video preview</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-1 mt-2">
-                    <Info className="h-3 w-3 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-gray-500">Select export quality and format</p>
-                  </div>
-                </div>
-
-                {/* Controls - Right side */}
-                <div className="w-3/5 space-y-4">
-                  <h3 className="text-sm font-medium text-gray-300 mb-3">Export Settings</h3>
-
-                  {/* Resolution */}
-                  <div className="space-y-1">
-                    <Label htmlFor="resolution" className="text-xs text-gray-300">
-                      Resolution
-                    </Label>
-                    <Select value={resolution} onValueChange={setResolution}>
-                      <SelectTrigger
-                        id="resolution"
-                        className="w-full h-9 text-sm text-white"
-                        style={{ backgroundColor: "#3a3a3a" }}
-                      >
-                        <SelectValue placeholder="Select resolution" />
-                      </SelectTrigger>
-                      <SelectContent style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border }}>
-                        {Object.entries(resolutionOptions).map(([key, value]) => (
-                          <SelectItem key={key} value={key} className="text-white focus:bg-[#444] focus:text-white">
-                            {key} ({value})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* FPS */}
-                  <div className="space-y-1">
-                    <Label className="text-xs text-gray-300">Frame Rate</Label>
-                    <div className="flex rounded-md overflow-hidden border" style={{ borderColor: COLORS.border }}>
-                      <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors rounded-l-md ${ 
-                          fps === "30" ? "text-white" : "bg-[#252525] text-gray-300 hover:bg-[#333]"
-                        }`}
-                        style={{ 
-                            backgroundColor: fps === "30" ? 'rgba(0, 195, 255, 0.4)' : undefined,
-                            boxShadow: fps === "30" ? `inset 0 0 0 1px ${COLORS.electricBlue}` : undefined
-                        }}
-                        onClick={() => setFps("30")}
-                      >
-                        30 FPS
-                      </button>
-                      <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors rounded-r-md ${ 
-                          fps === "60" ? "text-white" : "bg-[#252525] text-gray-300 hover:bg-[#333]"
-                        }`}
-                        style={{ 
-                            backgroundColor: fps === "60" ? 'rgba(0, 195, 255, 0.4)' : undefined,
-                            boxShadow: fps === "60" ? `inset 0 0 0 1px ${COLORS.electricBlue}` : undefined
-                        }}
-                        onClick={() => setFps("60")}
-                      >
-                        60 FPS
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Audio Format */}
-                  <div className="space-y-1">
-                    <Label className="text-xs text-gray-300">Audio Format</Label>
-                    <div className="flex rounded-md overflow-hidden border" style={{ borderColor: COLORS.border }}>
-                      <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors rounded-l-md ${ 
-                          audioFormat === "mp3"
-                            ? "text-white"
-                            : "bg-[#252525] text-gray-300 hover:bg-[#333]"
-                        }`}
-                        style={{ 
-                            backgroundColor: audioFormat === "mp3" ? 'rgba(0, 195, 255, 0.4)' : undefined,
-                            boxShadow: audioFormat === "mp3" ? `inset 0 0 0 1px ${COLORS.electricBlue}` : undefined
-                        }}
-                        onClick={() => setAudioFormat("mp3")}
-                      >
-                        <div className="flex items-center justify-center">
-                          <FileAudio className="h-3 w-3 mr-1" />
-                          MP3
-                        </div>
-                      </button>
-                      <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors rounded-r-md ${ 
-                          audioFormat === "wav"
-                            ? "text-white"
-                            : "bg-[#252525] text-gray-300 hover:bg-[#333]"
-                        }`}
-                        style={{ 
-                            backgroundColor: audioFormat === "wav" ? 'rgba(0, 195, 255, 0.4)' : undefined,
-                            boxShadow: audioFormat === "wav" ? `inset 0 0 0 1px ${COLORS.electricBlue}` : undefined
-                        }}
-                        onClick={() => setAudioFormat("wav")}
-                      >
-                        <div className="flex items-center justify-center">
-                          <FileAudio className="h-3 w-3 mr-1" />
-                          WAV
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between pt-4 mt-4 border-t" style={{ borderColor: COLORS.border }}>
-                <Button
-                  variant="outline"
-                  onClick={onClose} // Use parent's close handler
-                  style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}
-                  className="hover:bg-[#555] transition-colors"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="text-white hover:shadow-[0_0_15px_rgba(0,195,255,0.5)] transform hover:-translate-y-0.5 transition-all"
-                  style={{
-                    backgroundColor: COLORS.electricBlue,
-                    borderColor: COLORS.electricBlue,
-                  }}
-                  onClick={handleInitiateExport} // Call parent's export starter
-                >
-                  Export
-                </Button>
-              </div>
-            </div>
+        <DialogFooter>
+          {/* Show Cancel during export, Close otherwise */} 
+          <Button variant="outline" onClick={onCancel} disabled={isExporting && !exportCompleted && !exportError}>
+            {isExporting ? 'Cancel' : 'Close'}
+          </Button>
+          {/* Show Start Export only when settings are visible */} 
+          {showSettings && (
+            <Button onClick={handleInitiateExport}>Start Export</Button>
           )}
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
