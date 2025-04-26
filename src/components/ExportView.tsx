@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Download, FileAudio, Video, Check, Info, Share } from "lucide-react"
-import { Dialog, DialogContent } from "../components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog"
 import { Button } from "../components/ui/button"
 import { Progress } from "../components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
@@ -99,7 +99,9 @@ export function ExportView({
               <Share className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Export Project</h2>
+              <DialogTitle className="text-lg font-semibold text-white">
+                Export Project
+              </DialogTitle>
               <p className="text-sm text-gray-400">Create shareable video from your project</p>
             </div>
           </div>
