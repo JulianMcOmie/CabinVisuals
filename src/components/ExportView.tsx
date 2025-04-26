@@ -148,12 +148,6 @@ export function ExportView({
                   Download
                 </Button>
               </div>
-              {/* Close button after completion */} 
-              <div className="flex justify-end pt-4 border-t" style={{ borderColor: COLORS.border }}>
-                  <Button variant="outline" onClick={onClose} style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}>
-                      Close
-                  </Button>
-              </div>
             </div>
           ) : isExporting ? (
             <div className="space-y-6">
@@ -183,10 +177,10 @@ export function ExportView({
               </div>
 
               <div className="flex justify-end pt-4 border-t" style={{ borderColor: COLORS.border }}>
-                {/* --- TODO: Implement actual cancel functionality --- */}
                 <Button
                   variant="outline"
-                  onClick={onCancel} // Use parent's cancel handler
+                  onClick={onCancel} 
+                  className="hover:bg-[#555] transition-colors" 
                   style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}
                   disabled // Disable for now unless backend supports cancel
                 >
@@ -249,17 +243,25 @@ export function ExportView({
                     <Label className="text-xs text-gray-300">Frame Rate</Label>
                     <div className="flex rounded-md overflow-hidden border" style={{ borderColor: COLORS.border }}>
                       <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${
-                          fps === "30" ? "bg-[#3a3a3a] text-white" : "bg-[#252525] text-gray-300 hover:bg-[#333]"
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${ 
+                          fps === "30" ? "text-white" : "bg-[#252525] text-gray-300 hover:bg-[#333]"
                         }`}
+                        style={{ 
+                            backgroundColor: fps === "30" ? 'rgba(0, 195, 255, 0.4)' : undefined,
+                            boxShadow: fps === "30" ? `inset 0 0 0 1px ${COLORS.electricBlue}` : undefined
+                        }}
                         onClick={() => setFps("30")}
                       >
                         30 FPS
                       </button>
                       <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${
-                          fps === "60" ? "bg-[#3a3a3a] text-white" : "bg-[#252525] text-gray-300 hover:bg-[#333]"
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${ 
+                          fps === "60" ? "text-white" : "bg-[#252525] text-gray-300 hover:bg-[#333]"
                         }`}
+                        style={{ 
+                            backgroundColor: fps === "60" ? 'rgba(0, 195, 255, 0.4)' : undefined,
+                            boxShadow: fps === "60" ? `inset 0 0 0 1px ${COLORS.electricBlue}` : undefined
+                        }}
                         onClick={() => setFps("60")}
                       >
                         60 FPS
@@ -267,16 +269,20 @@ export function ExportView({
                     </div>
                   </div>
 
-                  {/* Audio Format - Currently not used by backend, keep for UI */}
+                  {/* Audio Format */}
                   <div className="space-y-1">
                     <Label className="text-xs text-gray-300">Audio Format</Label>
                     <div className="flex rounded-md overflow-hidden border" style={{ borderColor: COLORS.border }}>
                       <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${ 
                           audioFormat === "mp3"
-                            ? "bg-[#3a3a3a] text-white"
+                            ? "text-white"
                             : "bg-[#252525] text-gray-300 hover:bg-[#333]"
                         }`}
+                        style={{ 
+                            backgroundColor: audioFormat === "mp3" ? 'rgba(0, 195, 255, 0.4)' : undefined,
+                            boxShadow: audioFormat === "mp3" ? `inset 0 0 0 1px ${COLORS.electricBlue}` : undefined
+                        }}
                         onClick={() => setAudioFormat("mp3")}
                       >
                         <div className="flex items-center justify-center">
@@ -285,11 +291,15 @@ export function ExportView({
                         </div>
                       </button>
                       <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${ 
                           audioFormat === "wav"
-                            ? "bg-[#3a3a3a] text-white"
+                            ? "text-white"
                             : "bg-[#252525] text-gray-300 hover:bg-[#333]"
                         }`}
+                        style={{ 
+                            backgroundColor: audioFormat === "wav" ? 'rgba(0, 195, 255, 0.4)' : undefined,
+                            boxShadow: audioFormat === "wav" ? `inset 0 0 0 1px ${COLORS.electricBlue}` : undefined
+                        }}
                         onClick={() => setAudioFormat("wav")}
                       >
                         <div className="flex items-center justify-center">
@@ -307,6 +317,7 @@ export function ExportView({
                   variant="outline"
                   onClick={onClose} // Use parent's close handler
                   style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}
+                  className="hover:bg-[#555] transition-colors"
                 >
                   Cancel
                 </Button>
