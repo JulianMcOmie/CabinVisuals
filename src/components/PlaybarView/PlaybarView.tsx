@@ -1,15 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import useStore from '../../store/store';
 import styles from './PlaybarView.module.css';
 import { Repeat, Upload } from 'lucide-react';
 import { Play, Square, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ExportView, { ExportSettings } from '../ExportView';
-
-// Define WebSocket URL (adjust based on your server setup)
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001'; 
+import { ExportView, ExportSettings } from '../ExportView';
 
 // Main PlaybarView component
 const PlaybarView: React.FC = () => {
@@ -26,8 +23,7 @@ const PlaybarView: React.FC = () => {
     isInstrumentSidebarVisible,
     toggleInstrumentSidebar,
     setSelectedWindow,
-    tracks,
-    timeManager
+    tracks
   } = useStore();
 
   const [exportButtonHover, setExportButtonHover] = useState(false);
@@ -36,101 +32,6 @@ const PlaybarView: React.FC = () => {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatusMessage, setExportStatusMessage] = useState('Preparing export...');
   const [exportCompleted, setExportCompleted] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [exportJobId, setExportJobId] = useState<string | null>(null);
-  const [exportUrl, setExportUrl] = useState<string | null>(null);
-
-  // WebSocket Ref
-  const ws = useRef<WebSocket | null>(null);
-
-  // --- WebSocket Connection Effect ---
-  useEffect(() => {
-    // Don't connect until needed (e.g., modal opens or export starts)
-    // For simplicity, let's connect when the component mounts and manage registration later
-    if (!ws.current) {
-      console.log(`Attempting to connect WebSocket: ${WS_URL}`);
-      ws.current = new WebSocket(WS_URL);
-
-      ws.current.onopen = () => {
-        console.log('WebSocket Connected');
-        // If we already have a job ID when connection opens, register it
-        if (exportJobId) {
-          console.log(`WebSocket open, registering existing jobId: ${exportJobId}`);
-          ws.current?.send(JSON.stringify({ type: 'register', jobId: exportJobId }));
-        }
-      };
-
-      ws.current.onclose = (event) => {
-        console.log(`WebSocket Disconnected: code=${event.code}, reason=${event.reason}`);
-        ws.current = null; // Ensure ref is cleared on close
-        // Optional: Implement reconnection logic here if needed
-      };
-
-      ws.current.onerror = (error) => {
-        console.error('WebSocket Error:', error);
-        setExportError('WebSocket connection error.'); // Show error in UI
-        setIsExporting(false); // Stop exporting state on WS error
-        // ws.current might be null here already depending on when error occurs
-      };
-
-      ws.current.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data as string);
-          console.log('WebSocket Message Received:', message);
-
-          // Only process messages for the current job
-          if (message.jobId === exportJobId) {
-            switch (message.type) {
-              case 'status': // Initial status update
-              case 'progress':
-                setExportProgress(message.percent ?? exportProgress);
-                setExportStatusMessage(message.message ?? exportStatusMessage);
-                setIsExporting(true); // Ensure exporting is true on progress
-                setExportCompleted(false);
-                setExportError(null);
-                break;
-              case 'complete':
-                setExportProgress(100);
-                setExportStatusMessage(message.message || 'Export complete!');
-                setExportUrl(message.url);
-                setExportCompleted(true);
-                setIsExporting(false);
-                setExportError(null);
-                // Consider closing WS here or keep open for other tasks
-                break;
-              case 'error':
-                setExportStatusMessage(`Export failed: ${message.message}`);
-                setExportError(message.message);
-                setExportCompleted(false); // Ensure not marked completed
-                setIsExporting(false);
-                // Keep WS open potentially, or close based on error type
-                break;
-              case 'registered': // Confirmation from server
-                 console.log(`WebSocket registered successfully for job ${message.jobId}`);
-                 break;
-              default:
-                console.warn('Unknown WebSocket message type:', message.type);
-            }
-          } else if (message.jobId) {
-             console.warn(`WebSocket message received for different job (${message.jobId}), current job is ${exportJobId}`);
-          }
-        } catch (e) {
-          console.error('Failed to parse WebSocket message:', e);
-        }
-      };
-    }
-
-    // Cleanup function to close WebSocket on component unmount
-    return () => {
-      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-        console.log('Closing WebSocket connection.');
-        ws.current.close();
-      }
-      ws.current = null;
-    };
-  // Run only once on mount to establish connection
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array
 
   const handlePlaybarClick = () => {
     setSelectedWindow(null);
@@ -142,9 +43,6 @@ const PlaybarView: React.FC = () => {
     setExportCompleted(false);
     setExportProgress(0);
     setExportStatusMessage('Configure export settings.');
-    setExportError(null);
-    setExportJobId(null);
-    setExportUrl(null);
     setShowExportModal(true);
   };
 
@@ -152,84 +50,51 @@ const PlaybarView: React.FC = () => {
     setIsExporting(true);
     setExportCompleted(false);
     setExportProgress(0);
-    setExportStatusMessage('Sending request to server...');
-    setExportError(null);
-    setExportJobId(null);
-    setExportUrl(null);
+    setExportStatusMessage('Initializing export...');
 
     console.log('Starting export with settings:', settings);
-
-    const estimatedDuration = 30;
-
     const payload = {
-        width: settings.resolution === "720p" ? 1280 :
-               settings.resolution === "1080p" ? 1920 :
+        width: settings.resolution === "720p" ? 1280 : 
+               settings.resolution === "1080p" ? 1920 : 
                settings.resolution === "1440p" ? 2560 : 3840,
-        height: settings.resolution === "720p" ? 720 :
-                settings.resolution === "1080p" ? 1080 :
+        height: settings.resolution === "720p" ? 720 : 
+                settings.resolution === "1080p" ? 1080 : 
                 settings.resolution === "1440p" ? 1440 : 2160,
-        fps: parseInt(settings.fps, 10),
-        durationSeconds: estimatedDuration,
+        fps: parseInt(settings.fps),
+        startTime: 0,
+        endTime: 10,
         bpm: bpm,
         tracks: tracks,
-        bloomParams: {
-            strength: 1.0,
-            threshold: 0.1,
-            radius: 0.2
-        }
     };
-    console.log('Sending payload to /api/export:', payload);
+    console.log('Sending payload:', payload);
 
     try {
-        const response = await fetch('/api/export', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Server error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log('Export request accepted, Job ID:', result.jobId);
-        setExportJobId(result.jobId);
-        setExportStatusMessage('Waiting for server connection...');
-
-        // --- Register Job ID with WebSocket ---
-        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            console.log(`WebSocket connected, sending register message for jobId: ${result.jobId}`);
-            ws.current.send(JSON.stringify({ type: 'register', jobId: result.jobId }));
-            setExportStatusMessage('Server connected. Waiting for progress...');
-        } else {
-            console.warn('WebSocket not connected when export started. Registration will occur onopen.');
-            // onopen handler will pick up exportJobId and register
-        }
+      console.log('Export process started (simulation)');
+      for (let i = 0; i <= 100; i += 5) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        setExportProgress(i);
+        setExportStatusMessage(`Rendering frame ${Math.round(i * (payload.endTime - payload.startTime) * payload.fps / 100)}...`);
+        if (i > 95) setExportStatusMessage('Encoding video...');
+      }
+      
+      setExportStatusMessage('Export complete! File ready for download.'); 
+      setExportCompleted(true);
+      setIsExporting(false);
 
     } catch (error) {
-        console.error("Export failed:", error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        setExportStatusMessage(`Export failed: ${errorMessage}`);
-        setExportError(errorMessage);
-        setIsExporting(false);
-        setExportCompleted(false);
-        setExportJobId(null);
+      console.error("Export failed:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setExportStatusMessage(`Export failed: ${errorMessage}`);
+      setIsExporting(false);
+      setExportCompleted(false);
     }
   };
 
   const handleCloseOrCancel = () => {
     if (isExporting) {
-        console.log("Cancel requested during export (not fully implemented - needs API/WS message)");
-        // TODO: Send WS message or API call to cancel job on backend
+        console.log("Cancel requested during export (not implemented)");
     } else {
         setShowExportModal(false);
-        // Optional: Close WS if not needed elsewhere
-        // if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-        //   ws.current.close();
-        // }
     }
   };
 
@@ -330,8 +195,6 @@ const PlaybarView: React.FC = () => {
           statusMessage={exportStatusMessage}
           isExporting={isExporting}
           exportCompleted={exportCompleted}
-          exportError={exportError}
-          downloadUrl={exportUrl}
           onExportStart={handleStartExport}
           onCancel={handleCloseOrCancel}
         />
