@@ -95,38 +95,37 @@ export default function AlphaPage() {
 
   return (
     <div className={`${styles.alphaPageWrapper} flex flex-col h-screen bg-black text-white`}>
-       <header className="flex items-center justify-between p-3 border-b border-gray-800 flex-shrink-0">
+       <header className="flex items-center justify-start p-3 border-b border-gray-800 flex-shrink-0 space-x-6">
          <h1 className="text-lg font-bold">Cabin Visuals</h1>
-         <div className="flex items-center space-x-3">
-           {user ? (
-             <>
-               <span className="text-xs text-gray-400 hidden sm:inline">{user.email}</span>
-               {/* <form action={logout}>
-                  <button className="rounded-full border border-gray-600 px-3 py-1 text-xs font-semibold text-gray-300 shadow-sm hover:border-gray-400 hover:text-white transition-colors">
-                    Logout
-                  </button>
-               </form> */}
-             </>
-           ) : (
-             <>
-               <Link href="/login" legacyBehavior>
-                 <a className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors">
+         {!user && (
+            <div className="flex items-center space-x-3">
+              <Link href="/login" legacyBehavior>
+                 <a className="rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors">
                    Log In
                  </a>
                </Link>
                <Link href="/signup" legacyBehavior>
-                 <a className="rounded-full border border-gray-600 px-3 py-1 text-xs font-semibold text-gray-300 shadow-sm hover:border-gray-400 hover:text-white transition-colors">
+                 <a className="rounded-full border border-gray-600 px-4 py-1.5 text-sm font-semibold text-gray-300 shadow-sm hover:border-gray-400 hover:text-white transition-colors">
                    Sign Up
                  </a>
                </Link>
+            </div>
+         )}
+         <div className="flex-grow"></div>
+         <div className="flex items-center space-x-3">
+           {user ? (
+             <>
+               <span className="text-xs text-gray-400 hidden sm:inline">{user.email}</span>
              </>
+           ) : (
+             <></>
            )}
          </div>
        </header>
 
       <main className={`${styles.mainContainer} flex-grow flex flex-col`}>
         <div className={styles.playbarContainer}>
-          <PlaybarView />
+          <PlaybarView user={user} />
         </div>
         
         <PanelGroup direction="horizontal" className={`${styles.contentPanelGroup} flex-grow`}>

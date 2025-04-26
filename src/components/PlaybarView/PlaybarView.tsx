@@ -3,13 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../../store/store';
 import styles from './PlaybarView.module.css';
-import { Repeat, Upload } from 'lucide-react';
-import { Play, Square, PanelLeft } from 'lucide-react';
+import { Repeat, Upload, Play, Square, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import type { User } from '@supabase/supabase-js'; // Import User type
+import LogInButton from '../AuthButtons/LogInButton'; // Import new component
+import SignUpButton from '../AuthButtons/SignUpButton'; // Import new component
 
+// Define props including the user
+interface PlaybarViewProps {
+  user: User | null;
+}
 
 // Main PlaybarView component
-const PlaybarView: React.FC = () => {
+const PlaybarView: React.FC<PlaybarViewProps> = ({ user }) => { // Destructure user prop
   const { 
     currentBeat, 
     isPlaying, 
@@ -86,6 +92,14 @@ const PlaybarView: React.FC = () => {
     </div>
 
     <div className={styles.rightControls}>
+      {/* Use reusable Auth Button components */} 
+      {!user && (
+        <div className="flex items-center space-x-4 mr-4"> {/* Increased spacing */} 
+           <LogInButton />
+           <SignUpButton />
+        </div>
+      )}
+
       <div className={styles.beatDisplay}>
         {currentBeat}
       </div>

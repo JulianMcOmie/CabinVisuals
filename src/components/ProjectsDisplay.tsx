@@ -13,7 +13,8 @@ import { ProjectMetadata } from '../store/projectSlice'; // Import the type
 import type { User } from '@supabase/supabase-js'; // Import User type
 import { logout } from "../../app/(auth)/logout/actions"; // Corrected relative path
 import { useState } from "react"; // Import useState
-import Link from "next/link"; // Import Link
+import LogInButton from './AuthButtons/LogInButton'; // Import new component
+import SignUpButton from './AuthButtons/SignUpButton'; // Import new component
 
 // Define a type for the profile data (adjust fields as needed)
 interface ProfileData {
@@ -116,18 +117,10 @@ export default function ProjectsDisplay({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            // Show Log In / Sign Up buttons if user is not logged in
+            // Use reusable Auth Button components
             <div className="flex items-center space-x-4">
-              <Link href="/login" legacyBehavior>
-                 <a className="rounded-full bg-indigo-600 px-5 py-2 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors">
-                   Log In
-                 </a>
-               </Link>
-               <Link href="/signup" legacyBehavior>
-                 <a className="rounded-full border border-gray-600 px-5 py-2 text-base font-semibold text-gray-300 shadow-sm hover:border-gray-400 hover:text-white transition-colors">
-                   Sign Up
-                 </a>
-               </Link>
+              <LogInButton />
+              <SignUpButton />
             </div>
           )}
         </nav>
