@@ -243,7 +243,7 @@ export function ExportView({
                     <Label className="text-xs text-gray-300">Frame Rate</Label>
                     <div className="flex rounded-md overflow-hidden border" style={{ borderColor: COLORS.border }}>
                       <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${ 
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors rounded-l-md ${ 
                           fps === "30" ? "text-white" : "bg-[#252525] text-gray-300 hover:bg-[#333]"
                         }`}
                         style={{ 
@@ -255,7 +255,7 @@ export function ExportView({
                         30 FPS
                       </button>
                       <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${ 
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors rounded-r-md ${ 
                           fps === "60" ? "text-white" : "bg-[#252525] text-gray-300 hover:bg-[#333]"
                         }`}
                         style={{ 
@@ -274,7 +274,7 @@ export function ExportView({
                     <Label className="text-xs text-gray-300">Audio Format</Label>
                     <div className="flex rounded-md overflow-hidden border" style={{ borderColor: COLORS.border }}>
                       <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${ 
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors rounded-l-md ${ 
                           audioFormat === "mp3"
                             ? "text-white"
                             : "bg-[#252525] text-gray-300 hover:bg-[#333]"
@@ -291,7 +291,7 @@ export function ExportView({
                         </div>
                       </button>
                       <button
-                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors ${ 
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium transition-colors rounded-r-md ${ 
                           audioFormat === "wav"
                             ? "text-white"
                             : "bg-[#252525] text-gray-300 hover:bg-[#333]"
