@@ -45,8 +45,8 @@ export async function updateSession(request: NextRequest) {
     '/alpha',
     '/login',
     '/signup',
-    '/auth/reset-password',
-    '/auth/update-password',
+    '/reset-password',
+    '/update-password',
     // Add any other public paths like /about, /pricing, etc.
   ];
 
@@ -54,7 +54,7 @@ export async function updateSession(request: NextRequest) {
   const authRoutes = [
     '/login',
     '/signup',
-    '/auth/reset-password',
+    '/reset-password',
     // Don't usually redirect away from update-password as user needs to be there after clicking link
   ];
 
