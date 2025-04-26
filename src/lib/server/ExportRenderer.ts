@@ -4,17 +4,15 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { BloomPass } from 'three/examples/jsm/postprocessing/BloomPass.js'; // Check if this is the right Bloom pass used in R3F/postprocessing
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'; // Needed for correct colorspace
 // --- Potentially needed for R3F/postprocessing Bloom equivalence: ---
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'; 
 
 import VisualizerManager, { VisualObject3D } from '../VisualizerManager';
 import TimeManager from '../TimeManager';
-// @ts-ignore - No types available for 'gl'
-import GL from 'gl'; // Headless GL context
-import NodeTimeManager from './NodeTimeManager'; // Assuming this path
-import { spawn } from 'child_process'; // For ffmpeg
-import { Writable } from 'stream';    // For ffmpeg stream
+// import { spawn } from 'child_process'; // For ffmpeg
+// import { Writable } from 'stream';    // For ffmpeg stream
 // const createGLContext = require('gl'); // Example headless GL
 
 // --- Configuration ---
@@ -32,17 +30,7 @@ interface ExportOptions {
     bloomIntensity?: number;
     bloomThreshold?: number;
     bloomSmoothing?: number; // Note: Bloom parameters might map differently between R3F and three.js passes
-    durationSeconds: number; // Total duration to export
-    projectData: any;        // TODO: Define based on API request
-    bloomParams?: { strength: number; threshold: number; radius: number }; // Matching UnrealBloomPass params
 }
-
-interface ProgressUpdate {
-    percent: number;
-    message: string;
-}
-
-type OnProgressCallback = (update: ProgressUpdate) => void;
 
 class ExportRenderer {
     private visualizerManager: VisualizerManager;
@@ -54,8 +42,6 @@ class ExportRenderer {
     private renderer: THREE.WebGLRenderer;
     private composer: EffectComposer;
     private renderTarget: THREE.WebGLRenderTarget; // Used by composer
-    private glContext: WebGLRenderingContext;
-    private bloomPass?: UnrealBloomPass;
 
     // Headless WebGL context
     // private glContext: WebGLRenderingContext; 
@@ -74,11 +60,9 @@ class ExportRenderer {
         this.camera.position.set(0, 0, 15); // Match VisualizerView
 
         // --- Setup Headless WebGL & Renderer ---
-        this.glContext = GL(this.options.width, this.options.height, { preserveDrawingBuffer: true });
-        this.renderer = new THREE.WebGLRenderer({
-            context: this.glContext,
-            antialias: true, // Optional: configure as needed
-        });
+        // this.glContext = createGLContext(this.options.width, this.options.height, { preserveDrawingBuffer: true });
+        // this.renderer = new THREE.WebGLRenderer({ context: this.glContext, antialias: true, alpha: true });
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // Placeholder
         this.renderer.setSize(this.options.width, this.options.height);
         this.renderer.setPixelRatio(1);
         // Important: Ensure output color space is correct, especially with post-processing
@@ -111,7 +95,7 @@ class ExportRenderer {
         // Configure Bloom - **MATCH VisualizerView settings**
         // Note: Mapping R3F/@react-postprocessing Bloom parameters to three.js passes might require checking library versions/specifics.
         // UnrealBloomPass is often used for the effect seen in R3F examples. Let's assume UnrealBloomPass for now.
-        this.bloomPass = new UnrealBloomPass(
+        const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(this.options.width, this.options.height),
             this.options.bloomIntensity ?? 1.0, // intensity
             this.options.bloomThreshold ?? 0.1,  // threshold (radius in UnrealBloomPass, maps differently than threshold)
@@ -124,7 +108,7 @@ class ExportRenderer {
         //     4,    // sigma
         //     256,  // resolution
         // );
-        this.composer.addPass(this.bloomPass);
+        this.composer.addPass(bloomPass);
         
         // Add OutputPass to handle color space and encoding correctly after post-processing
         const outputPass = new OutputPass();
@@ -216,83 +200,19 @@ class ExportRenderer {
         }
     }
 
-    // --- Post-Processing Setup (Step 4.3) ---
-    private setupPostProcessing(bloomParamsInput?: { strength: number; threshold: number; radius: number }): void {
-        // Default params based on VisualizerView.tsx
-        const defaultBloomParams = {
-            strength: 1.0,   // mapped from intensity
-            threshold: 0.1,  // mapped from luminanceThreshold
-            radius: 0.2      // mapped from luminanceSmoothing
-        };
-        const bloomParams = { ...defaultBloomParams, ...bloomParamsInput }; // Merge defaults with input
 
-        // Clear existing passes
-        this.composer.passes = [];
-
-        // 1. Render Pass (renders the scene to the composer's buffer)
-        const renderPass = new RenderPass(this.scene, this.camera);
-        this.composer.addPass(renderPass);
-
-        // 2. Bloom Pass
-        this.bloomPass = new UnrealBloomPass(
-            new THREE.Vector2(this.options.width, this.options.height),
-            bloomParams.strength, // strength
-            bloomParams.radius,   // radius
-            bloomParams.threshold // threshold
-        );
-        this.composer.addPass(this.bloomPass);
-        console.log('Bloom Pass enabled:', bloomParams);
-
-        // 3. Output Pass (handles final output to the render target, includes tone mapping/color space)
-        const outputPass = new OutputPass();
-        this.composer.addPass(outputPass);
-
-        console.log('Post-processing setup complete.');
-    }
-
-    // --- Frame Rendering Logic ---
-    private renderFrame(beat: number): Uint8Array {
-        // 1. Update time
-        this.timeManager.seekTo(beat);
-
-        // 2. Update scene contents based on current beat/time
-        this.updateSceneFromVisualObjects(this.visualizerManager.getVisualObjects());
-
-        // 3. Render the scene using the EffectComposer
-        this.composer.render();
-
-        // 4. Read pixels back from the composer's *write* buffer (or renderer's target if passes = 1)
-        // into a standard Uint8Array for ffmpeg.
-        const buffer = new Uint8Array(this.options.width * this.options.height * 4);
-        this.renderer.readRenderTargetPixels(
-            this.composer.readBuffer, // Read from the buffer the composer last wrote to
-            0, 0, // x, y
-            this.options.width, this.options.height, // width, height
-            buffer // target buffer
-            // No need to specify format/type here, it reads from the render target
-        );
-
-        // The buffer read by readRenderTargetPixels might be vertically flipped depending on the setup.
-        // ffmpeg expects frames top-to-bottom. If the output is flipped, we need to flip it back.
-        // For now, we assume it's correct. Add flipping logic later if needed.
-
-        return buffer;
-    }
-
-    // --- Main Export Function (Step 4.3 / Step 4.4 integration point) ---
-    public async export(onProgress: OnProgressCallback): Promise<void> {
-        const { width, height, fps, startTimeSeconds, endTimeSeconds, outputFilename, ffmpegPath = 'ffmpeg', durationSeconds, projectData, bloomParams } = this.options;
+    // --- Main Export Function ---
+    public async export(onProgress: (percent: number, message: string) => void): Promise<void> {
+        const { width, height, fps, startTimeSeconds, endTimeSeconds, outputFilename, ffmpegPath = 'ffmpeg' } = this.options;
+        const durationSeconds = endTimeSeconds - startTimeSeconds;
         const totalFrames = Math.ceil(durationSeconds * fps);
-        const timeStep = 1 / fps; // Time increment per frame in seconds
+        const pixelBuffer = new Uint8Array(width * height * 4); // RGBA
 
         console.log(`Starting export: ${totalFrames} frames (${durationSeconds}s @ ${fps}fps) to ${outputFilename}`);
-        onProgress({ percent: 0, message: `Starting export: ${totalFrames} frames...` });
+        onProgress(0, `Starting export: ${totalFrames} frames...`);
 
         // --- Reset ---
         this.visualizerManager.resetState();
-
-        // Setup post-processing (Bloom)
-        this.setupPostProcessing(bloomParams);
 
         // --- Setup ffmpeg process (Conceptual) ---
         const ffmpegArgs = [
@@ -316,28 +236,44 @@ class ExportRenderer {
         // Handle ffmpeg exit/error
 
         // --- Frame-by-Frame Rendering Loop ---
-        for (let frame = 0; frame < totalFrames; frame++) {
-            const currentTime = startTimeSeconds + frame * timeStep;
-            const currentBeat = this.timeManager.timeToBeat(currentTime);
+        for (let i = 0; i < totalFrames; i++) {
+            const currentTime = startTimeSeconds + i / fps;
+            const currentBeat = this.timeManager.timeToBeat(currentTime); // Use conversion
 
-            // Render frame
-            const pixelBuffer = this.renderFrame(currentBeat);
+            // Set exact time
+            this.timeManager.seekTo(currentBeat);
+
+            // Get visual state
+            const visualObjects = this.visualizerManager.getVisualObjects();
+
+            // Update Three.js scene
+            this.updateSceneFromVisualObjects(visualObjects);
+
+            // Render using the EffectComposer
+            this.composer.render(); // Renders the scene with post-processing to its internal buffer
+
+            // Read pixel data from the *renderer's* drawing buffer after composer has rendered
+            this.renderer.readRenderTargetPixels(
+                this.composer.readBuffer, // Read from the composer's output buffer
+                0, 0, width, height,
+                pixelBuffer
+            );
 
             // --- Pipe buffer to ffmpeg (Conceptual) ---
             // const success = ffmpegStdin.write(Buffer.from(pixelBuffer));
             // if (!success) await new Promise(resolve => ffmpegStdin.once('drain', resolve));
 
             // --- Update Progress ---
-            const percentComplete = ((frame + 1) / totalFrames) * 100;
-            if ((frame + 1) % 10 === 0 || frame === totalFrames - 1) { // Update progress less frequently
-                 onProgress({ percent: parseFloat(percentComplete.toFixed(1)), message: `Rendering frame ${frame + 1}/${totalFrames}` });
+            const progressPercent = ((i + 1) / totalFrames) * 100;
+            if ((i + 1) % 10 === 0 || i === totalFrames - 1) { // Update progress less frequently
+                 onProgress(progressPercent, `Rendering frame ${i + 1}/${totalFrames}`);
             }
         }
 
         // --- Finish ffmpeg ---
         // ffmpegStdin.end();
         console.log('All frames rendered. Waiting for ffmpeg...');
-        onProgress({ percent: 100, message: 'Finalizing video file...' });
+        onProgress(100, 'Finalizing video file...');
 
         // await new Promise<void>((resolve, reject) => { /* Wait for ffmpeg exit */ });
 
@@ -350,7 +286,7 @@ class ExportRenderer {
         // this.glContext.destroy();
 
         console.log(`Export complete: ${outputFilename}`);
-        onProgress({ percent: 100, message: `Export complete: ${outputFilename}` }); // Final success message
+        onProgress(100, `Export complete: ${outputFilename}`); // Final success message
     }
 }
 
