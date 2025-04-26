@@ -76,15 +76,7 @@ Implement a non-real-time video export feature allowing users to render their pr
     - Establish WebSocket connection.
     - Listen for messages and update corresponding state in `PlaybarView.tsx` / `useStore`.
 
-## 5. Key Considerations
-
-- **Node Compatibility:** `TimeManager` is the primary refactoring task. Synthesizers/Effects appear compatible based on review, but thorough testing is still needed.
-- **Performance:** Server-side rendering is intensive. Monitor resource usage.
-- **Bloom Parameter Mapping:** Requires careful matching between R3F and Three.js implementations.
-- **State Serialization/Deserialization:** Re-instantiating Synths/Effects on the backend needs a robust mechanism.
-- **Error Handling:** Implement comprehensive error handling in the backend process and report clearly to the frontend.
-
-## 6. Open Decisions
+## 5. Open Decisions
 
 - Specific headless WebGL library (`gl` recommended, but alternatives exist).
 - Exact WebSocket implementation details (library choice, message format, job association).
