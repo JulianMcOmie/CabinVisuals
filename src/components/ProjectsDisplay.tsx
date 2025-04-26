@@ -13,6 +13,7 @@ import { ProjectMetadata } from '../store/projectSlice'; // Import the type
 import type { User } from '@supabase/supabase-js'; // Import User type
 import { logout } from "../../app/(auth)/logout/actions"; // Corrected relative path
 import { useState } from "react"; // Import useState
+import Link from "next/link"; // Import Link
 
 // Define a type for the profile data (adjust fields as needed)
 interface ProfileData {
@@ -78,45 +79,57 @@ export default function ProjectsDisplay({
       <header className={styles.header}>
         <h1 className={`${styles.headerTitle} font-extrabold`}>Projects</h1>
         <nav className={styles.headerNav}>
-          <DropdownMenu>
-            <DropdownMenuTrigger className={styles.dropdownTriggerPlaceholder} disabled={isLoggingOut}>
-              {/* Use calculated initials */}
-              <span className={styles.dropdownTriggerText}>{userInitials}</span> 
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800">
-              {(user || profile) && ( // Only show section if user or profile data is available
-                <div className="px-3 py-2 text-sm text-white">
-                  {/* Display Full Name if profile available */}
-                  {profile && (profile.first_name || profile.last_name) && (
-                     <p className="font-medium truncate">{`${profile.first_name || ''} ${profile.last_name || ''}`.trim()}</p>
-                  )}
-                  {/* Display user email */}
-                  {user && (
-                    <p className="text-gray-300 truncate">{user.email}</p>
-                  )}
-                </div>
-              )}
-              <DropdownMenuSeparator className="bg-gray-800" />
-              <DropdownMenuItem className="flex items-center cursor-pointer text-white hover:bg-gray-700">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                <span>Discord Community</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-gray-800" />
-              {/* Logout Item with Loading State */}
-              <DropdownMenuItem
-                className={`flex items-center w-full text-red-400 cursor-pointer hover:bg-gray-700 rounded-sm text-sm p-1.5 focus:bg-gray-700 focus:text-red-400 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
-                disabled={isLoggingOut} // Disable when logging out
-                onSelect={(event) => {
-                  event.preventDefault();
-                  handleLogout();
-                }}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                {/* Change text when loading */}
-                <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {user ? (
+            // Show DropdownMenu if user is logged in
+            <DropdownMenu>
+              <DropdownMenuTrigger className={styles.dropdownTriggerPlaceholder} disabled={isLoggingOut}>
+                <span className={styles.dropdownTriggerText}>{userInitials}</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800">
+                {(user || profile) && (
+                  <div className="px-3 py-2 text-sm text-white">
+                    {profile && (profile.first_name || profile.last_name) && (
+                      <p className="font-medium truncate">{`${profile.first_name || ''} ${profile.last_name || ''}`.trim()}</p>
+                    )}
+                    {user && (
+                      <p className="text-gray-300 truncate">{user.email}</p>
+                    )}
+                  </div>
+                )}
+                <DropdownMenuSeparator className="bg-gray-800" />
+                <DropdownMenuItem className="flex items-center cursor-pointer text-white hover:bg-gray-700">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  <span>Discord Community</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-gray-800" />
+                <DropdownMenuItem
+                  className={`flex items-center w-full text-red-400 cursor-pointer hover:bg-gray-700 rounded-sm text-sm p-1.5 focus:bg-gray-700 focus:text-red-400 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={isLoggingOut}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    handleLogout();
+                  }}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            // Show Log In / Sign Up buttons if user is not logged in
+            <div className="flex items-center space-x-4">
+              <Link href="/login" legacyBehavior>
+                 <a className="rounded-full bg-indigo-600 px-5 py-2 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors">
+                   Log In
+                 </a>
+               </Link>
+               <Link href="/signup" legacyBehavior>
+                 <a className="rounded-full border border-gray-600 px-5 py-2 text-base font-semibold text-gray-300 shadow-sm hover:border-gray-400 hover:text-white transition-colors">
+                   Sign Up
+                 </a>
+               </Link>
+            </div>
+          )}
         </nav>
       </header>
 
