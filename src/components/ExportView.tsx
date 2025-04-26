@@ -80,7 +80,7 @@ export function ExportView({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-[600px] p-0 overflow-hidden"
+        className="sm:max-w-[600px] p-0 overflow-hidden text-white"
         style={{ backgroundColor: COLORS.background, borderColor: COLORS.border }}
         onInteractOutside={(e: Event) => {
              if (isExporting) e.preventDefault(); // Prevent closing during export
@@ -148,7 +148,7 @@ export function ExportView({
               </div>
               {/* Close button after completion */} 
               <div className="flex justify-end pt-4 border-t" style={{ borderColor: COLORS.border }}>
-                  <Button variant="outline" onClick={onClose} style={{ backgroundColor: "#3a3a3a", borderColor: "#555" }}>
+                  <Button variant="outline" onClick={onClose} style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}>
                       Close
                   </Button>
               </div>
@@ -185,7 +185,7 @@ export function ExportView({
                 <Button
                   variant="outline"
                   onClick={onCancel} // Use parent's cancel handler
-                  style={{ backgroundColor: "#3a3a3a", borderColor: "#555" }}
+                  style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}
                   disabled // Disable for now unless backend supports cancel
                 >
                   Cancel
@@ -227,14 +227,14 @@ export function ExportView({
                     <Select value={resolution} onValueChange={setResolution}>
                       <SelectTrigger
                         id="resolution"
-                        className="w-full h-9 text-sm"
+                        className="w-full h-9 text-sm text-white"
                         style={{ backgroundColor: "#3a3a3a" }}
                       >
                         <SelectValue placeholder="Select resolution" />
                       </SelectTrigger>
                       <SelectContent style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border }}>
                         {Object.entries(resolutionOptions).map(([key, value]) => (
-                          <SelectItem key={key} value={key}>
+                          <SelectItem key={key} value={key} className="text-white focus:bg-[#444] focus:text-white">
                             {key} ({value})
                           </SelectItem>
                         ))}
@@ -304,7 +304,7 @@ export function ExportView({
                 <Button
                   variant="outline"
                   onClick={onClose} // Use parent's close handler
-                  style={{ backgroundColor: "#3a3a3a", borderColor: "#555" }}
+                  style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}
                 >
                   Cancel
                 </Button>
