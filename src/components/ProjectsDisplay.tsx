@@ -11,7 +11,7 @@ import {
 import styles from '@/app/projects/projects.module.css' // Assuming styles are specific to this display
 import { ProjectMetadata } from '../store/projectSlice'; // Import the type
 import type { User } from '@supabase/supabase-js'; // Import User type
-import { logout } from "../../app/(auth)/actions"; // Corrected relative path
+import { logout } from "../../app/(auth)/logout/actions"; // Corrected relative path
 import { useState } from "react"; // Import useState
 
 // Define a type for the profile data (adjust fields as needed)
