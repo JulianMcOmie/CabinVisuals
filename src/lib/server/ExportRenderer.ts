@@ -7,7 +7,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { BloomPass } from 'three/examples/jsm/postprocessing/BloomPass.js'; // Check if this is the right Bloom pass used in R3F/postprocessing
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'; // Needed for correct colorspace
 // --- Potentially needed for R3F/postprocessing Bloom equivalence: ---
-// import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'; 
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'; 
 
 import VisualizerManager, { VisualObject3D } from '../VisualizerManager';
 import TimeManager from '../TimeManager';
