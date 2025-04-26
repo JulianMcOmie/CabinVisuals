@@ -19,22 +19,32 @@ import { Writable } from 'stream';    // For ffmpeg stream
 
 // --- Configuration ---
 interface ExportOptions {
-    width: number;          // e.g., 1280
-    height: number;         // e.g., 720
-    fps: number;            // e.g., 60
-    startTimeSeconds: number;
-    endTimeSeconds: number;
-    outputFilename: string; // e.g., 'output.mp4'
-    bpm: number;            // Current BPM
-    tracks: any[];          // Pass necessary track data
-    ffmpegPath?: string;
-    // Add Bloom settings if needed, mirroring VisualizerView
-    bloomIntensity?: number;
-    bloomThreshold?: number;
-    bloomSmoothing?: number; // Note: Bloom parameters might map differently between R3F and three.js passes
+    // Direct rendering options
+    width: number;
+    height: number;
+    fps: number;
     durationSeconds: number; // Total duration to export
-    projectData: any;        // TODO: Define based on API request
-    bloomParams?: { strength: number; threshold: number; radius: number }; // Matching UnrealBloomPass params
+    outputFilename: string; // Where to save the file
+    
+    // Project-specific data (passed to managers)
+    projectData: {
+        bpm: number;
+        tracks: any[]; // Use actual Track type if available
+        // Add other relevant project settings here if needed
+    };
+    
+    // Optional features/configs
+    bloomParams?: { strength: number; threshold: number; radius: number }; 
+    ffmpegPath?: string; // Optional path to ffmpeg executable
+    
+    // Remove duplicated/misplaced fields:
+    // startTimeSeconds: number; // Should be implicit (0) or part of projectData if needed
+    // endTimeSeconds: number;   // Use durationSeconds instead
+    // bpm: number;            // Moved inside projectData
+    // tracks: any[];          // Moved inside projectData
+    // bloomIntensity?: number; // Use bloomParams structure
+    // bloomThreshold?: number;// Use bloomParams structure
+    // bloomSmoothing?: number;// Use bloomParams structure
 }
 
 interface ProgressUpdate {

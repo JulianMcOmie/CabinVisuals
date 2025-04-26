@@ -7,6 +7,8 @@ import os from 'os'; // Needed for temporary directory
 import NodeTimeManager from '@/src/lib/server/NodeTimeManager';
 import VisualizerManager from '@/src/lib/VisualizerManager'; // Assuming VisualizerManager is Node-safe
 import ExportRenderer from '@/src/lib/server/ExportRenderer';
+// Import WebSocket utility
+import { sendUpdate } from '@/src/lib/server/websocketServer';
 
 // Placeholder Types (Refine based on actual Track/Project data structure)
 type TrackData = any;
@@ -42,21 +44,28 @@ export async function POST(request: Request) {
 
         console.log(`[Job ${jobId}] Received export request. Output: ${outputPath}`);
 
-        // --- Set Initial Job Status ---
-        exportJobs.set(jobId, { status: 'starting', percent: 0, message: 'Initializing export...' });
+        // --- Set Initial Job Status (also send initial WS message) ---
+        const initialStatus = { status: 'starting', percent: 0, message: 'Initializing export...' };
+        exportJobs.set(jobId, initialStatus);
+        sendUpdate(jobId, { type: 'status', ...initialStatus }); // Send initial status
 
-        // --- Define Progress Callback ---
+        // --- Define Progress Callback (now sends WS messages) ---
         const onProgress = (update: { percent: number; message: string }) => {
             console.log(`[Job ${jobId}] Progress: ${update.percent}% - ${update.message}`);
             const currentJob = exportJobs.get(jobId);
+            let status = 'rendering';
             if (currentJob) {
                 currentJob.percent = update.percent;
                 currentJob.message = update.message;
                 if (update.percent < 100) {
-                    currentJob.status = 'rendering';
-                }
+                    currentJob.status = status;
+                } // Status updated on complete/fail later
+            } else {
+                // Store status if map entry somehow got deleted mid-process
+                exportJobs.set(jobId, { status: status, percent: update.percent, message: update.message });
             }
-            // In Step 4.7, this will send a WebSocket message
+            // Send WebSocket update
+            sendUpdate(jobId, { type: 'progress', percent: update.percent, message: update.message });
         };
 
         // --- Start Export Process Asynchronously ---
@@ -98,21 +107,24 @@ export async function POST(request: Request) {
                 );
 
                 console.log(`[Job ${jobId}] Export finished successfully.`);
-                // Update job status on success
-                 const finalUrl = `/api/download/${outputFilename}`; // Example download URL structure
-                exportJobs.set(jobId, { status: 'complete', percent: 100, message: 'Export complete', url: finalUrl });
+                // Update job status & Send WebSocket message on success
+                const finalUrl = `/api/download/${outputFilename}`; // Example download URL structure
+                const successStatus = { status: 'complete', percent: 100, message: 'Export complete', url: finalUrl };
+                exportJobs.set(jobId, successStatus);
+                sendUpdate(jobId, { type: 'complete', url: finalUrl });
                 // TODO: Implement file serving or temporary storage cleanup logic
 
             } catch (error: any) {
                 console.error(`[Job ${jobId}] Export process failed:`, error);
-                // Update job status on error
-                exportJobs.set(jobId, {
+                // Update job status & Send WebSocket message on error
+                const errorStatus = {
                     status: 'failed',
-                    percent: 100,
+                    percent: 100, // Indicate process finished (even if failed)
                     message: 'Export failed',
                     error: error.message || String(error)
-                });
-                // In Step 4.7, send error via WebSocket
+                };
+                exportJobs.set(jobId, errorStatus);
+                sendUpdate(jobId, { type: 'error', message: errorStatus.error });
             }
         })(); // Self-invoking async function
 
@@ -121,12 +133,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ jobId: jobId, message: 'Export process started.' }, { status: 202 }); // 202 Accepted
 
     } catch (error: any) {
+        // Handle initial setup errors (before async process starts)
         console.error('Error processing /api/export request:', error);
-        // Update status if job ID was generated before the error
-        if (jobId && exportJobs.has(jobId)) {
-            exportJobs.set(jobId, { status: 'failed', percent: 0, message: 'Initialization failed', error: error.message || String(error) });
+        const initialErrorMsg = error.message || String(error);
+        // Update status if job ID was generated and send WS message
+        if (jobId) { // Check if jobId was assigned before error
+             const setupErrorStatus = { status: 'failed', percent: 0, message: 'Initialization failed', error: initialErrorMsg };
+             exportJobs.set(jobId, setupErrorStatus);
+             // Try sending WS error, might fail if connection isn't established yet
+             sendUpdate(jobId, { type: 'error', message: initialErrorMsg });
         }
-        return NextResponse.json({ error: 'Failed to start export process.', details: error.message || String(error) }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to start export process.', details: initialErrorMsg }, { status: 500 });
     }
 }
 
