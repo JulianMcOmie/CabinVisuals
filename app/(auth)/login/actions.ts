@@ -20,8 +20,8 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  // Redirect to the projects page after successful email/password login
-  redirect('/projects');
+  // Redirect to the alpha page after successful email/password login
+  redirect('/alpha');
 }
 
 export async function handleSignInWithGoogle(idToken: string) {
@@ -47,6 +47,6 @@ export async function handleSignInWithGoogle(idToken: string) {
 
   console.log("signInWithIdToken success!");
   revalidatePath('/', 'layout')
-  // Redirect to the projects page after successful Google Sign-In
-  redirect('/projects');
+  // Redirect to the alpha page after successful Google Sign-In
+  redirect('/alpha');
 } 

@@ -15,6 +15,7 @@ import { logout } from "../../app/(auth)/logout/actions"; // Corrected relative 
 import { useState } from "react"; // Import useState
 import LogInButton from './AuthButtons/LogInButton'; // Import new component
 import SignUpButton from './AuthButtons/SignUpButton'; // Import new component
+import { usePathname } from 'next/navigation'; // Import usePathname
 
 // Define a type for the profile data (adjust fields as needed)
 interface ProfileData {
@@ -51,16 +52,16 @@ export default function ProjectsDisplay({
   // For now, assuming styles are relevant here.
 
   const [isLoggingOut, setIsLoggingOut] = useState(false); // Add loading state
-
-  // Call getInitials with potentially null/undefined values from profile
   const userInitials = getInitials(profile?.first_name, profile?.last_name);
+  const currentPath = usePathname(); // Get current path
 
   // Define the async handler for logout
   const handleLogout = async () => {
     if (isLoggingOut) return; // Prevent double-clicks
     setIsLoggingOut(true); // Set loading state
     try {
-      await logout();
+      // Pass the current path to the logout action
+      await logout(currentPath);
       // Redirect happens in server action, no need to reset state here usually
     } catch (error) {
       console.error("Logout failed:", error);

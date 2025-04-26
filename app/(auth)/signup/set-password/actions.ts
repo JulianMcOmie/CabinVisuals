@@ -53,7 +53,6 @@ export async function completeSignup(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  // Redirect to the projects page after successful account creation
-  // We might want to add a success message query param later
-  redirect('/projects');
+  // Redirect to the alpha page after successful account creation
+  redirect('/alpha');
 } 
