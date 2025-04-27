@@ -6,7 +6,8 @@ import styles from './PlaybarView.module.css';
 import { Repeat, Upload } from 'lucide-react';
 import { Play, Square, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ExportView, { ExportSettings } from '../ExportView';
+import ExportView from '../ExportView';
+import { ExportSettings } from '../../lib/ExportRenderer';
 
 // Main PlaybarView component
 const PlaybarView: React.FC = () => {
