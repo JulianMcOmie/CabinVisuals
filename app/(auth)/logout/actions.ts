@@ -19,5 +19,5 @@ export async function logout() {
 
   // Redirect to the login page after sign out, regardless of error (best practice)
   // Use the public-facing login route
-  redirect('/login'); 
+  redirect('/projects'); 
 } 

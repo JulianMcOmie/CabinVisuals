@@ -14,6 +14,7 @@ import type { User } from '@supabase/supabase-js'; // Import User type
 import { logout } from "../../app/(auth)/logout/actions"; // Corrected relative path
 import { useState } from "react"; // Import useState
 import Link from "next/link"; // Import Link
+import { createClient } from "../utils/supabase/client"; // Correct the import path for the client-side helper
 
 // Define a type for the profile data (adjust fields as needed)
 interface ProfileData {
@@ -58,13 +59,30 @@ export default function ProjectsDisplay({
   const handleLogout = async () => {
     if (isLoggingOut) return; // Prevent double-clicks
     setIsLoggingOut(true); // Set loading state
+    
+    const supabase = createClient(); // Create CLIENT instance
+
     try {
-      await logout();
-      // Redirect happens in server action, no need to reset state here usually
+      // 1. Sign out on the client first to trigger local state updates
+      const { error: clientSignOutError } = await supabase.auth.signOut();
+      if (clientSignOutError) {
+        // Log client-side error, but proceed to server logout anyway
+        console.error("Client sign out error:", clientSignOutError.message);
+      } else {
+        console.log("Client signed out successfully.");
+      }
+
+      // 2. Call the server action to clear cookies and redirect
+      await logout(); 
+      // Redirect happens in server action, no need to reset loading state here
+      // unless server action call *itself* fails.
     } catch (error) {
-      console.error("Logout failed:", error);
-      setIsLoggingOut(false); // Reset state on explicit failure if redirect doesn't happen
-    }
+      // This catch block handles errors from calling the logout() server action
+      console.error("Server logout action failed:", error);
+      // Reset loading state only if the server action call fails
+      setIsLoggingOut(false); 
+    } 
+    // No finally block needed to set loading false if redirect always happens
   };
 
   return (
