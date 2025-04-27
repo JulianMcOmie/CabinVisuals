@@ -6,8 +6,6 @@ import styles from './PlaybarView.module.css';
 import { Repeat, Upload } from 'lucide-react';
 import { Play, Square, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ExportView from '../ExportView';
-import { ExportSettings } from '../../lib/ExportRenderer';
 
 // Main PlaybarView component
 const PlaybarView: React.FC = () => {
@@ -16,7 +14,7 @@ const PlaybarView: React.FC = () => {
     isPlaying, 
     bpm, 
     play, 
-    pause, 
+    pause,
     stop, 
     setBPM, 
     loopEnabled,
@@ -24,79 +22,19 @@ const PlaybarView: React.FC = () => {
     isInstrumentSidebarVisible,
     toggleInstrumentSidebar,
     setSelectedWindow,
-    tracks
+    openExportView
   } = useStore();
 
   const [exportButtonHover, setExportButtonHover] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-  const [exportStatusMessage, setExportStatusMessage] = useState('Preparing export...');
-  const [exportCompleted, setExportCompleted] = useState(false);
 
   const handlePlaybarClick = () => {
     setSelectedWindow(null);
   };
   
   const handleOpenExportModal = () => {
+    console.log("PlaybarView: Export button clicked, calling openExportView action...");
     setSelectedWindow(null);
-    setIsExporting(false);
-    setExportCompleted(false);
-    setExportProgress(0);
-    setExportStatusMessage('Configure export settings.');
-    setShowExportModal(true);
-  };
-
-  const handleStartExport = async (settings: ExportSettings) => {
-    setIsExporting(true);
-    setExportCompleted(false);
-    setExportProgress(0);
-    setExportStatusMessage('Initializing export...');
-
-    console.log('Starting export with settings:', settings);
-    const payload = {
-        width: settings.resolution === "720p" ? 1280 : 
-               settings.resolution === "1080p" ? 1920 : 
-               settings.resolution === "1440p" ? 2560 : 3840,
-        height: settings.resolution === "720p" ? 720 : 
-                settings.resolution === "1080p" ? 1080 : 
-                settings.resolution === "1440p" ? 1440 : 2160,
-        fps: parseInt(settings.fps),
-        startTime: 0,
-        endTime: 10,
-        bpm: bpm,
-        tracks: tracks,
-    };
-    console.log('Sending payload:', payload);
-
-    try {
-      console.log('Export process started (simulation)');
-      for (let i = 0; i <= 100; i += 5) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setExportProgress(i);
-        setExportStatusMessage(`Rendering frame ${Math.round(i * (payload.endTime - payload.startTime) * payload.fps / 100)}...`);
-        if (i > 95) setExportStatusMessage('Encoding video...');
-      }
-      
-      setExportStatusMessage('Export complete! File ready for download.'); 
-      setExportCompleted(true);
-      setIsExporting(false);
-
-    } catch (error) {
-      console.error("Export failed:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      setExportStatusMessage(`Export failed: ${errorMessage}`);
-      setIsExporting(false);
-      setExportCompleted(false);
-    }
-  };
-
-  const handleCloseOrCancel = () => {
-    if (isExporting) {
-        console.log("Cancel requested during export (not implemented)");
-    } else {
-        setShowExportModal(false);
-    }
+    openExportView();
   };
 
   return (
@@ -155,7 +93,7 @@ const PlaybarView: React.FC = () => {
 
     <div className={styles.rightControls}>
       <div className={styles.beatDisplay}>
-        {currentBeat}
+        {currentBeat.toFixed(2)}
       </div>
 
       <div className={styles.bpmContainer}>
@@ -164,8 +102,11 @@ const PlaybarView: React.FC = () => {
           type="text"
           value={bpm}
           onChange={(e) => {
-            setBPM(parseInt(e.target.value));
-            setSelectedWindow(null);
+            const newBpm = parseInt(e.target.value);
+            if (!isNaN(newBpm)) {
+                setBPM(newBpm);
+                setSelectedWindow(null);
+            }
           }}
           className={styles.bpmInput}
         />
@@ -187,19 +128,6 @@ const PlaybarView: React.FC = () => {
         <span>Export</span>
       </Button>
     </div>
-
-    {showExportModal && (
-        <ExportView
-          isOpen={showExportModal}
-          onClose={handleCloseOrCancel}
-          progress={exportProgress}
-          statusMessage={exportStatusMessage}
-          isExporting={isExporting}
-          exportCompleted={exportCompleted}
-          onExportStart={handleStartExport}
-          onCancel={handleCloseOrCancel}
-        />
-    )}
   </div>
   );
 };

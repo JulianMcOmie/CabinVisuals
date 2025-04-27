@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/t
 import { Maximize2 } from 'lucide-react';
 import useStore from '../store/store';
 import VisualizerManager, { VisualObject3D } from '../lib/VisualizerManager';
-import { VisualizerContextProvider } from '../contexts/VisualizerContext';
+import { ExportView } from './ExportView';
 
 // Scene component that handles animation and object rendering
 function Scene({ objects }: { objects: VisualObject3D[] }) {
@@ -63,6 +63,8 @@ function VisualObject({ object }: { object: VisualObject3D }) {
 function VisualizerView() {
   const { timeManager, tracks, currentBeat } = useStore();
   const isExporting = useStore(state => state.isExporting);
+  const isExportViewOpen = useStore(state => state.isExportViewOpen);
+  const closeExportView = useStore(state => state.closeExportView);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -73,6 +75,14 @@ function VisualizerView() {
   
   // State to hold the objects for the Scene component
   const [currentObjects, setCurrentObjects] = useState<VisualObject3D[]>([]);
+  
+  // Refs to store R3F internals needed for props
+  const r3fInternalsRef = useRef<{ 
+      gl: THREE.WebGLRenderer | null, 
+      scene: THREE.Scene | null, 
+      camera: THREE.Camera | null, 
+      invalidate: (() => void) | null 
+  }>({ gl: null, scene: null, camera: null, invalidate: null });
   
   // Update dimensions on resize
   useEffect(() => {
@@ -125,7 +135,13 @@ function VisualizerView() {
   // --- R3F Components/Hooks --- 
   // Create a helper component to access R3F context and control clock/updates
   const R3FController = () => {
-    const clock = useThree(state => state.clock);
+    const { gl, scene, camera, invalidate, clock } = useThree();
+
+    // Store R3F internals in the ref for parent access
+    useEffect(() => {
+        r3fInternalsRef.current = { gl, scene, camera, invalidate };
+        // Cleanup function optional, depends if these refs change significantly
+    }, [gl, scene, camera, invalidate]);
 
     // Effect to pause/resume R3F clock based on export state
     useEffect(() => {
@@ -156,6 +172,25 @@ function VisualizerView() {
     return null; 
   };
   
+  // --- DEBUG LOG --- 
+  // Evaluate the conditions needed to render ExportView
+  const shouldRenderExportView = 
+    isExportViewOpen && 
+    !!r3fInternalsRef.current.gl && 
+    !!r3fInternalsRef.current.scene && 
+    !!r3fInternalsRef.current.camera && 
+    !!r3fInternalsRef.current.invalidate && 
+    !!canvasRef.current;
+    
+  console.log(`VisualizerView: Checking conditions to render ExportView: 
+    isExportViewOpen: ${isExportViewOpen}
+    gl available: ${!!r3fInternalsRef.current.gl}
+    scene available: ${!!r3fInternalsRef.current.scene}
+    camera available: ${!!r3fInternalsRef.current.camera}
+    invalidate available: ${!!r3fInternalsRef.current.invalidate}
+    canvasRef.current available: ${!!canvasRef.current}
+    Result: shouldRenderExportView = ${shouldRenderExportView}`);
+
   return (
     <div 
       className="visualizer-view" 
@@ -170,20 +205,16 @@ function VisualizerView() {
             camera={{ position: [0, 0, 15] }} 
             gl={{ preserveDrawingBuffer: true }}
           >
-            {canvasRef.current && (
-                <VisualizerContextProvider visualizerManager={visualizerManager} canvasRef={canvasRef as React.RefObject<HTMLCanvasElement>}>
-                    <R3FController /> 
-                    <Scene objects={currentObjects} />
-                    <EffectComposer>
-                        <Bloom 
-                            intensity={1.0}
-                            luminanceThreshold={0.1}
-                            luminanceSmoothing={0.2}
-                            mipmapBlur={true}
-                        />
-                    </EffectComposer>
-                </VisualizerContextProvider>
-            )}
+            <R3FController /> 
+            <Scene objects={currentObjects} />
+            <EffectComposer>
+                <Bloom 
+                    intensity={1.0}
+                    luminanceThreshold={0.1}
+                    luminanceSmoothing={0.2}
+                    mipmapBlur={true}
+                />
+            </EffectComposer>
           </Canvas>
         )}
         {/* Beat indicator overlay - styled like page.tsx */}
@@ -219,6 +250,21 @@ function VisualizerView() {
           </Tooltip>
         </TooltipProvider>
       </div>
+
+      {/* Conditionally render ExportView outside Canvas, passing props */}
+      {shouldRenderExportView && (
+          // --- DEBUG LOG --- 
+          console.log("VisualizerView: Rendering ExportView..."),
+          <ExportView 
+              gl={r3fInternalsRef.current.gl!}
+              scene={r3fInternalsRef.current.scene!}
+              camera={r3fInternalsRef.current.camera!}
+              canvasRef={canvasRef as React.RefObject<HTMLCanvasElement>}
+              visualizerManager={visualizerManager}
+              timeManager={timeManager} 
+              invalidate={r3fInternalsRef.current.invalidate!}
+          />
+      )}
     </div>
   );
 }

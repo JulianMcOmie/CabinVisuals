@@ -38,8 +38,15 @@ Object.values(availableEffectsData).flat().forEach((effect: EffectDefinition) =>
 // --- Combined AppState Definition ---
 
 // Combine all slice types into a single AppState type
-// This AppState type is exported and used by slices for cross-slice access via get()
-export type AppState = TimeSlice & AudioSlice & TrackSlice & InstrumentSlice & EffectSlice & UISlice & ProjectSlice & ExportSlice;
+// Ensure UISlice (which now contains isExportViewOpen/closeExportView) is included correctly
+export type AppState = TimeSlice & 
+                     AudioSlice & 
+                     TrackSlice & 
+                     InstrumentSlice & 
+                     EffectSlice & 
+                     UISlice & // Make sure UISlice includes the new properties
+                     ProjectSlice & 
+                     ExportSlice;
 
 // --- Store Creator ---
 
@@ -49,7 +56,7 @@ const useStore = create<AppState>()((...a) => ({
     ...createTrackSlice(...a),
     ...createInstrumentSlice(...a),
     ...createEffectSlice(...a),
-    ...createUISlice(...a),
+    ...createUISlice(...a), // This should now provide the new UI state/actions
     ...createProjectSlice(...a),
     ...createExportSlice(...a),
 }));

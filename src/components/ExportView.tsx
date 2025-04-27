@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import * as THREE from 'three'; // Import THREE
 import { Download, FileAudio, Video, Check, Info, Share } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog"
 import { Button } from "../components/ui/button"
@@ -8,9 +9,9 @@ import { Progress } from "../components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
 import { Label } from "../components/ui/label"
 import useStore from "../store/store"; // Import main store
-import { useVisualizerContext } from "../contexts/VisualizerContext"; // Import context hook
-import { ExportRenderer, ExportRendererDeps } from "../lib/ExportRenderer"; // Import renderer
-import type { ExportSettings } from "../lib/ExportRenderer"; // Settings type might be better defined here or shared
+import { ExportRenderer, ExportRendererDeps, ExportSettings } from "../lib/ExportRenderer"; // Import renderer
+import type TimeManager from "../lib/TimeManager"; // Import types needed for props
+import type VisualizerManager from "../lib/VisualizerManager";
 
 // Define the colors to match the app's aesthetic
 const COLORS = {
@@ -25,21 +26,27 @@ const COLORS = {
   selectedBlue: "#e0f7ff", // Whitish blue for selection
 }
 
-// --- Interface matching PlaybarView state (Props for the Dialog) ---
+// --- Define Props Interface --- 
 interface ExportViewProps {
-  isOpen: boolean;
-  onClose: () => void;
-  // Progress, status, etc., will now come from the Zustand store
+  // Required R3F/App instances passed from VisualizerView
+  gl: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.Camera;
+  canvasRef: React.RefObject<HTMLCanvasElement>; // Pass the ref itself
+  visualizerManager: VisualizerManager;
+  timeManager: TimeManager;
+  invalidate: () => void;
 }
 
-// --- Renamed component to ExportView ---
-export function ExportView({ isOpen, onClose }: ExportViewProps) {
+export function ExportView(props: ExportViewProps) {
+  const { gl, scene, camera, canvasRef, visualizerManager, timeManager, invalidate } = props;
+
   // Local state for dialog settings
-  const [audioFormat, setAudioFormat] = useState<"mp3" | "wav">("mp3"); // Keep for UI, though not used in render yet
-  const [resolution, setResolution] = useState("1080p"); // Keep for UI, will be needed later
+  const [audioFormat, setAudioFormat] = useState<"mp3" | "wav">("mp3");
+  const [resolution, setResolution] = useState("1080p");
   const [fps, setFps] = useState<"30" | "60">("60");
 
-  // Get state and actions from the export slice
+  // Get state and actions from the store
   const {
     isExporting,
     exportProgress,
@@ -48,35 +55,22 @@ export function ExportView({ isOpen, onClose }: ExportViewProps) {
     startExport,
     cancelExport,
     resetExportState,
-  } = useStore(state => state); // Assuming slice actions/state are top-level
+    isExportViewOpen,
+    closeExportView,
+  } = useStore(state => state);
 
-  // Access R3F context (will throw error if used outside provider)
-  // This component MUST be rendered within the VisualizerContextProvider scope
-  // OR handle context potentially being null if rendered elsewhere.
-  let vizContext: ReturnType<typeof useVisualizerContext> | null = null;
-  try {
-      vizContext = useVisualizerContext();
-  } catch (e) {
-      // Context not available - This likely means ExportView is rendered outside
-      // the R3F Canvas where the provider lives. This needs architectural review
-      // if ExportView isn't naturally nested within the visualizer.
-      // For now, we'll disable the export button if context is missing.
-      console.warn("ExportView: VisualizerContext not found. Export disabled.");
-  }
-
-  const canInitiateExport = vizContext !== null && !isExporting;
+  // Determine if export can be initiated based on props and state
+  // Simplified check: Ensure main objects and the canvas ref *value* exist
+  const canInitiateExport = !!(gl && scene && camera && canvasRef.current && visualizerManager && timeManager && !isExporting);
 
   // Reset state when dialog closes
   useEffect(() => {
-    if (!isOpen) {
-      // Optionally reset only if not currently exporting, or always?
-      // Decide based on desired UX if closing should cancel.
-      // For now, let's reset only if not exporting.
+    if (!isExportViewOpen) {
       if (!isExporting) {
           resetExportState();
       }
     }
-  }, [isOpen, isExporting, resetExportState]);
+  }, [isExportViewOpen, isExporting, resetExportState]);
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -85,16 +79,15 @@ export function ExportView({ isOpen, onClose }: ExportViewProps) {
           // For now, just call the parent's onClose.
           // Cancellation must be done via the Cancel button.
       }
-      onClose();
+      closeExportView();
     }
     // Dialog opening is handled by the parent setting `isOpen`
   };
 
   const handleInitiateExport = () => {
-    if (!vizContext || !vizContext.canvasRef.current) {
-      console.error("Cannot start export: Visualizer context or canvas ref is missing.");
-      // Optionally use failExport action here
-      // failExport("Internal error: Missing visualizer context.");
+    // Use props directly for checks and dependencies
+    if (!gl || !scene || !camera || !canvasRef.current || !visualizerManager || !timeManager || !invalidate) {
+      console.error("Cannot start export: Essential rendering dependencies are missing.");
       return;
     }
     if (isExporting) {
@@ -104,16 +97,16 @@ export function ExportView({ isOpen, onClose }: ExportViewProps) {
 
     const currentSettings: ExportSettings = { resolution, fps, audioFormat };
 
-    // Prepare dependencies for the renderer
+    // Prepare dependencies for the renderer using props
     const rendererDeps: ExportRendererDeps = {
-        canvas: vizContext.canvasRef.current,
-        gl: vizContext.gl,
-        scene: vizContext.scene,
-        camera: vizContext.camera,
-        timeManager: vizContext.timeManager,
-        invalidate: vizContext.invalidate,
+        canvas: canvasRef.current, // Get current canvas element from ref
+        gl,
+        scene,
+        camera,
+        timeManager,
+        invalidate,
         settings: currentSettings,
-        // Pass only the necessary actions from the store slice
+        // Store actions remain the same
         actions: {
             updateExportProgress: useStore.getState().updateExportProgress,
             finishExport: useStore.getState().finishExport,
@@ -122,10 +115,7 @@ export function ExportView({ isOpen, onClose }: ExportViewProps) {
         },
     };
 
-    // Create a new renderer instance for this export
     const renderer = new ExportRenderer(rendererDeps);
-
-    // Call the action in the store to start the process
     startExport(currentSettings, renderer);
   };
 
@@ -150,7 +140,7 @@ export function ExportView({ isOpen, onClose }: ExportViewProps) {
   const exportCompletedSuccessfully = exportProgress === 1 && !isExporting && !exportError;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+    <Dialog open={isExportViewOpen} onOpenChange={handleOpenChange}>
       <DialogContent
         className="sm:max-w-[600px] p-0 overflow-hidden text-white"
         style={{ backgroundColor: COLORS.background, borderColor: COLORS.border }}
@@ -203,7 +193,7 @@ export function ExportView({ isOpen, onClose }: ExportViewProps) {
                <div className="flex justify-end pt-4 border-t" style={{ borderColor: COLORS.border }}>
                     <Button
                         variant="outline"
-                        onClick={onClose} 
+                        onClick={closeExportView} 
                         style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}
                         className="hover:bg-[#555] transition-colors"
                         >
@@ -275,8 +265,8 @@ export function ExportView({ isOpen, onClose }: ExportViewProps) {
                         <Info className="h-3 w-3 text-gray-500 mt-0.5 flex-shrink-0" />
                         <p className="text-xs text-gray-500">Select export quality and format (Audio format ignored for now)</p>
                     </div>
-                    {!vizContext && (
-                        <p className="text-xs text-yellow-500 mt-2">Warning: Visualizer context not found. Cannot start export.</p>
+                    {!gl && (
+                        <p className="text-xs text-yellow-500 mt-2">Warning: Rendering context not available.</p>
                     )} 
                 </div>
 
@@ -390,7 +380,7 @@ export function ExportView({ isOpen, onClose }: ExportViewProps) {
               <div className="flex justify-between pt-4 mt-4 border-t" style={{ borderColor: COLORS.border }}>
                 <Button
                   variant="outline"
-                  onClick={onClose} // Use parent's close handler
+                  onClick={closeExportView} // Use parent's close handler
                   style={{ backgroundColor: "#3a3a3a", borderColor: "#555", color: "white" }}
                   className="hover:bg-[#555] transition-colors"
                 >
