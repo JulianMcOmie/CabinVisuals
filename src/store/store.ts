@@ -13,6 +13,7 @@ import { InstrumentSlice, InstrumentDefinition, InstrumentCategories, availableI
 import { EffectSlice, EffectDefinition, EffectCategories, availableEffectsData, createEffectSlice } from './effectSlice';
 import { UISlice, UIState, createUISlice, SelectedWindowType } from './uiSlice';
 import { ProjectSlice, createProjectSlice, ProjectMetadata } from './projectSlice';
+import { ExportSlice, createExportSlice } from './exportSlice';
 
 // Import persistence service and utils
 import * as P from '../Persistence/persistence-service';
@@ -38,7 +39,7 @@ Object.values(availableEffectsData).flat().forEach((effect: EffectDefinition) =>
 
 // Combine all slice types into a single AppState type
 // This AppState type is exported and used by slices for cross-slice access via get()
-export type AppState = TimeSlice & AudioSlice & TrackSlice & InstrumentSlice & EffectSlice & UISlice & ProjectSlice;
+export type AppState = TimeSlice & AudioSlice & TrackSlice & InstrumentSlice & EffectSlice & UISlice & ProjectSlice & ExportSlice;
 
 // --- Store Creator ---
 
@@ -50,6 +51,7 @@ const useStore = create<AppState>()((...a) => ({
     ...createEffectSlice(...a),
     ...createUISlice(...a),
     ...createProjectSlice(...a),
+    ...createExportSlice(...a),
 }));
 
 /**

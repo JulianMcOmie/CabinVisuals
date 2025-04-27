@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { Button } from './ui/button';
@@ -9,16 +9,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/t
 import { Maximize2 } from 'lucide-react';
 import useStore from '../store/store';
 import VisualizerManager, { VisualObject3D } from '../lib/VisualizerManager';
+import { VisualizerContextProvider } from '../contexts/VisualizerContext';
 
 // Scene component that handles animation and object rendering
-function Scene({ visualizerManager }: { visualizerManager: VisualizerManager }) {
-  const [objects, setObjects] = useState<VisualObject3D[]>([]);
-  
-  // Update objects on each frame
-  useFrame(() => {
-    setObjects(visualizerManager.getVisualObjects());
-  });
-  
+function Scene({ objects }: { objects: VisualObject3D[] }) {
   return (
     <>
       <ambientLight intensity={0.5} />
@@ -68,12 +62,17 @@ function VisualObject({ object }: { object: VisualObject3D }) {
 // Main VisualizerView component
 function VisualizerView() {
   const { timeManager, tracks, currentBeat } = useStore();
+  const isExporting = useStore(state => state.isExporting);
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Initialize VisualizerManager with timeManager and initial tracks
   const [visualizerManager] = useState(() => new VisualizerManager(timeManager, tracks));
+  
+  // State to hold the objects for the Scene component
+  const [currentObjects, setCurrentObjects] = useState<VisualObject3D[]>([]);
   
   // Update dimensions on resize
   useEffect(() => {
@@ -87,8 +86,9 @@ function VisualizerView() {
     };
     
     updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    const hostWindow = containerRef.current?.ownerDocument.defaultView || window;
+    hostWindow.addEventListener('resize', updateDimensions);
+    return () => hostWindow.removeEventListener('resize', updateDimensions);
   }, []);
   
   // Effect to update VisualizerManager when tracks change
@@ -122,6 +122,40 @@ function VisualizerView() {
     }
   };
   
+  // --- R3F Components/Hooks --- 
+  // Create a helper component to access R3F context and control clock/updates
+  const R3FController = () => {
+    const clock = useThree(state => state.clock);
+
+    // Effect to pause/resume R3F clock based on export state
+    useEffect(() => {
+        if (isExporting) {
+            if (clock.running) {
+                clock.stop();
+                console.log("R3F clock stopped for export.");
+            }
+        } else {
+            if (!clock.running) {
+                clock.start();
+                console.log("R3F clock started after export.");
+                // No need to invalidate here, ExportRenderer does it on finish/cancel
+            }
+        }
+    }, [isExporting, clock]);
+
+    // Frame loop for normal playback updates
+    useFrame(() => {
+        // Only update state for the Scene if not exporting and clock is running
+        if (!isExporting && clock.running) {
+            const liveObjects = visualizerManager.getVisualObjects();
+            setCurrentObjects(liveObjects); // Update state passed to Scene
+        }
+    });
+
+    // This component doesn't render anything itself
+    return null; 
+  };
+  
   return (
     <div 
       className="visualizer-view" 
@@ -130,16 +164,26 @@ function VisualizerView() {
     >
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {dimensions.width > 0 && dimensions.height > 0 && (
-          <Canvas style={{ background: '#000' }} camera={{ position: [0, 0, 15] }}>
-            <Scene visualizerManager={visualizerManager} />
-            <EffectComposer>
-              <Bloom 
-                intensity={1.0}
-                luminanceThreshold={0.1}
-                luminanceSmoothing={0.2}
-                mipmapBlur={true}
-              />
-            </EffectComposer>
+          <Canvas 
+            ref={canvasRef}
+            style={{ background: '#000' }} 
+            camera={{ position: [0, 0, 15] }} 
+            gl={{ preserveDrawingBuffer: true }}
+          >
+            {canvasRef.current && (
+                <VisualizerContextProvider visualizerManager={visualizerManager} canvasRef={canvasRef as React.RefObject<HTMLCanvasElement>}>
+                    <R3FController /> 
+                    <Scene objects={currentObjects} />
+                    <EffectComposer>
+                        <Bloom 
+                            intensity={1.0}
+                            luminanceThreshold={0.1}
+                            luminanceSmoothing={0.2}
+                            mipmapBlur={true}
+                        />
+                    </EffectComposer>
+                </VisualizerContextProvider>
+            )}
           </Canvas>
         )}
         {/* Beat indicator overlay - styled like page.tsx */}

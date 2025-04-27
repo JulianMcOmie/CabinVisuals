@@ -32,6 +32,10 @@ class VisualizerManager {
     // Initialize object states from initial tracks if needed (e.g., loading a saved state)
   }
 
+  getTimeManager(): TimeManager {
+    return this.timeManager;
+  }
+
   // Method to update tracks
   setTracks(newTracks: Track[]): void {
     // TODO: Consider merging state if tracks change mid-playback, 
