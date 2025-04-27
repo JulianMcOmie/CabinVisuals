@@ -90,7 +90,7 @@ export default function LoginPage() {
           </div>
 
           <div className="text-center text-sm py-2">
-            <Link href="/auth/reset-password" legacyBehavior>
+            <Link href="/reset-password" legacyBehavior>
                <a className="font-medium text-indigo-400 hover:text-indigo-300">Forgot password?</a>
             </Link>
           </div>

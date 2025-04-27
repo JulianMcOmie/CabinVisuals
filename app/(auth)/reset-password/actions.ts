@@ -21,7 +21,7 @@ export async function requestPasswordReset(formData: FormData) {
   }
 
   // Construct the redirect URL for the update password page (now nested under /auth)
-  const redirectUrl = `${origin}/auth/update-password`;
+  const redirectUrl = `${origin}/update-password`;
 
   console.log(`Requesting password reset for ${email} with redirect to ${redirectUrl}`);
 

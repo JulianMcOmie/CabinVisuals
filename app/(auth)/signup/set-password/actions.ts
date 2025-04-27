@@ -25,7 +25,7 @@ export async function completeSignup(formData: FormData) {
   if (password.length < 6) {
     params.set('message', 'Password must be at least 6 characters long');
     // Redirect back to new set-password path
-    return redirect(`/auth/signup/set-password?${params.toString()}`);
+    return redirect(`/signup/set-password?${params.toString()}`);
   }
 
   const { error } = await supabase.auth.signUp({
@@ -48,12 +48,11 @@ export async function completeSignup(formData: FormData) {
         errorMessage = 'Password is too weak. Please choose a stronger one.';
     }
     params.set('message', errorMessage);
-    // Redirect back to new set-password path
-    return redirect(`/auth/signup/set-password?${params.toString()}`);
+    // Redirect back to set-password path with error
+    return redirect(`/signup/set-password?${params.toString()}`);
   }
 
-  revalidatePath('/', 'layout')
-  // Redirect to the projects page after successful account creation
-  // We might want to add a success message query param later
-  redirect('/projects');
+  // On successful signup initiation, redirect to login with a confirmation message
+  console.log(`Signup initiated for ${email}. Redirecting to login for confirmation.`);
+  return redirect('/login?message=Please check your email to confirm your account.');
 } 

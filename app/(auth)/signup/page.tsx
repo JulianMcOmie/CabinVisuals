@@ -9,8 +9,7 @@ import { handleSignInWithGoogle } from '../login/actions'; // Updated import
 
 declare global {
   interface Window {
-    // google?: typeof import('google-one-tap');
-    google?: any; // Use any to bypass type error for GSI script
+    google?: typeof import('google-one-tap');
     handleGoogleSignInCallback?: (response: any) => void;
   }
 }

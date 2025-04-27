@@ -57,7 +57,7 @@ function UpdatePasswordFormInternal() {
       setMessage('Password updated successfully! You will be redirected to login shortly.')
       setTimeout(() => {
          // Redirect to new login path
-         window.location.href = '/auth/login';
+         window.location.href = '/login';
       }, 3000);
     }
     setIsSubmitting(false)
@@ -95,7 +95,7 @@ function UpdatePasswordFormInternal() {
         </form>
         {!message && (
             <div className="mt-6 text-center text-sm">
-                <Link href="/auth/login" legacyBehavior>
+                <Link href="/login" legacyBehavior>
                     <a className="font-medium text-indigo-400 hover:text-indigo-300">Cancel and go to Login</a>
                 </Link>
             </div>

@@ -24,5 +24,5 @@ export async function initiateSignup(formData: FormData) {
   params.set('lastName', lastName.trim());
 
   // Redirect to the new password page path
-  return redirect(`/auth/signup/set-password?${params.toString()}`);
+  return redirect(`/signup/set-password?${params.toString()}`);
 } 

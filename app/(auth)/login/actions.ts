@@ -16,7 +16,7 @@ export async function login(formData: FormData) {
   if (error) {
     console.error("Login Error:", error.message);
     // Redirect back to new login path with error
-    return redirect('/auth/login?error=Could not authenticate user');
+    return redirect('/login?error=Could not authenticate user');
   }
 
   revalidatePath('/', 'layout')
@@ -30,7 +30,7 @@ export async function handleSignInWithGoogle(idToken: string) {
   if (!idToken) {
     console.error("handleSignInWithGoogle called without an ID token!");
     // Redirect back to new login path with error
-    return redirect('/auth/login?error=Google sign-in failed: No token received.');
+    return redirect('/login?error=Google sign-in failed: No token received.');
   }
 
   console.log("Attempting signInWithIdToken...");
@@ -42,7 +42,7 @@ export async function handleSignInWithGoogle(idToken: string) {
   if (error) {
     console.error("signInWithIdToken error:", error);
     // Redirect back to new login path with error
-    return redirect('/auth/login?error=Could not authenticate with Google.');
+    return redirect('/login?error=Could not authenticate with Google.');
   }
 
   console.log("signInWithIdToken success!");

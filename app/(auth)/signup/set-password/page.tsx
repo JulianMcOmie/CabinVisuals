@@ -22,7 +22,7 @@ function SetPasswordFormInternal() {
     if (!email || !firstName || !lastName) {
       console.error('Missing user details on password page, redirecting.');
       if (typeof window !== 'undefined') {
-         window.location.href = '/auth/signup?message=Something went wrong, please try again.';
+         window.location.href = '/signup?message=Something went wrong, please try again.';
       }
     }
   }, [searchParams, email, firstName, lastName]);
@@ -73,7 +73,7 @@ function SetPasswordFormInternal() {
           </div>
         </form>
         <div className="mt-6 text-center text-sm">
-           <Link href="/auth/signup" legacyBehavior>
+           <Link href="/signup" legacyBehavior>
              <a className="font-medium text-indigo-400 hover:text-indigo-300">&lt; Back</a>
            </Link>
         </div>
