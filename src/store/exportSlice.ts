@@ -9,17 +9,20 @@ export interface ExportSliceState {
   exportStatusMessage: string;
   exportError: string | null;
   cancelExportFn: (() => void) | null;
+  exportResultUrl: string | null;
+  isEncoderLoading: boolean;
 }
 
 // --- Actions Definition ---
 export interface ExportSliceActions {
   startExport: (settings: ExportSettings, rendererInstance: ExportRenderer) => Promise<void>;
   updateExportProgress: (progress: number, message: string) => void;
-  finishExport: () => void;
+  finishExport: (blobUrl: string) => void;
   failExport: (errorMessage: string) => void;
   setCancelExportFn: (fn: (() => void) | null) => void;
   cancelExport: () => void;
   resetExportState: () => void;
+  setEncoderLoading: (isLoading: boolean) => void;
 }
 
 // --- Combined Slice Type ---
@@ -32,6 +35,8 @@ const initialState: ExportSliceState = {
   exportStatusMessage: '',
   exportError: null,
   cancelExportFn: null,
+  exportResultUrl: null,
+  isEncoderLoading: false,
 };
 
 // --- Slice Creator ---
@@ -47,12 +52,13 @@ export const createExportSlice: StateCreator<
    * Starts the export process managed by the provided ExportRenderer instance.
    */
   startExport: async (settings, rendererInstance) => {
-    // Reset state and mark as exporting
-    set({ 
-        ...initialState, // Reset to defaults except...
+    // Reset state, mark as exporting, but don't clear encoder loading status yet
+    set(state => ({ 
+        ...initialState, 
         isExporting: true, 
-        exportStatusMessage: 'Initializing export...' 
-    });
+        exportStatusMessage: 'Initializing export...',
+        isEncoderLoading: state.isEncoderLoading, // Preserve loading status
+    }));
     console.log("Export slice: startExport action called.");
     try {
         // Delegate the actual export process to the renderer instance.
@@ -87,14 +93,16 @@ export const createExportSlice: StateCreator<
    * Marks the export as successfully completed.
    * Typically called by the ExportRenderer after CCapture finishes.
    */
-  finishExport: () => {
+  finishExport: (blobUrl) => {
     console.log("Export slice: finishExport action called.");
     set({
       isExporting: false,
       exportProgress: 1, // Ensure progress is 100%
-      exportStatusMessage: 'Export complete! Download should start automatically.',
+      exportStatusMessage: 'Export complete! Video ready.',
       exportError: null,
       cancelExportFn: null, // Clear cancel function
+      exportResultUrl: blobUrl, // Store the generated URL
+      isEncoderLoading: false, // Encoder is no longer needed
     });
   },
 
@@ -109,6 +117,8 @@ export const createExportSlice: StateCreator<
       exportError: errorMessage,
       exportStatusMessage: `Export failed: ${errorMessage}`,
       cancelExportFn: null, // Clear cancel function
+      exportResultUrl: null, // Clear any potential URL on failure
+      isEncoderLoading: false, // Ensure loading state is reset
     });
      // Optionally reset state fully after a delay
     // setTimeout(() => get().resetExportState(), 8000);
@@ -132,7 +142,9 @@ export const createExportSlice: StateCreator<
         set({ 
             isExporting: false, // Mark as not exporting immediately
             exportStatusMessage: 'Cancelling export...', 
-            cancelExportFn: null // Clear the function
+            cancelExportFn: null, // Clear the function
+            exportResultUrl: null,
+            isEncoderLoading: false,
         });
     } else {
         console.warn("Export slice: cancelExport called but no cancel function is set.");
@@ -144,6 +156,19 @@ export const createExportSlice: StateCreator<
    */
   resetExportState: () => {
     console.log("Export slice: resetExportState action called.");
-    set({ ...initialState });
+    // Revoke previous object URL if it exists to prevent memory leaks
+    const currentUrl = get().exportResultUrl;
+    if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+    }
+    set({ ...initialState }); // Reset to initial state
   },
+
+  // Action to update encoder loading status
+  setEncoderLoading: (isLoading: boolean) => {
+      set({ 
+          isEncoderLoading: isLoading, 
+          exportStatusMessage: isLoading ? "Loading video encoder..." : get().exportStatusMessage 
+      });
+  }
 }); 
