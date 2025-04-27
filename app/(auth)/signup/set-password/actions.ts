@@ -19,7 +19,7 @@ export async function completeSignup(formData: FormData) {
 
   if (!email || !password || !firstName || !lastName) {
     console.error('CompleteSignup: Missing form data');
-    return redirect('/auth/signup?message=Something went wrong, please start over.'); // Updated path
+    return redirect('/signup?message=Something went wrong, please start over.'); // Updated path
   }
 
   if (password.length < 6) {
