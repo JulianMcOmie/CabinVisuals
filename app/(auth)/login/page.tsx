@@ -8,7 +8,8 @@ import { useSearchParams, usePathname } from 'next/navigation';
 
 declare global {
   interface Window {
-    google?: typeof import('google-one-tap');
+    // google?: typeof import('google-one-tap');
+    google?: any; // Use any to bypass type error for GSI script
     handleGoogleSignInCallback?: (response: any) => void;
   }
 }
@@ -18,19 +19,24 @@ export default function LoginPage() {
   const pathname = usePathname();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   async function handleGoogleSignInCallback(response: any) {
     console.log("Google Sign-In CredentialResponse:", response);
     if (response.credential) {
+      setIsLoading(true);
+      setError(null);
       try {
         await handleSignInWithGoogle(response.credential);
       } catch (error) {
         console.error("Error calling handleSignInWithGoogle server action:", error);
         setError('Could not authenticate with Google.');
+        setIsLoading(false);
       }
     } else {
       console.error("Google Sign-In failed: No credential received.");
       setError('Google Sign-In failed. Please try again.');
+      setIsLoading(false);
     }
   }
 
@@ -38,7 +44,7 @@ export default function LoginPage() {
     const msg = searchParams.get('message');
     const errMsg = searchParams.get('error');
     if (msg) setMessage(msg);
-    if (errMsg) setError(errMsg);
+    if (errMsg && !isLoading) setError(errMsg);
 
     window.handleGoogleSignInCallback = handleGoogleSignInCallback;
 
