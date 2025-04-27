@@ -182,15 +182,6 @@ function VisualizerView() {
     !!r3fInternalsRef.current.invalidate && 
     !!canvasRef.current;
     
-  console.log(`VisualizerView: Checking conditions to render ExportView: 
-    isExportViewOpen: ${isExportViewOpen}
-    gl available: ${!!r3fInternalsRef.current.gl}
-    scene available: ${!!r3fInternalsRef.current.scene}
-    camera available: ${!!r3fInternalsRef.current.camera}
-    invalidate available: ${!!r3fInternalsRef.current.invalidate}
-    canvasRef.current available: ${!!canvasRef.current}
-    Result: shouldRenderExportView = ${shouldRenderExportView}`);
-
   return (
     <div 
       className="visualizer-view" 
@@ -253,8 +244,6 @@ function VisualizerView() {
 
       {/* Conditionally render ExportView outside Canvas, passing props */}
       {shouldRenderExportView && (
-          // --- DEBUG LOG --- 
-          console.log("VisualizerView: Rendering ExportView..."),
           <ExportView 
               gl={r3fInternalsRef.current.gl!}
               scene={r3fInternalsRef.current.scene!}

@@ -29,8 +29,6 @@ export interface ExportRendererDeps {
 
 export class ExportRenderer {
   private deps: ExportRendererDeps;
-  // Replace capturer with ffmpeg instance
-  // private capturer: any = null; 
   private ffmpeg: FFmpeg | null = null;
   private isEncoderLoaded: boolean = false; // Track loading state explicitly
   private isRunning: boolean = false;
@@ -91,7 +89,7 @@ export class ExportRenderer {
     this.frameCount = 0;
     this.abortController = new AbortController();
     const { settings, actions } = this.deps;
-    const exportDurationSeconds = 5; 
+    const exportDurationSeconds = 1; 
     const fps = parseInt(settings.fps, 10);
     this.totalFrames = Math.floor(exportDurationSeconds * fps);
     actions.setCancelExportFn(() => this.cancel());
@@ -103,16 +101,21 @@ export class ExportRenderer {
             this.cleanupFFmpegFS(true);
             await this.renderAndCaptureFrames();
             if (this.abortController?.signal.aborted) throw new Error("Cancelled");
-            
-            // --- FFmpeg Encoding --- 
-            // Update progress manually before starting exec
-            actions.updateExportProgress(0.5, "Encoding video...");
 
-            // Remove setProgress - it's likely gone
-            // ffmpeg.setProgress(({ ratio }: { ratio: number }) => { 
-            //    const encodingProgress = 0.5 + (ratio * 0.5);
-            //    actions.updateExportProgress(encodingProgress, `Encoding... ${Math.round(ratio * 100)}%`);
-            // });
+            // --- DEBUG: Check if frame files exist before encoding ---
+            try {
+                const files = await ffmpeg.listDir('/');
+                const frameFiles = files.filter(f => f.name.startsWith('frame-') && !f.isDir);
+                console.log(`DEBUG: Found ${frameFiles.length} frame files in FS before encoding. First few:`, frameFiles.slice(0, 5).map(f => f.name));
+                if (frameFiles.length !== this.totalFrames) {
+                    console.warn(`DEBUG: Mismatch between expected frames (${this.totalFrames}) and found files (${frameFiles.length})`);
+                }
+            } catch (e) {
+                console.error("DEBUG: Error listing directory before encoding:", e);
+            }
+            // --- End Debug ---
+            
+            actions.updateExportProgress(0.5, "Encoding video...");
 
             console.log("Running FFmpeg command...");
             const outputFilename = 'output.mp4';
@@ -127,23 +130,46 @@ export class ExportRenderer {
                 '-movflags', '+faststart',
                 outputFilename
             ];
-            // Use ffmpeg.exec() instead of run()
+            // Add more logging around exec
+            console.log("Executing FFmpeg with args:", args);
             await ffmpeg.exec(args);
-            console.log("FFmpeg command finished.");
-            // ffmpeg.setProgress(() => {}); // Remove clear progress
+            console.log("FFmpeg command finished execution."); // Log after await completes
 
             actions.updateExportProgress(0.99, "Finalizing video..."); 
 
+            // --- DEBUG: Check if output file exists after encoding ---
+            try {
+                const filesAfter = await ffmpeg.listDir('/');
+                const outputFile = filesAfter.find(f => f.name === outputFilename && !f.isDir);
+                console.log(`DEBUG: Output file '${outputFilename}' ${outputFile ? 'found' : 'NOT found'} in FS after encoding.`);
+                // If you have size info available (depends on FFmpeg version/listDir implementation):
+                // if (outputFile && outputFile.size !== undefined) console.log(`DEBUG: Output file size: ${outputFile.size}`);
+                 if (!outputFile) {
+                     console.error("DEBUG: output.mp4 was not created by FFmpeg.");
+                     // Try listing again slightly later?
+                     await new Promise(res => setTimeout(res, 100));
+                     const filesLater = await ffmpeg.listDir('/');
+                     console.log("DEBUG: Filesystem content after short delay:", filesLater);
+                 }
+            } catch (e) {
+                console.error("DEBUG: Error listing directory after encoding:", e);
+            }
+            // --- End Debug ---
+
             const data = await ffmpeg.readFile(outputFilename);
-            // Create Blob directly from the Uint8Array
             if (data instanceof Uint8Array) {
                 const blob = new Blob([data], { type: 'video/mp4' }); 
                 const blobUrl = URL.createObjectURL(blob);
                 console.log(`Video processed: ${outputFilename}, Size: ${blob.size} bytes`);
+                // --- DEBUG: Check blob size --- 
+                if (blob.size === 0) {
+                    console.error("DEBUG: Created Blob has size 0. Input data from readFile might be empty.");
+                }
+                // --- End Debug ---
                 actions.finishExport(blobUrl); 
                 this.triggerDownload(blobUrl, `export-${Date.now()}.mp4`);
             } else {
-                throw new Error("Failed to read processed video data from FFmpeg FS.");
+                throw new Error(`Failed to read ${outputFilename} data from FFmpeg FS.`);
             }
             resolve(); 
         } catch (error: any) { 
@@ -171,18 +197,38 @@ export class ExportRenderer {
     for (let i = 0; i < this.totalFrames; i++) {
         if (this.abortController?.signal.aborted) return;
         const currentTime = i / fps;
-        // Update progress for frame capture phase (0.0 to ~0.5)
         const captureProgress = (i + 1) / (this.totalFrames * 2); 
         try {
             const currentBeat = timeManager.timeToBeat(currentTime);
             timeManager.seekTo(currentBeat);
             invalidate();
             await new Promise(resolve => requestAnimationFrame(resolve));
+            
             const frameDataUrl = canvas.toDataURL('image/png');
             const frameFilename = `frame-${String(i).padStart(5, '0')}.png`;
             
-            // Use ffmpeg.writeFile() with data fetched using fetchFile from @ffmpeg/util
-            await ffmpeg.writeFile(frameFilename, await fetchFile(frameDataUrl));
+            // --- DEBUG: Check frame data before writing ---
+            if (!frameDataUrl || frameDataUrl === 'data:,') {
+                console.error(`DEBUG: Frame ${i}: Got empty data URL from canvas!`);
+                throw new Error(`Canvas returned empty data for frame ${i}`);
+            }
+            // console.log(`DEBUG: Frame ${i}: Data URL length: ${frameDataUrl.length}`); // Optional: Can be very verbose
+            // --- End Debug ---
+
+            const frameData = await fetchFile(frameDataUrl);
+            // --- DEBUG: Check fetched data size ---
+            // console.log(`DEBUG: Frame ${i}: Fetched data size: ${frameData.byteLength}`); // Optional: Verbose
+            // --- End Debug ---
+            await ffmpeg.writeFile(frameFilename, frameData);
+
+            // --- DEBUG: Confirm write by trying to read size (might fail/be slow) ---
+            // try {
+            //     const writtenFile = await ffmpeg.readFile(frameFilename);
+            //     console.log(`DEBUG: Frame ${i}: Verified write, size: ${writtenFile.byteLength}`);
+            // } catch(readErr) {
+            //     console.error(`DEBUG: Frame ${i}: Failed to read back file after write!`, readErr);
+            // }
+            // --- End Debug ---
 
             this.frameCount = i + 1;
             actions.updateExportProgress(captureProgress, `Capturing frame ${this.frameCount}/${this.totalFrames}`);

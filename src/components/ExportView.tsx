@@ -112,6 +112,7 @@ export function ExportView(props: ExportViewProps) {
             finishExport: useStore.getState().finishExport,
             failExport: useStore.getState().failExport,
             setCancelExportFn: useStore.getState().setCancelExportFn,
+            setEncoderLoading: useStore.getState().setEncoderLoading,
         },
     };
 
