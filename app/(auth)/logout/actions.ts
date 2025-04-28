@@ -20,6 +20,7 @@ export async function logout(redirectTo: string = '/') { // Accept redirectTo ar
     console.log("Successfully signed out.");
   }
 
-  // Redirect to the provided path or the default
-  redirect(redirectTo); 
+  // Redirect to the login page after sign out, regardless of error (best practice)
+  // Use the public-facing login route
+  redirect('/projects'); 
 } 

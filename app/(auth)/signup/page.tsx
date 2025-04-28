@@ -3,18 +3,20 @@
 import { initiateSignup } from './actions'; // Updated import
 import Link from 'next/link';
 import { useSearchParams, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react'; // Import Suspense
 import Script from 'next/script';
 import { handleSignInWithGoogle } from '../login/actions'; // Updated import
 
 declare global {
   interface Window {
-    google?: typeof import('google-one-tap');
+    // Use any to resolve the type conflict
+    google?: any;
     handleGoogleSignInCallback?: (response: any) => void;
   }
 }
 
-export default function SignupPage() {
+// Extracted content component
+function SignupPageContent() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -24,6 +26,7 @@ export default function SignupPage() {
     if (response.credential) {
       try {
         await handleSignInWithGoogle(response.credential);
+        // Assuming successful handleSignInWithGoogle navigates or updates state elsewhere
       } catch (error) {
         console.error("Error calling handleSignInWithGoogle server action:", error);
         setErrorMessage('Google sign-in failed. Please try again.');
@@ -56,6 +59,7 @@ export default function SignupPage() {
     return () => {
       delete window.handleGoogleSignInCallback;
     };
+    // Note: pathname dependency might not be necessary unless GSI logic depends on path
   }, [pathname]);
 
   return (
@@ -104,5 +108,14 @@ export default function SignupPage() {
       </div>
        <Script src="https://accounts.google.com/gsi/client" async defer strategy="afterInteractive" onLoad={() => console.log('Google GSI script loaded.')}></Script>
     </div>
+  );
+}
+
+// Default export wraps the content component with Suspense
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignupPageContent />
+    </Suspense>
   );
 } 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Script from 'next/script';
 import { handleSignInWithGoogle, login } from './actions';
 import Link from 'next/link';
@@ -8,29 +8,35 @@ import { useSearchParams, usePathname } from 'next/navigation';
 
 declare global {
   interface Window {
-    google?: typeof import('google-one-tap');
+    // google?: typeof import('google-one-tap');
+    google?: any; // Use any to bypass type error for GSI script
     handleGoogleSignInCallback?: (response: any) => void;
   }
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   async function handleGoogleSignInCallback(response: any) {
     console.log("Google Sign-In CredentialResponse:", response);
     if (response.credential) {
+      setIsLoading(true);
+      setError(null);
       try {
         await handleSignInWithGoogle(response.credential);
       } catch (error) {
         console.error("Error calling handleSignInWithGoogle server action:", error);
         setError('Could not authenticate with Google.');
+        setIsLoading(false);
       }
     } else {
       console.error("Google Sign-In failed: No credential received.");
       setError('Google Sign-In failed. Please try again.');
+      setIsLoading(false);
     }
   }
 
@@ -38,7 +44,8 @@ export default function LoginPage() {
     const msg = searchParams.get('message');
     const errMsg = searchParams.get('error');
     if (msg) setMessage(msg);
-    if (errMsg) setError(errMsg);
+    if (errMsg && !isLoading) setError(errMsg);
+    else if (!errMsg) setError(null);
 
     window.handleGoogleSignInCallback = handleGoogleSignInCallback;
 
@@ -60,7 +67,7 @@ export default function LoginPage() {
     return () => {
       delete window.handleGoogleSignInCallback;
     };
-  }, [pathname, searchParams]);
+  }, [pathname, searchParams, isLoading]);
 
 
   return (
@@ -84,7 +91,7 @@ export default function LoginPage() {
           </div>
 
           <div className="text-center text-sm py-2">
-            <Link href="/auth/reset-password" legacyBehavior>
+            <Link href="/reset-password" legacyBehavior>
                <a className="font-medium text-indigo-400 hover:text-indigo-300">Forgot password?</a>
             </Link>
           </div>
@@ -109,7 +116,7 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center text-sm">
           <p className="text-gray-400">
-            Don't have an account?
+            Don&apos;t have an account?
             <Link href="/signup" legacyBehavior>
                <a className="ml-1 font-medium text-indigo-400 hover:text-indigo-300">Sign up</a>
              </Link>
@@ -119,5 +126,13 @@ export default function LoginPage() {
       </div>
        <Script src="https://accounts.google.com/gsi/client" async defer strategy="afterInteractive" onLoad={() => console.log('Google GSI script loaded.')}></Script>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 } 
