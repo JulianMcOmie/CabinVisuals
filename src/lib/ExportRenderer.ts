@@ -132,7 +132,8 @@ export class ExportRenderer {
     
     // Set export size and update camera BEFORE the try block or frame loop
     gl.setPixelRatio(1); // Use pixel ratio 1 for exact resolution
-    gl.setSize(targetWidth, targetHeight, false); // false = don't update style
+    gl.setSize(40, 20, false);
+    // gl.setSize(targetWidth, targetHeight, false); // false = don't update style
     if (perspectiveCamera) {
         perspectiveCamera.aspect = targetWidth / targetHeight;
         perspectiveCamera.updateProjectionMatrix();
