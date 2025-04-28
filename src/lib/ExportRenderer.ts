@@ -332,57 +332,78 @@ export class ExportRenderer {
    */
   private async renderAndCaptureFrames(): Promise<void> {
     const ffmpeg = this.ffmpeg!;
-    const { canvas, timeManager, invalidate, actions } = this.deps;
+    const { canvas, timeManager, invalidate, actions, gl } = this.deps;
     const fps = parseInt(this.deps.settings.fps, 10);
     console.log("Starting render and capture frame loop...");
 
-    for (let i = 0; i < this.totalFrames; i++) {
-        console.log(`Export Frame ${i} of ${this.totalFrames}`);
-        if (this.abortController?.signal.aborted) {
-          console.log("Export cancelled. Exiting frame loop.");
-          return;
-        }
-        const currentTime = i / fps;
-        const captureProgress = (i + 1) / (this.totalFrames * 2); 
-        try {
-            const currentBeat = timeManager.timeToBeat(currentTime);
-            timeManager.seekTo(currentBeat);
-            invalidate();
-            await new Promise(resolve => requestAnimationFrame(resolve));
-            
-            const frameDataUrl = canvas.toDataURL('image/png');
-            const frameFilename = `frame-${String(i).padStart(5, '0')}.png`;
-            
-            
-            // --- DEBUG: Check frame data before writing ---
-            if (!frameDataUrl || frameDataUrl === 'data:,') {
-                console.error(`DEBUG: Frame ${i}: Got empty data URL from canvas!`);
-                throw new Error(`Canvas returned empty data for frame ${i}`);
-            }
-            // console.log(`DEBUG: Frame ${i}: Data URL length: ${frameDataUrl.length}`); // Optional: Verbose, commented out
-            // --- End Debug ---
+    // Store original clear settings
+    const originalClearColor = new THREE.Color();
+    gl.getClearColor(originalClearColor);
+    const originalClearAlpha = gl.getClearAlpha();
 
-            const frameData = await fetchFile(frameDataUrl);
-            // --- DEBUG: Check fetched data size ---
-            // console.log(`DEBUG: Frame ${i}: Fetched data size: ${frameData.byteLength}`); // Optional: Verbose, commented out
-            // --- End Debug ---
-            await ffmpeg.writeFile(frameFilename, frameData);
+    try {
+      for (let i = 0; i < this.totalFrames; i++) {
+          console.log(`Export Frame ${i} of ${this.totalFrames}`);
+          if (this.abortController?.signal.aborted) {
+            console.log("Export cancelled. Exiting frame loop.");
+            return;
+          }
+          const currentTime = i / fps;
+          const captureProgress = (i + 1) / (this.totalFrames * 2); 
+          try {
+              const currentBeat = timeManager.timeToBeat(currentTime);
+              timeManager.seekTo(currentBeat);
 
-            // --- DEBUG: Confirm write by trying to read size (might fail/be slow) ---
-            // try {
-            //     const writtenFile = await ffmpeg.readFile(frameFilename);
-            //     console.log(`DEBUG: Frame ${i}: Verified write, size: ${writtenFile.byteLength}`);
-            // } catch(readErr) {
-            //     console.error(`DEBUG: Frame ${i}: Failed to read back file after write!`, readErr);
-            // }
-            // --- End Debug ---
+              // --- Prepare canvas for opaque capture ---
+              gl.setClearColor(0x000000, 1.0); // Set background to black, alpha to 1
+              gl.clear(true, true, true); // Clear color, depth, and stencil buffers
+              // --- End preparation ---
+              
+              invalidate(); // Render the scene onto the black background
+              await new Promise(resolve => requestAnimationFrame(resolve)); // Wait for render
+              
+              // Capture as PNG (should now be opaque)
+              const frameDataUrl = canvas.toDataURL('image/png'); 
+              const frameFilename = `frame-${String(i).padStart(5, '0')}.png`;
+              
+              
+              // --- DEBUG: Check frame data before writing ---
+              if (!frameDataUrl || frameDataUrl === 'data:,') {
+                  console.error(`DEBUG: Frame ${i}: Got empty data URL from canvas!`);
+                  throw new Error(`Canvas returned empty data for frame ${i}`);
+              }
+              // console.log(`DEBUG: Frame ${i}: Data URL length: ${frameDataUrl.length}`); // Optional: Verbose, commented out
+              // --- End Debug ---
 
-            this.frameCount = i + 1;
-            actions.updateExportProgress(captureProgress, `Capturing frame ${this.frameCount}/${this.totalFrames}`);
-        } catch (error: any) {
-            console.error(`Error during frame ${i} capture:`, error);
-            throw new Error(`Failed capturing frame ${i}: ${error.message || 'Unknown error'}`);
-        }
+              const frameData = await fetchFile(frameDataUrl);
+              // --- DEBUG: Check fetched data size ---
+              // console.log(`DEBUG: Frame ${i}: Fetched data size: ${frameData.byteLength}`); // Optional: Verbose, commented out
+              // --- End Debug ---
+              await ffmpeg.writeFile(frameFilename, frameData);
+
+              // --- DEBUG: Confirm write by trying to read size (might fail/be slow) ---
+              // try {
+              //     const writtenFile = await ffmpeg.readFile(frameFilename);
+              //     console.log(`DEBUG: Frame ${i}: Verified write, size: ${writtenFile.byteLength}`);
+              // } catch(readErr) {
+              //     console.error(`DEBUG: Frame ${i}: Failed to read back file after write!`, readErr);
+              // }
+              // --- End Debug ---
+
+              this.frameCount = i + 1;
+              actions.updateExportProgress(captureProgress, `Capturing frame ${this.frameCount}/${this.totalFrames}`);
+          } catch (error: any) {
+              console.error(`Error during frame ${i} capture:`, error);
+              // Restore clear color even if a single frame fails
+              gl.setClearColor(originalClearColor, originalClearAlpha);
+              throw new Error(`Failed capturing frame ${i}: ${error.message || 'Unknown error'}`);
+          }
+      }
+    } finally {
+        // --- Restore original clear settings --- 
+        console.log("Restoring original renderer clear color and alpha.");
+        gl.setClearColor(originalClearColor, originalClearAlpha);
+        // --- End restoration ---
     }
     console.log("Render and capture frame loop finished.");
   }
