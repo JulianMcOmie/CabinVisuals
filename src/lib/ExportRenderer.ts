@@ -27,6 +27,20 @@ export interface ExportRendererDeps {
   actions: Pick<ExportSliceActions, 'updateExportProgress' | 'finishExport' | 'failExport' | 'setCancelExportFn' | 'setEncoderLoading'>;
 }
 
+// Add a helper function to parse resolution strings (can be outside the class or static)
+function parseResolution(resolution: string): { width: number; height: number } {
+    switch (resolution) {
+        case '480p': return { width: 854, height: 480 };
+        case '720p': return { width: 1280, height: 720 };
+        case '1080p': return { width: 1920, height: 1080 };
+        case '1440p': return { width: 2560, height: 1440 };
+        case '4K': return { width: 3840, height: 2160 };
+        default:
+            console.warn(`Unsupported resolution: ${resolution}, defaulting to 1080p`);
+            return { width: 1920, height: 1080 }; // Default fallback
+    }
+}
+
 export class ExportRenderer {
   private deps: ExportRendererDeps;
   private ffmpeg: FFmpeg | null = null;
@@ -88,17 +102,50 @@ export class ExportRenderer {
     this.isRunning = true;
     this.frameCount = 0;
     this.abortController = new AbortController();
-    const { settings, actions } = this.deps;
-    const exportDurationSeconds = 1; 
+    const { settings, actions, gl, camera } = this.deps; // Destructure gl and camera
+
+    // --- Store original state ---
+    const originalSize = new THREE.Vector2();
+    gl.getSize(originalSize);
+    const originalPixelRatio = gl.getPixelRatio();
+    // Store aspect ratio only if it's a PerspectiveCamera
+    let originalAspect: number | null = null;
+    let perspectiveCamera: THREE.PerspectiveCamera | null = null; // Define here
+
+    if (camera instanceof THREE.PerspectiveCamera) {
+        perspectiveCamera = camera; // Assign here
+        originalAspect = perspectiveCamera.aspect; // Read aspect here
+        console.log(`Original Renderer Size: ${originalSize.x}x${originalSize.y}, PixelRatio: ${originalPixelRatio}, Aspect: ${originalAspect}`);
+    } else {
+         console.log(`Original Renderer Size: ${originalSize.x}x${originalSize.y}, PixelRatio: ${originalPixelRatio}. Camera is not PerspectiveCamera.`);
+         console.warn("Camera is not a PerspectiveCamera. Aspect ratio cannot be stored or updated, output might be distorted.");
+    }
+
+    // --- Prepare for export resolution ---
+    const { width: targetWidth, height: targetHeight } = parseResolution(settings.resolution);
+    console.log(`Setting export resolution: ${targetWidth}x${targetHeight}`);
+    
+    // Set export size and update camera BEFORE the try block or frame loop
+    gl.setPixelRatio(1); // Use pixel ratio 1 for exact resolution
+    gl.setSize(targetWidth, targetHeight, false); // false = don't update style
+    // Update aspect only if we confirmed it's a PerspectiveCamera earlier
+    if (perspectiveCamera) {
+        perspectiveCamera.aspect = targetWidth / targetHeight;
+        perspectiveCamera.updateProjectionMatrix();
+        console.log(`Updated camera aspect for export: ${perspectiveCamera.aspect}`);
+    }
+
+    const exportDurationSeconds = 1;
     const fps = parseInt(settings.fps, 10);
     this.totalFrames = Math.floor(exportDurationSeconds * fps);
     actions.setCancelExportFn(() => this.cancel());
-    actions.updateExportProgress(0, "Preparing frames..."); 
+    actions.updateExportProgress(0, "Preparing frames...");
     console.log(`Starting export: ${this.totalFrames} frames, ${fps} FPS, duration ${exportDurationSeconds}s`);
 
     return new Promise(async (resolve, reject) => {
         try {
             this.cleanupFFmpegFS(true);
+            // Frame rendering will now use the adjusted size
             await this.renderAndCaptureFrames();
             if (this.abortController?.signal.aborted) throw new Error("Cancelled");
 
@@ -235,10 +282,21 @@ export class ExportRenderer {
             }
             reject(error);
         } finally {
+            console.log("Export finished or failed. Restoring original renderer size and camera aspect.");
+            // --- Restore original state ---
+            gl.setPixelRatio(originalPixelRatio);
+            gl.setSize(originalSize.x, originalSize.y, false);
+            // Restore aspect only if we stored an original value and have the camera ref
+            if (perspectiveCamera && originalAspect !== null) {
+                perspectiveCamera.aspect = originalAspect;
+                perspectiveCamera.updateProjectionMatrix();
+                console.log(`Restored camera aspect: ${perspectiveCamera.aspect}`);
+            }
+
             this.isRunning = false;
             actions.setCancelExportFn(null);
-            this.cleanupFFmpegFS(); 
-            this.deps.invalidate(); 
+            this.cleanupFFmpegFS();
+            this.deps.invalidate(); // Invalidate one last time with restored settings
         }
     });
   }
