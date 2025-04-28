@@ -79,5 +79,5 @@ export async function completeSignup(formData: FormData) {
 
   // On successful signup initiation, redirect to login with a confirmation message
   console.log(`Signup initiated for ${email}. Redirecting to login for confirmation.`);
-  return redirect('/login?message=Please check your email to confirm your account.');
+  return redirect('/projects');//redirect('/login?message=Please check your email to confirm your account.');
 } 
