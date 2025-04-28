@@ -195,7 +195,11 @@ export class ExportRenderer {
     console.log("Starting render and capture frame loop...");
 
     for (let i = 0; i < this.totalFrames; i++) {
-        if (this.abortController?.signal.aborted) return;
+        console.log(`Export Frame ${i} of ${this.totalFrames}`);
+        if (this.abortController?.signal.aborted) {
+          console.log("Export cancelled. Exiting frame loop.");
+          return;
+        }
         const currentTime = i / fps;
         const captureProgress = (i + 1) / (this.totalFrames * 2); 
         try {
@@ -207,17 +211,23 @@ export class ExportRenderer {
             const frameDataUrl = canvas.toDataURL('image/png');
             const frameFilename = `frame-${String(i).padStart(5, '0')}.png`;
             
+            // --- DEBUG: Trigger download for each frame ---
+            // WARNING: This will trigger a LOT of downloads if totalFrames is high!
+            // Comment this out when not debugging individual frames.
+            this.triggerDownload(frameDataUrl, frameFilename);
+            // --- End DEBUG ---
+            
             // --- DEBUG: Check frame data before writing ---
             if (!frameDataUrl || frameDataUrl === 'data:,') {
                 console.error(`DEBUG: Frame ${i}: Got empty data URL from canvas!`);
                 throw new Error(`Canvas returned empty data for frame ${i}`);
             }
-            // console.log(`DEBUG: Frame ${i}: Data URL length: ${frameDataUrl.length}`); // Optional: Can be very verbose
+            console.log(`DEBUG: Frame ${i}: Data URL length: ${frameDataUrl.length}`); // Optional: Can be very verbose
             // --- End Debug ---
 
             const frameData = await fetchFile(frameDataUrl);
             // --- DEBUG: Check fetched data size ---
-            // console.log(`DEBUG: Frame ${i}: Fetched data size: ${frameData.byteLength}`); // Optional: Verbose
+            console.log(`DEBUG: Frame ${i}: Fetched data size: ${frameData.byteLength}`); // Optional: Verbose
             // --- End Debug ---
             await ffmpeg.writeFile(frameFilename, frameData);
 

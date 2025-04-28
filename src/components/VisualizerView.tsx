@@ -84,6 +84,23 @@ function VisualizerView() {
       invalidate: (() => void) | null 
   }>({ gl: null, scene: null, camera: null, invalidate: null });
   
+  // --- Wrapper function for export invalidation ---
+  const invalidateForExport = useCallback(() => {
+    console.log("DEBUG: invalidateForExport called");
+    const originalInvalidate = r3fInternalsRef.current.invalidate;
+    if (originalInvalidate) {
+        // 1. Explicitly update the state needed for rendering this frame
+        const objects = visualizerManager.getVisualObjects();
+        console.log("DEBUG: Setting currentObjects for export frame:", objects);
+        setCurrentObjects(objects);
+
+        // 2. Now, trigger the R3F redraw using the function from the ref
+        originalInvalidate();
+    } else {
+        console.warn("DEBUG: invalidateForExport called but original invalidate not found in ref.");
+    }
+  }, [visualizerManager, setCurrentObjects]); // Dependencies: visualizerManager and setCurrentObjects are stable
+  
   // Update dimensions on resize
   useEffect(() => {
     const updateDimensions = () => {
@@ -251,7 +268,7 @@ function VisualizerView() {
               canvasRef={canvasRef as React.RefObject<HTMLCanvasElement>}
               visualizerManager={visualizerManager}
               timeManager={timeManager} 
-              invalidate={r3fInternalsRef.current.invalidate!}
+              invalidate={invalidateForExport}
           />
       )}
     </div>
