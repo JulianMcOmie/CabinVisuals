@@ -4,12 +4,14 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import type { EffectComposer as PostProcessingEffectComposer } from 'postprocessing';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Maximize2 } from 'lucide-react';
 import useStore from '../store/store';
 import VisualizerManager, { VisualObject3D } from '../lib/VisualizerManager';
 import { ExportView } from './ExportView';
+import type { ExportRendererDeps } from '../lib/ExportRenderer';
 
 // Scene component that handles animation and object rendering
 function Scene({ objects }: { objects: VisualObject3D[] }) {
@@ -83,6 +85,7 @@ function VisualizerView() {
       camera: THREE.Camera | null, 
       invalidate: (() => void) | null 
   }>({ gl: null, scene: null, camera: null, invalidate: null });
+  const composerRef = useRef<PostProcessingEffectComposer>(null);
   
   // --- Wrapper function for export invalidation ---
   const invalidateForExport = useCallback(() => {
@@ -100,6 +103,16 @@ function VisualizerView() {
         console.warn("DEBUG: invalidateForExport called but original invalidate not found in ref.");
     }
   }, [visualizerManager, setCurrentObjects]); // Dependencies: visualizerManager and setCurrentObjects are stable
+  
+  // Callback to resize the EffectComposer
+  const resizeComposer = useCallback((width: number, height: number) => {
+    if (composerRef.current) {
+      console.log(`DEBUG: Resizing EffectComposer to ${width}x${height}`);
+      composerRef.current.setSize(width, height);
+    } else {
+      console.warn("DEBUG: resizeComposer called but composerRef is null");
+    }
+  }, []); // No dependencies needed if composerRef is stable
   
   // Update dimensions on resize
   useEffect(() => {
@@ -199,6 +212,27 @@ function VisualizerView() {
     !!r3fInternalsRef.current.invalidate && 
     !!canvasRef.current;
     
+  // Function to assemble ExportView props (including the new callback)
+  // Note: This is simplified. Ensure ALL necessary props are passed.
+  // It assumes ExportView internally creates ExportRenderer or handles deps.
+  // If ExportView expects individual deps, adjust accordingly.
+  const getExportViewProps = () => {
+    if (!shouldRenderExportView) return null;
+    return {
+        gl: r3fInternalsRef.current.gl!,
+        scene: r3fInternalsRef.current.scene!,
+        camera: r3fInternalsRef.current.camera!,
+        canvasRef: canvasRef as React.RefObject<HTMLCanvasElement>,
+        visualizerManager: visualizerManager, 
+        timeManager: timeManager, 
+        invalidate: invalidateForExport, 
+        resizeComposer: resizeComposer // Pass the new resize function
+        // Pass any other props ExportView needs directly
+    };
+  };
+
+  const exportViewProps = getExportViewProps();
+
   return (
     <div 
       className="visualizer-view" 
@@ -215,7 +249,7 @@ function VisualizerView() {
           >
             <R3FController /> 
             <Scene objects={currentObjects} />
-            <EffectComposer>
+            <EffectComposer ref={composerRef}>
                 <Bloom 
                     intensity={1.0}
                     luminanceThreshold={0.1}
@@ -259,16 +293,10 @@ function VisualizerView() {
         </TooltipProvider>
       </div>
 
-      {/* Conditionally render ExportView outside Canvas, passing props */}
-      {shouldRenderExportView && (
+      {/* Conditionally render ExportView using the prepared props */}      
+      {exportViewProps && (
           <ExportView 
-              gl={r3fInternalsRef.current.gl!}
-              scene={r3fInternalsRef.current.scene!}
-              camera={r3fInternalsRef.current.camera!}
-              canvasRef={canvasRef as React.RefObject<HTMLCanvasElement>}
-              visualizerManager={visualizerManager}
-              timeManager={timeManager} 
-              invalidate={invalidateForExport}
+              {...exportViewProps} // Spread the generated props
           />
       )}
     </div>

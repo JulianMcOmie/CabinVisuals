@@ -36,10 +36,11 @@ interface ExportViewProps {
   visualizerManager: VisualizerManager;
   timeManager: TimeManager;
   invalidate: () => void;
+  resizeComposer: (width: number, height: number) => void;
 }
 
 export function ExportView(props: ExportViewProps) {
-  const { gl, scene, camera, canvasRef, visualizerManager, timeManager, invalidate } = props;
+  const { gl, scene, camera, canvasRef, visualizerManager, timeManager, invalidate, resizeComposer } = props;
 
   // Local state for dialog settings
   const [audioFormat, setAudioFormat] = useState<"mp3" | "wav">("mp3");
@@ -61,7 +62,7 @@ export function ExportView(props: ExportViewProps) {
 
   // Determine if export can be initiated based on props and state
   // Simplified check: Ensure main objects and the canvas ref *value* exist
-  const canInitiateExport = !!(gl && scene && camera && canvasRef.current && visualizerManager && timeManager && !isExporting);
+  const canInitiateExport = !!(gl && scene && camera && canvasRef.current && visualizerManager && timeManager && !isExporting && resizeComposer);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -86,8 +87,8 @@ export function ExportView(props: ExportViewProps) {
 
   const handleInitiateExport = () => {
     // Use props directly for checks and dependencies
-    if (!gl || !scene || !camera || !canvasRef.current || !visualizerManager || !timeManager || !invalidate) {
-      console.error("Cannot start export: Essential rendering dependencies are missing.");
+    if (!gl || !scene || !camera || !canvasRef.current || !visualizerManager || !timeManager || !invalidate || !resizeComposer) {
+      console.error("Cannot start export: Essential rendering dependencies (including resizeComposer) are missing.");
       return;
     }
     if (isExporting) {
@@ -106,7 +107,6 @@ export function ExportView(props: ExportViewProps) {
         timeManager,
         invalidate,
         settings: currentSettings,
-        // Store actions remain the same
         actions: {
             updateExportProgress: useStore.getState().updateExportProgress,
             finishExport: useStore.getState().finishExport,
@@ -114,6 +114,7 @@ export function ExportView(props: ExportViewProps) {
             setCancelExportFn: useStore.getState().setCancelExportFn,
             setEncoderLoading: useStore.getState().setEncoderLoading,
         },
+        resizeComposer: resizeComposer,
     };
 
     const renderer = new ExportRenderer(rendererDeps);

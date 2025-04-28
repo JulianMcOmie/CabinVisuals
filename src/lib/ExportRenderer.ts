@@ -3,6 +3,7 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import type { ExportSliceActions } from '../store/exportSlice'; // Adjust path if needed
 import type TimeManager from './TimeManager'; // Adjust path if needed
+import type { EffectComposer as PostProcessingEffectComposer } from 'postprocessing'; // Import type if needed, or just use Function
 
 // Remove CCapture declaration
 // declare const CCapture: any;
@@ -15,7 +16,7 @@ export interface ExportSettings {
     audioFormat: "mp3" | "wav"; // Still included, though not used for video encoding yet
 }
 
-// Interface for the dependencies required by the renderer
+// Define the dependencies including the new callback
 export interface ExportRendererDeps {
   gl: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -25,6 +26,7 @@ export interface ExportRendererDeps {
   invalidate: () => void;
   settings: ExportSettings; // Uses the exported type
   actions: Pick<ExportSliceActions, 'updateExportProgress' | 'finishExport' | 'failExport' | 'setCancelExportFn' | 'setEncoderLoading'>;
+  resizeComposer: (width: number, height: number) => void; // Add the new dependency
 }
 
 // Add a helper function to parse resolution strings (can be outside the class or static)
@@ -53,6 +55,10 @@ export class ExportRenderer {
   constructor(dependencies: ExportRendererDeps) {
     if (!dependencies.canvas) {
       throw new Error("ExportRenderer requires a valid canvas element dependency.");
+    }
+    // Check for the new dependency
+    if (typeof dependencies.resizeComposer !== 'function') {
+        throw new Error("ExportRenderer requires a valid resizeComposer function dependency.");
     }
     this.deps = dependencies;
   }
@@ -102,19 +108,18 @@ export class ExportRenderer {
     this.isRunning = true;
     this.frameCount = 0;
     this.abortController = new AbortController();
-    const { settings, actions, gl, camera } = this.deps; // Destructure gl and camera
+    // Destructure resizeComposer from deps
+    const { settings, actions, gl, camera, resizeComposer } = this.deps;
 
     // --- Store original state ---
     const originalSize = new THREE.Vector2();
     gl.getSize(originalSize);
     const originalPixelRatio = gl.getPixelRatio();
-    // Store aspect ratio only if it's a PerspectiveCamera
     let originalAspect: number | null = null;
-    let perspectiveCamera: THREE.PerspectiveCamera | null = null; // Define here
-
+    let perspectiveCamera: THREE.PerspectiveCamera | null = null;
     if (camera instanceof THREE.PerspectiveCamera) {
-        perspectiveCamera = camera; // Assign here
-        originalAspect = perspectiveCamera.aspect; // Read aspect here
+        perspectiveCamera = camera;
+        originalAspect = perspectiveCamera.aspect;
         console.log(`Original Renderer Size: ${originalSize.x}x${originalSize.y}, PixelRatio: ${originalPixelRatio}, Aspect: ${originalAspect}`);
     } else {
          console.log(`Original Renderer Size: ${originalSize.x}x${originalSize.y}, PixelRatio: ${originalPixelRatio}. Camera is not PerspectiveCamera.`);
@@ -128,12 +133,15 @@ export class ExportRenderer {
     // Set export size and update camera BEFORE the try block or frame loop
     gl.setPixelRatio(1); // Use pixel ratio 1 for exact resolution
     gl.setSize(targetWidth, targetHeight, false); // false = don't update style
-    // Update aspect only if we confirmed it's a PerspectiveCamera earlier
     if (perspectiveCamera) {
         perspectiveCamera.aspect = targetWidth / targetHeight;
         perspectiveCamera.updateProjectionMatrix();
         console.log(`Updated camera aspect for export: ${perspectiveCamera.aspect}`);
     }
+    
+    // !!! Resize the composer !!!
+    console.log("Resizing composer for export dimensions...");
+    resizeComposer(targetWidth, targetHeight);
 
     const exportDurationSeconds = 1;
     const fps = parseInt(settings.fps, 10);
@@ -145,7 +153,6 @@ export class ExportRenderer {
     return new Promise(async (resolve, reject) => {
         try {
             this.cleanupFFmpegFS(true);
-            // Frame rendering will now use the adjusted size
             await this.renderAndCaptureFrames();
             if (this.abortController?.signal.aborted) throw new Error("Cancelled");
 
@@ -172,8 +179,8 @@ export class ExportRenderer {
                 '-map', '0:v:0',
                 '-c:v', 'libx264',
                 '-pix_fmt', 'yuv420p',
-                '-preset', 'ultrafast',
-                '-crf', '23',
+                '-preset', 'medium',
+                '-crf', '20',
                 '-movflags', '+faststart',
                 outputFilename
             ];
@@ -282,16 +289,19 @@ export class ExportRenderer {
             }
             reject(error);
         } finally {
-            console.log("Export finished or failed. Restoring original renderer size and camera aspect.");
+            console.log("Export finished or failed. Restoring original state...");
             // --- Restore original state ---
             gl.setPixelRatio(originalPixelRatio);
             gl.setSize(originalSize.x, originalSize.y, false);
-            // Restore aspect only if we stored an original value and have the camera ref
             if (perspectiveCamera && originalAspect !== null) {
                 perspectiveCamera.aspect = originalAspect;
                 perspectiveCamera.updateProjectionMatrix();
                 console.log(`Restored camera aspect: ${perspectiveCamera.aspect}`);
             }
+            
+            // !!! Restore composer size !!!
+            console.log("Restoring composer to original dimensions...");
+            resizeComposer(originalSize.x, originalSize.y);
 
             this.isRunning = false;
             actions.setCancelExportFn(null);
