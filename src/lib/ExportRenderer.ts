@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { FFmpeg, type ProgressEventCallback } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import type { ExportSliceActions } from '../store/exportSlice'; // Adjust path if needed
 import type TimeManager from './TimeManager'; // Adjust path if needed
@@ -143,7 +143,7 @@ export class ExportRenderer {
     console.log("Resizing composer for export dimensions...");
     resizeComposer(targetWidth, targetHeight);
 
-    const exportDurationSeconds = 1;
+    const exportDurationSeconds = 10;
     const fps = parseInt(settings.fps, 10);
     this.totalFrames = Math.floor(exportDurationSeconds * fps);
     actions.setCancelExportFn(() => this.cancel());
@@ -187,6 +187,22 @@ export class ExportRenderer {
 
             console.log("Executing FFmpeg command:", args); // Keep this log
             try {
+                // Add the progress callback to ffmpeg.exec
+                ffmpeg.on('progress', (event: { progress: number; time?: number }) => {
+                    // The frame capture stage accounts for the first 50% (0.0 to 0.5)
+                    // The encoding stage accounts for the second 50% (0.5 to 1.0)
+                    const encodingProgress = event.progress; // 0.0 to 1.0
+                    const overallProgress = 0.5 + (encodingProgress * 0.5); // Map to 0.5 - 1.0
+                    
+                    // Prevent progress going slightly over 1 due to floating point math
+                    const clampedProgress = Math.min(overallProgress, 0.99); 
+
+                    actions.updateExportProgress(
+                        clampedProgress, 
+                        `Encoding video... ${(encodingProgress * 100).toFixed(0)}%`
+                    );
+                });
+
                 await ffmpeg.exec(args);
                 console.log("FFmpeg command finished execution successfully."); // Log success
             } catch (execError) {
