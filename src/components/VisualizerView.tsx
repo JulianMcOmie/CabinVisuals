@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import type { EffectComposer as PostProcessingEffectComposer } from 'postprocessing';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
@@ -11,55 +9,7 @@ import { Maximize2 } from 'lucide-react';
 import useStore from '../store/store';
 import VisualizerManager, { VisualObject3D } from '../lib/VisualizerManager';
 import { ExportView } from './ExportView';
-import type { ExportRendererDeps } from '../lib/ExportRenderer';
-
-// Scene component that handles animation and object rendering
-function Scene({ objects }: { objects: VisualObject3D[] }) {
-  return (
-    <>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 10, 5]} intensity={1} />
-      {objects.map(obj => (
-        <VisualObject key={obj.id} object={obj} />
-      ))}
-    </>
-  );
-}
-
-// Component for a single visual object
-function VisualObject({ object }: { object: VisualObject3D }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  
-  const isTransparent = object.opacity < 1.0;
-  // Use provided emissive properties, defaulting if undefined
-  const emissiveColor = object.emissive ?? object.color; // Default emissive to base color if not provided
-  const emissiveIntensity = object.emissiveIntensity ?? 0; // Default intensity to 0
-
-  return (
-    <mesh
-      ref={meshRef}
-      position={object.position}
-      rotation={object.rotation as any}
-      scale={object.scale}
-    >
-      {/* Conditionally render geometry based on type */}
-      {object.type === 'sphere' ? (
-        <sphereGeometry args={[0.5, 32, 32]} /> // Radius 0.5 for base sphere
-      ) : (
-        <boxGeometry args={[1, 1, 1]} /> // Default to cube
-      )}
-      <meshStandardMaterial 
-        color={object.color} 
-        opacity={object.opacity}
-        transparent={isTransparent}
-        depthWrite={!isTransparent}
-        emissive={emissiveColor}       // Apply emissive color
-        emissiveIntensity={emissiveIntensity} // Apply emissive intensity
-        toneMapped={false} // Disable tone mapping for emissive materials for stronger bloom
-      />
-    </mesh>
-  );
-}
+import VisualizerCanvas from './VisualizerCanvas';
 
 // Main VisualizerView component
 function VisualizerView() {
@@ -162,45 +112,15 @@ function VisualizerView() {
     }
   };
   
-  // --- R3F Components/Hooks --- 
-  // Create a helper component to access R3F context and control clock/updates
-  const R3FController = () => {
-    const { gl, scene, camera, invalidate, clock } = useThree();
-
-    // Store R3F internals in the ref for parent access
-    useEffect(() => {
-        r3fInternalsRef.current = { gl, scene, camera, invalidate };
-        // Cleanup function optional, depends if these refs change significantly
-    }, [gl, scene, camera, invalidate]);
-
-    // Effect to pause/resume R3F clock based on export state
-    useEffect(() => {
-        if (isExporting) {
-            if (clock.running) {
-                clock.stop();
-                console.log("R3F clock stopped for export.");
-            }
-        } else {
-            if (!clock.running) {
-                clock.start();
-                console.log("R3F clock started after export.");
-                // No need to invalidate here, ExportRenderer does it on finish/cancel
-            }
-        }
-    }, [isExporting, clock]);
-
-    // Frame loop for normal playback updates
-    useFrame(() => {
-        // Only update state for the Scene if not exporting and clock is running
-        if (!isExporting && clock.running) {
-            const liveObjects = visualizerManager.getVisualObjects();
-            setCurrentObjects(liveObjects); // Update state passed to Scene
-        }
-    });
-
-    // This component doesn't render anything itself
-    return null; 
-  };
+  // Frame update callback for VisualizerCanvas
+  const updateCurrentObjects = useCallback(() => {
+    // Only update state for the Scene if not exporting 
+    // (The check for clock.running is now internal to R3FController within VisualizerCanvas)
+    if (!isExporting) {
+        const liveObjects = visualizerManager.getVisualObjects();
+        setCurrentObjects(liveObjects); // Update state passed to Scene
+    }
+  }, [isExporting, visualizerManager]);
   
   // --- DEBUG LOG --- 
   // Evaluate the conditions needed to render ExportView
@@ -241,23 +161,14 @@ function VisualizerView() {
     >
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {dimensions.width > 0 && dimensions.height > 0 && (
-          <Canvas 
-            ref={canvasRef}
-            style={{ background: '#000' }} 
-            camera={{ position: [0, 0, 15] }} 
-            gl={{ preserveDrawingBuffer: true }}
-          >
-            <R3FController /> 
-            <Scene objects={currentObjects} />
-            <EffectComposer ref={composerRef}>
-                <Bloom 
-                    intensity={1.0}
-                    luminanceThreshold={0.1}
-                    luminanceSmoothing={0.2}
-                    mipmapBlur={true}
-                />
-            </EffectComposer>
-          </Canvas>
+          <VisualizerCanvas
+            objects={currentObjects}
+            canvasRef={canvasRef}
+            composerRef={composerRef}
+            r3fInternalsRef={r3fInternalsRef}
+            isExporting={isExporting}
+            updateCurrentObjects={updateCurrentObjects}
+          />
         )}
         {/* Beat indicator overlay - styled like page.tsx */}
         <div

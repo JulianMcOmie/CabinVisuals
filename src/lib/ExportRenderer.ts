@@ -127,13 +127,13 @@ export class ExportRenderer {
     }
 
     // --- Prepare for export resolution ---
-    const { width: targetWidth, height: targetHeight } = parseResolution(settings.resolution);
-    console.log(`Setting export resolution: ${targetWidth}x${targetHeight}`);
-    
+    // const { width: targetWidth, height: targetHeight } = parseResolution(settings.resolution);
+    // console.log(`Setting export resolution: ${targetWidth}x${targetHeight}`);
+    let targetWidth = 4096;
+    let targetHeight = 2160;
     // Set export size and update camera BEFORE the try block or frame loop
     gl.setPixelRatio(1); // Use pixel ratio 1 for exact resolution
-    gl.setSize(40, 20, false);
-    // gl.setSize(targetWidth, targetHeight, false); // false = don't update style
+    gl.setSize(targetWidth, targetHeight, false); // false = don't update style
     if (perspectiveCamera) {
         perspectiveCamera.aspect = targetWidth / targetHeight;
         perspectiveCamera.updateProjectionMatrix();
@@ -144,7 +144,7 @@ export class ExportRenderer {
     console.log("Resizing composer for export dimensions...");
     resizeComposer(targetWidth, targetHeight);
 
-    const exportDurationSeconds = 10;
+    const exportDurationSeconds = 0.5;
     const fps = parseInt(settings.fps, 10);
     this.totalFrames = Math.floor(exportDurationSeconds * fps);
     actions.setCancelExportFn(() => this.cancel());
@@ -181,7 +181,7 @@ export class ExportRenderer {
                 '-c:v', 'libx264',
                 '-pix_fmt', 'yuv420p',
                 '-preset', 'medium',
-                '-crf', '20',
+                '-crf', '15',
                 '-movflags', '+faststart',
                 outputFilename
             ];
