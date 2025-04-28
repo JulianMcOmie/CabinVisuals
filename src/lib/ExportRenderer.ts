@@ -116,67 +116,125 @@ export class ExportRenderer {
             // --- End Debug ---
             
             actions.updateExportProgress(0.5, "Encoding video...");
+            console.log("Starting FFmpeg encoding process..."); // Log start
 
-            console.log("Running FFmpeg command...");
             const outputFilename = 'output.mp4';
             const args = [
                 '-framerate', `${fps}`,
                 '-i', 'frame-%05d.png',
-                '-map', '0:v:0', 
-                '-c:v', 'libx264', 
+                '-map', '0:v:0',
+                '-c:v', 'libx264',
                 '-pix_fmt', 'yuv420p',
-                '-preset', 'ultrafast', 
-                '-crf', '23', 
+                '-preset', 'ultrafast',
+                '-crf', '23',
                 '-movflags', '+faststart',
                 outputFilename
             ];
-            // Add more logging around exec
-            console.log("Executing FFmpeg with args:", args);
-            await ffmpeg.exec(args);
-            console.log("FFmpeg command finished execution."); // Log after await completes
 
-            actions.updateExportProgress(0.99, "Finalizing video..."); 
+            console.log("Executing FFmpeg command:", args); // Keep this log
+            try {
+                await ffmpeg.exec(args);
+                console.log("FFmpeg command finished execution successfully."); // Log success
+            } catch (execError) {
+                console.error("FFmpeg command failed execution:", execError); // Log specific exec error
+                throw execError; // Re-throw to be caught by the outer catch
+            }
 
-            // --- DEBUG: Check if output file exists after encoding ---
+            actions.updateExportProgress(0.99, "Finalizing video...");
+            console.log("Attempting to read output file from FFmpeg FS:", outputFilename); // Log before read
+
+            // --- DEBUG: Check if output file exists after encoding --- (Keep this block)
             try {
                 const filesAfter = await ffmpeg.listDir('/');
                 const outputFile = filesAfter.find(f => f.name === outputFilename && !f.isDir);
                 console.log(`DEBUG: Output file '${outputFilename}' ${outputFile ? 'found' : 'NOT found'} in FS after encoding.`);
-                // If you have size info available (depends on FFmpeg version/listDir implementation):
-                // if (outputFile && outputFile.size !== undefined) console.log(`DEBUG: Output file size: ${outputFile.size}`);
-                 if (!outputFile) {
-                     console.error("DEBUG: output.mp4 was not created by FFmpeg.");
-                     // Try listing again slightly later?
-                     await new Promise(res => setTimeout(res, 100));
-                     const filesLater = await ffmpeg.listDir('/');
-                     console.log("DEBUG: Filesystem content after short delay:", filesLater);
-                 }
+                if (!outputFile) {
+                    console.error("DEBUG: output.mp4 was not created by FFmpeg.");
+                    await new Promise(res => setTimeout(res, 100));
+                    const filesLater = await ffmpeg.listDir('/');
+                    console.log("DEBUG: Filesystem content after short delay:", filesLater);
+                }
             } catch (e) {
                 console.error("DEBUG: Error listing directory after encoding:", e);
             }
             // --- End Debug ---
 
-            const data = await ffmpeg.readFile(outputFilename);
-            if (data instanceof Uint8Array) {
-                const blob = new Blob([data], { type: 'video/mp4' }); 
-                const blobUrl = URL.createObjectURL(blob);
-                console.log(`Video processed: ${outputFilename}, Size: ${blob.size} bytes`);
-                // --- DEBUG: Check blob size --- 
-                if (blob.size === 0) {
-                    console.error("DEBUG: Created Blob has size 0. Input data from readFile might be empty.");
-                }
-                // --- End Debug ---
-                actions.finishExport(blobUrl); 
-                this.triggerDownload(blobUrl, `export-${Date.now()}.mp4`);
-            } else {
-                throw new Error(`Failed to read ${outputFilename} data from FFmpeg FS.`);
+            let rawData: unknown = null; // Read into an 'unknown' type first
+            try {
+                rawData = await ffmpeg.readFile(outputFilename);
+                // Log the raw result details
+                console.log(`Read ${outputFilename} from FFmpeg FS. Type: ${typeof rawData}, Potential Size: ${(rawData as any)?.byteLength ?? 'N/A'}`); 
+            } catch (readError) {
+                 console.error(`Failed to read ${outputFilename} from FFmpeg FS:`, readError); // Log specific read error
+                 // Attempt to list files again for more context on read failure
+                 try {
+                     const files = await ffmpeg.listDir('/');
+                     console.error("FFmpeg FS contents after failed read:", files);
+                 } catch (listError) {
+                    console.error("Could not list FFmpeg FS contents after failed read:", listError);
+                 }
+                 throw readError; // Re-throw
             }
-            resolve(); 
-        } catch (error: any) { 
-            console.error("Error during export process:", error);
-            if (this.isRunning) { actions.failExport(error?.message || 'Unknown error'); }
-            reject(error); 
-        } finally { 
+
+            // Explicitly check if it's the type we expect
+            if (rawData instanceof Uint8Array) {
+                const data: Uint8Array = rawData; // Now assign to a correctly typed variable
+                console.log(`Data confirmed as Uint8Array. Size: ${data.byteLength}`);
+
+                if (data.byteLength > 0) { // Check size *after* confirming type
+                    console.log("Creating Blob from video data..."); // Log before blob
+                    const blob = new Blob([data], { type: 'video/mp4' });
+                    console.log(`Blob created. Size: ${blob.size}, Type: ${blob.type}`); // Log blob info
+
+                    // --- DEBUG: Check blob size --- (Keep this check)
+                    if (blob.size === 0) {
+                        console.error("DEBUG: Created Blob has size 0. Input data from readFile might be empty or invalid.");
+                        // Consider throwing an error here if blob size 0 is always failure
+                    }
+                    // --- End Debug ---
+
+                    const blobUrl = URL.createObjectURL(blob);
+                    console.log("Created Blob URL:", blobUrl); // Log URL
+                    actions.finishExport(blobUrl);
+                    console.log("Triggering final video download..."); // Log before download
+                    this.triggerDownload(blobUrl, `export-${Date.now()}.mp4`);
+                    console.log("Final video download triggered."); // Log after download call
+                } else {
+                     // Handle empty Uint8Array case
+                    console.error(`Failed to process video data. Read data is an empty Uint8Array.`);
+                    throw new Error(`Read ${outputFilename} data from FFmpeg FS, but it was empty.`);
+                }
+            } else {
+                 // Handle case where readFile returned something unexpected
+                console.error(`Failed to process video data. Expected Uint8Array but received type: ${typeof rawData}`);
+                throw new Error(`Failed to read ${outputFilename} data as Uint8Array from FFmpeg FS.`);
+            }
+            resolve();
+        } catch (error: any) {
+            // Enhanced error logging
+            console.error("-----------------------------------------");
+            console.error("Error during export process in 'start':", error);
+            if (error && typeof error === 'object') { // Log properties if it's an object
+                console.error("Error properties:", Object.keys(error).map(key => `${key}: ${error[key]}`));
+            }
+             console.error("Current state:", {
+                 isRunning: this.isRunning,
+                 frameCount: this.frameCount,
+                 totalFrames: this.totalFrames,
+                 isEncoderLoaded: this.isEncoderLoaded,
+                 wasCancelled: this.abortController?.signal.aborted ?? false,
+             });
+            console.error("-----------------------------------------");
+
+            if (this.isRunning && !(this.abortController?.signal.aborted)) { // Only fail if not cancelled
+                actions.failExport(error?.message || 'Unknown error during encoding/finalizing');
+            } else if (this.abortController?.signal.aborted) {
+                console.log("Export process caught error, but was cancelled.");
+                // Optionally call failExport with a specific "Cancelled" message if needed
+                // actions.failExport("Export cancelled by user.");
+            }
+            reject(error);
+        } finally {
             this.isRunning = false;
             actions.setCancelExportFn(null);
             this.cleanupFFmpegFS(); 
@@ -211,23 +269,18 @@ export class ExportRenderer {
             const frameDataUrl = canvas.toDataURL('image/png');
             const frameFilename = `frame-${String(i).padStart(5, '0')}.png`;
             
-            // --- DEBUG: Trigger download for each frame ---
-            // WARNING: This will trigger a LOT of downloads if totalFrames is high!
-            // Comment this out when not debugging individual frames.
-            this.triggerDownload(frameDataUrl, frameFilename);
-            // --- End DEBUG ---
             
             // --- DEBUG: Check frame data before writing ---
             if (!frameDataUrl || frameDataUrl === 'data:,') {
                 console.error(`DEBUG: Frame ${i}: Got empty data URL from canvas!`);
                 throw new Error(`Canvas returned empty data for frame ${i}`);
             }
-            console.log(`DEBUG: Frame ${i}: Data URL length: ${frameDataUrl.length}`); // Optional: Can be very verbose
+            // console.log(`DEBUG: Frame ${i}: Data URL length: ${frameDataUrl.length}`); // Optional: Verbose, commented out
             // --- End Debug ---
 
             const frameData = await fetchFile(frameDataUrl);
             // --- DEBUG: Check fetched data size ---
-            console.log(`DEBUG: Frame ${i}: Fetched data size: ${frameData.byteLength}`); // Optional: Verbose
+            // console.log(`DEBUG: Frame ${i}: Fetched data size: ${frameData.byteLength}`); // Optional: Verbose, commented out
             // --- End Debug ---
             await ffmpeg.writeFile(frameFilename, frameData);
 
