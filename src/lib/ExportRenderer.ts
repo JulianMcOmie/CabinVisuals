@@ -144,7 +144,7 @@ export class ExportRenderer {
     console.log("Resizing composer for export dimensions...");
     resizeComposer(targetWidth, targetHeight);
 
-    const exportDurationSeconds = 0.5;
+    const exportDurationSeconds = 175.0;
     const fps = parseInt(settings.fps, 10);
     this.totalFrames = Math.floor(exportDurationSeconds * fps);
     actions.setCancelExportFn(() => this.cancel());
@@ -181,7 +181,7 @@ export class ExportRenderer {
                 '-c:v', 'libx264',
                 '-pix_fmt', 'yuv420p',
                 '-preset', 'medium',
-                '-crf', '15',
+                '-crf', '20',
                 '-movflags', '+faststart',
                 outputFilename
             ];
@@ -190,6 +190,9 @@ export class ExportRenderer {
             try {
                 // Add the progress callback to ffmpeg.exec
                 ffmpeg.on('progress', (event: { progress: number; time?: number }) => {
+                    // --- DEBUG: Log raw event data ---
+                    console.log("FFmpeg Progress Event:", event);
+                    
                     // The frame capture stage accounts for the first 50% (0.0 to 0.5)
                     // The encoding stage accounts for the second 50% (0.5 to 1.0)
                     const encodingProgress = event.progress; // 0.0 to 1.0
@@ -197,6 +200,9 @@ export class ExportRenderer {
                     
                     // Prevent progress going slightly over 1 due to floating point math
                     const clampedProgress = Math.min(overallProgress, 0.99); 
+
+                    // --- DEBUG: Log calculated progress ---
+                    console.log(`Calculated Progress: overall=${overallProgress.toFixed(3)}, clamped=${clampedProgress.toFixed(3)}`);
 
                     actions.updateExportProgress(
                         clampedProgress, 
