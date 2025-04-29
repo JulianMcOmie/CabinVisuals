@@ -205,12 +205,13 @@ export default function LandingPage() {
             <div className="relative w-full h-full bg-gray-900 flex items-center justify-center">
               {/* Consider adding a placeholder/thumbnail before the iframe loads */}
               <iframe
-                className="absolute top-0 left-0 w-full h-full"
-                src="https://www.youtube.com/watch?v=8jPhqXtWIUw" // Added parameters to YouTube URL
-                title="Cabin Visuals Demo"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              ></iframe>
+                width="560"
+                height="315"
+                src="https://www.youtube.com/embed/8jPhqXtWIUw?si=2oOtH6bzIHDo7_j9"
+                title="YouTube video player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin" allowFullScreen></iframe>
             </div>
           </div>
         </section>
