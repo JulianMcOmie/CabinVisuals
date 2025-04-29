@@ -18,60 +18,88 @@ function VisualizerView() {
   const isExportViewOpen = useStore(state => state.isExportViewOpen);
   const closeExportView = useStore(state => state.closeExportView);
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // Initialize VisualizerManager with timeManager and initial tracks
-  const [visualizerManager] = useState(() => new VisualizerManager(timeManager, tracks));
-  
-  // State to hold the objects for the Scene component
-  const [currentObjects, setCurrentObjects] = useState<VisualObject3D[]>([]);
-  
-  // Refs to store R3F internals needed for props
-  const r3fInternalsRef = useRef<{ 
+  // Refs for the main, visible canvas
+  const mainCanvasRef = useRef<HTMLCanvasElement>(null);
+  const mainComposerRef = useRef<PostProcessingEffectComposer>(null);
+  const mainR3fInternalsRef = useRef<{ 
       gl: THREE.WebGLRenderer | null, 
       scene: THREE.Scene | null, 
       camera: THREE.Camera | null, 
       invalidate: (() => void) | null 
   }>({ gl: null, scene: null, camera: null, invalidate: null });
-  const composerRef = useRef<PostProcessingEffectComposer>(null);
+
+  // Refs for the offscreen export canvas
+  const exportCanvasRef = useRef<HTMLCanvasElement>(null);
+  const exportComposerRef = useRef<PostProcessingEffectComposer>(null);
+  const exportR3fInternalsRef = useRef<{ 
+      gl: THREE.WebGLRenderer | null, 
+      scene: THREE.Scene | null, 
+      camera: THREE.Camera | null, 
+      invalidate: (() => void) | null 
+  }>({ gl: null, scene: null, camera: null, invalidate: null });
+
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [exportDimensions, setExportDimensions] = useState({ width: 1920, height: 1080 }); // Default export dimensions
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // --- Wrapper function for export invalidation ---
+  // Initialize VisualizerManager with timeManager and initial tracks
+  const [visualizerManager] = useState(() => new VisualizerManager(timeManager, tracks));
+  
+  // State to hold the objects for the Scene component (shared by both canvases)
+  const [currentObjects, setCurrentObjects] = useState<VisualObject3D[]>([]);
+  
+  // --- Wrapper function for export invalidation --- 
+  // This now targets the EXPORT canvas internals
   const invalidateForExport = useCallback(() => {
-    console.log("DEBUG: invalidateForExport called");
-    const originalInvalidate = r3fInternalsRef.current.invalidate;
-    if (originalInvalidate) {
+    console.log("DEBUG: invalidateForExport called (targeting export canvas)");
+    const exportInvalidate = exportR3fInternalsRef.current.invalidate;
+    if (exportInvalidate) {
         // 1. Explicitly update the state needed for rendering this frame
+        // Both canvases read from this state, so update it once.
         const objects = visualizerManager.getVisualObjects();
         console.log("DEBUG: Setting currentObjects for export frame:", objects);
         setCurrentObjects(objects);
 
-        // 2. Now, trigger the R3F redraw using the function from the ref
-        originalInvalidate();
+        // 2. Now, trigger the EXPORT R3F redraw using the function from the ref
+        exportInvalidate();
     } else {
-        console.warn("DEBUG: invalidateForExport called but original invalidate not found in ref.");
+        console.warn("DEBUG: invalidateForExport called but export invalidate function not found in ref.");
     }
-  }, [visualizerManager, setCurrentObjects]); // Dependencies: visualizerManager and setCurrentObjects are stable
+  }, [visualizerManager]); // Dependencies: visualizerManager only (setCurrentObjects is stable)
   
-  // Callback to resize the EffectComposer
-  const resizeComposer = useCallback((width: number, height: number) => {
-    if (composerRef.current) {
-      console.log(`DEBUG: Resizing EffectComposer to ${width}x${height}`);
-      composerRef.current.setSize(width, height);
+  // Callback to resize the MAIN EffectComposer
+  const resizeMainComposer = useCallback((width: number, height: number) => {
+    if (mainComposerRef.current) {
+      console.log(`DEBUG: Resizing MAIN EffectComposer to ${width}x${height}`);
+      mainComposerRef.current.setSize(width, height);
     } else {
-      console.warn("DEBUG: resizeComposer called but composerRef is null");
+      console.warn("DEBUG: resizeMainComposer called but mainComposerRef is null");
     }
-  }, []); // No dependencies needed if composerRef is stable
-  
-  // Update dimensions on resize
+  }, []); // No dependencies needed if mainComposerRef is stable
+
+  // Callback to resize the EXPORT EffectComposer
+  const resizeExportComposer = useCallback((width: number, height: number) => {
+    if (exportComposerRef.current) {
+      console.log(`DEBUG: Resizing EXPORT EffectComposer to ${width}x${height}`);
+      exportComposerRef.current.setSize(width, height);
+    } else {
+      console.warn("DEBUG: resizeExportComposer called but exportComposerRef is null");
+    }
+  }, []); // No dependencies needed if exportComposerRef is stable
+
+  // --- Effects --- 
+  // Update dimensions on resize for the main view
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight
-        });
+        const newWidth = containerRef.current.offsetWidth;
+        const newHeight = containerRef.current.offsetHeight;
+        setDimensions({ width: newWidth, height: newHeight });
+        // Also resize the main composer when the main view resizes
+        resizeMainComposer(newWidth, newHeight);
+        // Optionally update default export dimensions (or have separate controls)
+        // setExportDimensions({ width: newWidth, height: newHeight }); 
       }
     };
     
@@ -79,7 +107,7 @@ function VisualizerView() {
     const hostWindow = containerRef.current?.ownerDocument.defaultView || window;
     hostWindow.addEventListener('resize', updateDimensions);
     return () => hostWindow.removeEventListener('resize', updateDimensions);
-  }, []);
+  }, [resizeMainComposer]);
   
   // Effect to update VisualizerManager when tracks change
   useEffect(() => {
@@ -89,7 +117,13 @@ function VisualizerView() {
   // Fullscreen change handler
   const handleFullscreenChange = useCallback(() => {
     setIsFullscreen(!!document.fullscreenElement);
-  }, []);
+    // Force resize after exiting fullscreen potentially?
+    setTimeout(() => {
+        if (containerRef.current) {
+            resizeMainComposer(containerRef.current.offsetWidth, containerRef.current.offsetHeight);
+        }
+    }, 100); // Delay slightly
+  }, [resizeMainComposer]);
 
   useEffect(() => {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -112,46 +146,58 @@ function VisualizerView() {
     }
   };
   
-  // Frame update callback for VisualizerCanvas
+  // Frame update callback passed to BOTH VisualizerCanvas instances
+  // The R3FController inside each canvas handles pausing based on isExporting
   const updateCurrentObjects = useCallback(() => {
-    // Only update state for the Scene if not exporting 
-    // (The check for clock.running is now internal to R3FController within VisualizerCanvas)
-    if (!isExporting) {
-        const liveObjects = visualizerManager.getVisualObjects();
-        setCurrentObjects(liveObjects); // Update state passed to Scene
-    }
-  }, [isExporting, visualizerManager]);
+    // Get objects once, used by whichever canvas is currently rendering frames
+    const liveObjects = visualizerManager.getVisualObjects();
+    setCurrentObjects(liveObjects); 
+  }, [visualizerManager]);
   
-  // --- DEBUG LOG --- 
-  // Evaluate the conditions needed to render ExportView
+  // --- ExportView Setup --- 
+  // Evaluate the conditions needed to render ExportView (using EXPORT refs)
   const shouldRenderExportView = 
     isExportViewOpen && 
-    !!r3fInternalsRef.current.gl && 
-    !!r3fInternalsRef.current.scene && 
-    !!r3fInternalsRef.current.camera && 
-    !!r3fInternalsRef.current.invalidate && 
-    !!canvasRef.current;
+    !!exportR3fInternalsRef.current.gl && 
+    !!exportR3fInternalsRef.current.scene && 
+    !!exportR3fInternalsRef.current.camera && 
+    !!exportR3fInternalsRef.current.invalidate && // Ensure export invalidate is ready
+    !!exportCanvasRef.current;
     
-  // Function to assemble ExportView props (including the new callback)
-  // Note: This is simplified. Ensure ALL necessary props are passed.
-  // It assumes ExportView internally creates ExportRenderer or handles deps.
-  // If ExportView expects individual deps, adjust accordingly.
+  // Function to assemble ExportView props (using EXPORT refs)
   const getExportViewProps = () => {
     if (!shouldRenderExportView) return null;
     return {
-        gl: r3fInternalsRef.current.gl!,
-        scene: r3fInternalsRef.current.scene!,
-        camera: r3fInternalsRef.current.camera!,
-        canvasRef: canvasRef as React.RefObject<HTMLCanvasElement>,
+        gl: exportR3fInternalsRef.current.gl!,
+        scene: exportR3fInternalsRef.current.scene!,
+        camera: exportR3fInternalsRef.current.camera!,
+        canvasRef: exportCanvasRef as React.RefObject<HTMLCanvasElement>, // Pass export canvas ref
         visualizerManager: visualizerManager, 
         timeManager: timeManager, 
-        invalidate: invalidateForExport, 
-        resizeComposer: resizeComposer // Pass the new resize function
-        // Pass any other props ExportView needs directly
+        invalidate: invalidateForExport, // Pass the invalidate targeting export
+        resizeComposer: resizeExportComposer, // Pass the resize for export
+        onClose: closeExportView, // Pass the close handler
+        // TODO: Pass export dimensions if needed by ExportView itself?
+        // initialWidth: exportDimensions.width,
+        // initialHeight: exportDimensions.height,
     };
   };
 
   const exportViewProps = getExportViewProps();
+
+  // --- DEBUG LOG --- 
+  // useEffect(() => {
+  //   console.log("ExportView Props Status:", {
+  //       shouldRenderExportView,
+  //       exportViewProps: getExportViewProps(), // Call again to see latest status
+  //       isExportViewOpen,
+  //       gl: !!exportR3fInternalsRef.current.gl,
+  //       scene: !!exportR3fInternalsRef.current.scene,
+  //       camera: !!exportR3fInternalsRef.current.camera,
+  //       invalidate: !!exportR3fInternalsRef.current.invalidate,
+  //       canvas: !!exportCanvasRef.current
+  //   });
+  // }, [shouldRenderExportView, isExportViewOpen]);
 
   return (
     <div 
@@ -159,18 +205,19 @@ function VisualizerView() {
       ref={containerRef} 
       style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}
     >
+      {/* Main Visible Canvas Area */}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {dimensions.width > 0 && dimensions.height > 0 && (
           <VisualizerCanvas
             objects={currentObjects}
-            canvasRef={canvasRef}
-            composerRef={composerRef}
-            r3fInternalsRef={r3fInternalsRef}
-            isExporting={isExporting}
+            canvasRef={mainCanvasRef} // Use main ref
+            composerRef={mainComposerRef} // Use main ref
+            r3fInternalsRef={mainR3fInternalsRef} // Use main ref
+            isExporting={isExporting} // Let this canvas know about export state (to pause)
             updateCurrentObjects={updateCurrentObjects}
           />
         )}
-        {/* Beat indicator overlay - styled like page.tsx */}
+        {/* Overlays for the main canvas */}
         <div
           className="absolute top-3 left-3 px-3 py-1 rounded-md border text-xs text-gray-300"
           style={{
@@ -204,7 +251,30 @@ function VisualizerView() {
         </TooltipProvider>
       </div>
 
-      {/* Conditionally render ExportView using the prepared props */}      
+      {/* Offscreen Canvas for Exporting - Always rendered but hidden */}
+      {/* Ensure it has dimensions BEFORE the Canvas component mounts */}
+      {exportDimensions.width > 0 && exportDimensions.height > 0 && (
+          <div style={{
+              position: 'absolute',
+              left: '-9999px', // Position offscreen
+              top: '-9999px',
+              width: `${exportDimensions.width}px`, 
+              height: `${exportDimensions.height}px`, 
+              // background: 'red', // For debugging visibility
+              // zIndex: 1000, // For debugging visibility
+          }}>
+              <VisualizerCanvas
+                  objects={currentObjects} // Share the same objects
+                  canvasRef={exportCanvasRef} // Use export ref
+                  composerRef={exportComposerRef} // Use export ref
+                  r3fInternalsRef={exportR3fInternalsRef} // Use export ref
+                  isExporting={true} // This canvas's clock should initially be stopped if it respects this
+                  updateCurrentObjects={updateCurrentObjects} // Share the update logic
+              />
+          </div>
+      )}
+
+      {/* Conditionally render ExportView using the prepared props */}
       {exportViewProps && (
           <ExportView 
               {...exportViewProps} // Spread the generated props
