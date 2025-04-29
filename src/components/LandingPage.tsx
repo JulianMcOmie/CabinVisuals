@@ -206,7 +206,7 @@ export default function LandingPage() {
               {/* Consider adding a placeholder/thumbnail before the iframe loads */}
               <iframe
                 className="absolute top-0 left-0 w-full h-full"
-                src="https://www.youtube.com/embed/8jPhqXtWIUw" // Added parameters to YouTube URL
+                src="https://www.youtube.com/embed/21oQR1AMxBQ" // Added parameters to YouTube URL
                 title="Cabin Visuals Demo"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
