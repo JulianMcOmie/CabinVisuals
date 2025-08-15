@@ -26,6 +26,10 @@ function VisualObject({ object }: { object: VisualObject3D }) {
       {/* Conditionally render geometry based on type */}
       {object.type === 'sphere' ? (
         <sphereGeometry args={[0.5, 32, 32]} /> // Radius 0.5 for base sphere
+      ) : object.type === 'torus' ? (
+        <torusGeometry args={[1, 0.3, 16, 100]} /> // Major radius 1, minor radius 0.3
+      ) : object.type === 'ring' ? (
+        <ringGeometry args={[0.5, 1, 32]} /> // Inner radius 0.5, outer radius 1
       ) : (
         <boxGeometry args={[1, 1, 1]} /> // Default to cube
       )}

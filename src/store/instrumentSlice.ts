@@ -17,6 +17,10 @@ import RadialDuplicateGlowSynth from '../lib/synthesizers/RadialDuplicateGlowSyn
 import VelocityOffsetDuplicateSynth from '../lib/synthesizers/VelocityOffsetDuplicateSynth';
 import PositionPulseSynth from '../lib/synthesizers/PositionPulseSynth';
 import BackgroundLightSynth from '../lib/synthesizers/BackgroundLightSynth';
+import ViolinRingSynth from '../lib/synthesizers/ViolinRingSynth';
+import CircleOrbsSynth from '../lib/synthesizers/CircleOrbsSynth';
+import GlobalColorSynth from '../lib/synthesizers/GlobalColorSynth';
+import MountainRushSynth from '../lib/synthesizers/MountainRushSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -48,6 +52,8 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'GlowSynth', name: 'Glow Synth', constructor: GlowSynth },
     { id: 'GlowingCubeSynth', name: 'Glowing Cube', constructor: GlowingCubeSynth },
     { id: 'RadialDuplicateGlowSynth', name: 'Radial Glow Dup', constructor: RadialDuplicateGlowSynth },
+    { id: 'ViolinRingSynth', name: 'Violin Ring', constructor: ViolinRingSynth },
+    { id: 'CircleOrbsSynth', name: 'Circle Orbs', constructor: CircleOrbsSynth },
   ],
   Percussive: [
     { id: 'ConvergingSpheresSynth', name: 'Converging Spheres', constructor: ConvergingSpheresSynth },
@@ -55,6 +61,7 @@ export const availableInstrumentsData: InstrumentCategories = {
   Background: [
     { id: 'SpiralGalaxySynth', name: 'Spiral Galaxy', constructor: SpiralGalaxySynth },
     { id: 'BackgroundLightSynth', name: 'Background Light', constructor: BackgroundLightSynth },
+    { id: 'MountainRushSynth', name: 'Mountain Rush', constructor: MountainRushSynth },
   ],
   Utility: [
     { id: 'PulseSynth', name: 'Global Pulse', constructor: PulseSynth },
@@ -62,6 +69,7 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'VelocityRotateSynth', name: 'Velocity Rotate', constructor: VelocityRotateSynth },
     { id: 'VelocityOffsetDuplicateSynth', name: 'Velocity Duplicate', constructor: VelocityOffsetDuplicateSynth },
     { id: 'PositionPulseSynth', name: 'Position Pulse', constructor: PositionPulseSynth },
+    { id: 'GlobalColorSynth', name: 'Global Color', constructor: GlobalColorSynth },
   ]
 };
 
