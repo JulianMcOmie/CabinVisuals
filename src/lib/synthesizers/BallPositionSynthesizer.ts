@@ -7,6 +7,7 @@ interface TrailPoint {
   position: [number, number, number];
   timestamp: number;
   age: number; // 0 to 1, where 1 is fully faded
+  rotation?: number; // Store the actual rotation angle for orbital trails
 }
 
 class BallPositionSynthesizer extends Synthesizer {
@@ -44,6 +45,7 @@ class BallPositionSynthesizer extends Synthesizer {
   private fRotationAnimationStartTime: number = 0;
 
   // Trail tracking
+  private mainBallTrail: TrailPoint[] = [];
   private dOrbTrail: TrailPoint[] = [];
   private eOrbTrail: TrailPoint[] = [];
   private fOrbTrail: TrailPoint[] = [];
@@ -87,8 +89,8 @@ class BallPositionSynthesizer extends Synthesizer {
       ['idleRotationSpeed', new Property<number>('idleRotationSpeed', 0.1, {
         uiType: 'slider', label: 'Idle Rotation Speed', min: 0, max: 1, step: 0.01
       })],
-      ['trailLength', new Property<number>('trailLength', 20, {
-        uiType: 'slider', label: 'Trail Length', min: 5, max: 50, step: 1
+      ['trailLength', new Property<number>('trailLength', 50, {
+        uiType: 'slider', label: 'Trail Length', min: 10, max: 100, step: 1
       })],
       ['trailFadeTime', new Property<number>('trailFadeTime', 1.0, {
         uiType: 'slider', label: 'Trail Fade Time (s)', min: 0.2, max: 3.0, step: 0.1
@@ -218,8 +220,120 @@ class BallPositionSynthesizer extends Synthesizer {
     ];
   }
 
+  private updateTrailWithRotation(trail: TrailPoint[], currentPos: [number, number, number], currentTime: number, fadeTime: number, maxLength: number, centerPos: [number, number, number], orbitDistance: number, tilt: number, currentRotation: number, orbitType: 'main' | 'd' | 'e' | 'f'): void {
+    // If we have a previous position, interpolate along the orbital arc using actual rotation values
+    if (trail.length > 0 && trail[0].rotation !== undefined) {
+      const lastTime = trail[0].timestamp;
+      const lastRotation = trail[0].rotation!;
+      const timeDiff = currentTime - lastTime;
+      
+      // Calculate rotational distance moved (speed-based density)
+      let rotationDiff = currentRotation - lastRotation;
+      
+      // Handle angle wrapping (shortest path between angles)
+      if (rotationDiff > Math.PI) rotationDiff -= 2 * Math.PI;
+      if (rotationDiff < -Math.PI) rotationDiff += 2 * Math.PI;
+      
+      const rotationalDistance = Math.abs(rotationDiff);
+      
+      // Only interpolate if there's significant rotation
+      if (rotationalDistance > 0.02 && timeDiff > 0.01) {
+        // Base interpolation on rotational distance (angular speed)
+        // More rotation = more trail points for consistent density
+        const interpolationSteps = Math.max(1, Math.min(25, Math.floor(rotationalDistance * 15))); // 15 points per radian
+        
+        for (let i = 1; i <= interpolationSteps; i++) {
+          const t = i / interpolationSteps;
+          const interpolatedTime = this.lerp(lastTime, currentTime, t);
+          const interpolatedRotation = lastRotation + (rotationDiff * t);
+          
+          // Calculate position on the orbital arc using the interpolated rotation
+          const interpolatedPos = this.calculateOrbitPosition(centerPos, orbitDistance, interpolatedRotation, tilt, orbitType);
+          
+          trail.unshift({
+            position: interpolatedPos,
+            timestamp: interpolatedTime,
+            rotation: interpolatedRotation,
+            age: 0
+          });
+        }
+      }
+    } else {
+      // First position or fallback - just add it with rotation
+      trail.unshift({
+        position: [...currentPos] as [number, number, number],
+        timestamp: currentTime,
+        rotation: currentRotation,
+        age: 0
+      });
+    }
+
+    // Update ages and remove old points
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const point = trail[i];
+      const timeDiff = currentTime - point.timestamp;
+      point.age = Math.min(1, timeDiff / fadeTime);
+      
+      if (point.age >= 1 || i >= maxLength) {
+        trail.splice(i, 1);
+      }
+    }
+  }
+
+  private calculateOrbitAngle(pos: [number, number, number], center: [number, number, number], distance: number, tilt: number, orbitType: 'main' | 'd' | 'e' | 'f'): number {
+    const relativePos = [pos[0] - center[0], pos[1] - center[1], pos[2] - center[2]];
+    
+    switch (orbitType) {
+      case 'main': // Main ball horizontal orbit
+        return Math.atan2(relativePos[2], relativePos[0]);
+      case 'd': // D orb: 45 degree tilt around X axis
+        return Math.atan2(relativePos[2] * Math.cos(tilt) + relativePos[1] * Math.sin(tilt), relativePos[0]);
+      case 'e': // E orb: uses sin for X, cos for Y - perpendicular to D
+        return Math.atan2(relativePos[2], relativePos[1]);
+      case 'f': // F orb: cos for X, sin for Y in horizontal plane
+        return Math.atan2(relativePos[2] * Math.sin(tilt), relativePos[0] * Math.cos(tilt));
+      default:
+        return Math.atan2(relativePos[2], relativePos[0]);
+    }
+  }
+
+  private calculateOrbitPosition(center: [number, number, number], distance: number, angle: number, tilt: number, orbitType: 'main' | 'd' | 'e' | 'f'): [number, number, number] {
+    switch (orbitType) {
+      case 'main': // Main ball horizontal orbit
+        return [
+          center[0] + Math.cos(angle) * distance,
+          center[1],
+          center[2] + Math.sin(angle) * distance
+        ];
+      case 'd': // D orb: matches actual calculation
+        return [
+          center[0] + Math.cos(angle) * distance * Math.cos(tilt),
+          center[1] + Math.sin(angle) * distance * Math.sin(tilt),
+          center[2] + Math.sin(angle) * distance * Math.cos(tilt)
+        ];
+      case 'e': // E orb: matches actual calculation (sin for X, cos for Y)
+        return [
+          center[0] + Math.sin(angle) * distance * Math.cos(tilt),
+          center[1] + Math.cos(angle) * distance * Math.sin(tilt),
+          center[2] + Math.cos(angle) * distance * Math.cos(tilt)
+        ];
+      case 'f': // F orb: matches actual calculation
+        return [
+          center[0] + Math.cos(angle) * distance * Math.cos(tilt),
+          center[1] + Math.sin(angle) * distance,
+          center[2] + Math.sin(angle) * distance * Math.sin(tilt)
+        ];
+      default:
+        return [
+          center[0] + Math.cos(angle) * distance,
+          center[1],
+          center[2] + Math.sin(angle) * distance
+        ];
+    }
+  }
+
   private updateTrail(trail: TrailPoint[], currentPos: [number, number, number], currentTime: number, fadeTime: number, maxLength: number): void {
-    // Add current position
+    // Simple linear interpolation fallback for non-orbital trails
     trail.unshift({
       position: [...currentPos] as [number, number, number],
       timestamp: currentTime,
@@ -238,10 +352,12 @@ class BallPositionSynthesizer extends Synthesizer {
     }
   }
 
-  private addTrailVisuals(visuals: VisualObject[], trail: TrailPoint[], baseColor: string, trailId: string): void {
+  private addTrailVisuals(visuals: VisualObject[], trail: TrailPoint[], baseColor: string, trailId: string, isMainBall: boolean = false): void {
     trail.forEach((point, index) => {
       const opacity = (1 - point.age) * 0.8; // Fade from 0.8 to 0
-      const scale = (1 - point.age) * 0.3; // Shrink from 0.3 to 0
+      const scale = isMainBall 
+        ? (1 - point.age) * 0.8  // Bigger spheres for main ball (0.8 vs 0.2)
+        : (1 - point.age) * 0.2; // Smaller for orbs
       
       if (opacity > 0.01) { // Only render if visible
         visuals.push({
@@ -299,7 +415,7 @@ class BallPositionSynthesizer extends Synthesizer {
     const rotationSpeed = this.getPropertyValue<number>('rotationSpeed') ?? 1;
     const numPositions = this.getPropertyValue<number>('numPositions') ?? 4;
     const trailFadeTime = this.getPropertyValue<number>('trailFadeTime') ?? 1.0;
-    const trailLength = this.getPropertyValue<number>('trailLength') ?? 20;
+    const trailLength = this.getPropertyValue<number>('trailLength') ?? 50;
 
     // Generate positions dynamically based on current setting
     const currentPositions = this.generatePositions(numPositions);
@@ -409,15 +525,25 @@ class BallPositionSynthesizer extends Synthesizer {
     const fOrbY = animatedPosition[1] + Math.sin(animatedFRotation) * fOrbitDistance;
     const fOrbZ = animatedPosition[2] + Math.sin(animatedFRotation) * fOrbitDistance * Math.sin(fTilt);
 
-    // Update trails
+    // Update trails with actual rotation values for perfect sync
+    if (hasAnyCDEOrFNotes) {
+      // Main ball trail - use simple trail since it's not rotating around a center
+      this.updateTrail(this.mainBallTrail, animatedPosition, time, trailFadeTime, trailLength);
+    }
     if (dNotesThatHaveStarted > 0) {
-      this.updateTrail(this.dOrbTrail, [dOrbX, dOrbY, dOrbZ], time, trailFadeTime, trailLength);
+      // D orb trail - 45 degree tilted orbit around main ball
+      const tilt = Math.PI / 4; // 45 degrees
+      this.updateTrailWithRotation(this.dOrbTrail, [dOrbX, dOrbY, dOrbZ], time, trailFadeTime, trailLength, animatedPosition, dOrbitDistance, tilt, animatedDRotation, 'd');
     }
     if (eNotesThatHaveStarted > 0) {
-      this.updateTrail(this.eOrbTrail, [eOrbX, eOrbY, eOrbZ], time, trailFadeTime, trailLength);
+      // E orb trail - perpendicular 45 degree orbit
+      const eTilt = Math.PI / 4; // 45 degrees, perpendicular to D orb
+      this.updateTrailWithRotation(this.eOrbTrail, [eOrbX, eOrbY, eOrbZ], time, trailFadeTime, trailLength, animatedPosition, eOrbitDistance, eTilt, animatedERotation, 'e');
     }
     if (fNotesThatHaveStarted > 0) {
-      this.updateTrail(this.fOrbTrail, [fOrbX, fOrbY, fOrbZ], time, trailFadeTime, trailLength);
+      // F orb trail - 30 degree tilted orbit
+      const fTilt = Math.PI / 6; // 30 degrees
+      this.updateTrailWithRotation(this.fOrbTrail, [fOrbX, fOrbY, fOrbZ], time, trailFadeTime, trailLength, animatedPosition, fOrbitDistance, fTilt, animatedFRotation, 'f');
     }
 
     const visuals: VisualObject[] = [
@@ -486,6 +612,7 @@ class BallPositionSynthesizer extends Synthesizer {
 
     // Generate trail visuals
     if (this.getPropertyValue<boolean>('trailEnabled')) {
+      this.addTrailVisuals(visuals, this.mainBallTrail, '#ff6600', 'main-trail', true); // Bigger spheres for main ball
       this.addTrailVisuals(visuals, this.dOrbTrail, '#ff9900', 'd-trail');
       this.addTrailVisuals(visuals, this.eOrbTrail, '#0066ff', 'e-trail');
       this.addTrailVisuals(visuals, this.fOrbTrail, '#ff66cc', 'f-trail');
