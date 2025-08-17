@@ -126,6 +126,24 @@ class BallPositionSynthesizer extends Synthesizer {
       ['arcRadiusMultiplier', new Property<number>('arcRadiusMultiplier', 2.0, {
         uiType: 'slider', label: 'Arc Radius Multiplier', min: 1.0, max: 5.0, step: 0.1
       })],
+      ['explosiveArcEnabled', new Property<boolean>('explosiveArcEnabled', true, {
+        uiType: 'dropdown', label: 'Enable Explosive Arcs', options: [
+          { value: true, label: 'Enabled' },
+          { value: false, label: 'Disabled' }
+        ]
+      })],
+      ['explosiveArcScale', new Property<number>('explosiveArcScale', 1.5, {
+        uiType: 'slider', label: 'Explosive Arc Scale', min: 0.5, max: 4.0, step: 0.1
+      })],
+      ['explosiveArcExpansion', new Property<number>('explosiveArcExpansion', 12.0, {
+        uiType: 'slider', label: 'Explosive Arc Expansion', min: 5.0, max: 30.0, step: 1.0
+      })],
+      ['explosiveArcDuration', new Property<number>('explosiveArcDuration', 2.5, {
+        uiType: 'slider', label: 'Explosive Arc Duration (s)', min: 1.0, max: 5.0, step: 0.1
+      })],
+      ['explosiveArcGlow', new Property<number>('explosiveArcGlow', 8.0, {
+        uiType: 'slider', label: 'Explosive Arc Glow', min: 3.0, max: 20.0, step: 0.5
+      })],
     ]);
   }
 
@@ -473,14 +491,98 @@ class BallPositionSynthesizer extends Synthesizer {
     switch (orbitType) {
       case 'main':
         return [0, 1, 0]; // Expand up/down from horizontal orbit
-      case 'd': // 45 degree tilt around X axis
-        return [0, Math.cos(tilt), -Math.sin(tilt)];
+      case 'd': // 45 degree tilt around X axis - expand perpendicular to the tilted orbital plane
+        // The D orb orbits in a tilted plane, so expansion should be perpendicular to that plane
+        return [0, -Math.sin(angle) * Math.sin(tilt), Math.sin(angle) * Math.cos(tilt)]; 
       case 'e': // Perpendicular to D
         return [Math.sin(angle), 0, Math.cos(angle)];
       case 'f': // Different plane
-        return [Math.sin(tilt), 1, Math.cos(tilt)];
+        return [Math.sin(tilt), 0, Math.cos(tilt)]; // Keep Y expansion minimal
       default:
         return [0, 1, 0];
+    }
+  }
+
+  private addExplosiveOrbitalArcVisuals(
+    visuals: VisualObject[], 
+    centerPos: [number, number, number], 
+    changeRotation: number, 
+    orbitDistance: number, 
+    tilt: number, 
+    orbitType: 'main' | 'd' | 'e' | 'f',
+    color: string,
+    lastNoteChangeTime: number,
+    time: number
+  ): void {
+    if (!this.getPropertyValue<boolean>('explosiveArcEnabled')) return;
+    
+    const arcLength = this.getPropertyValue<number>('arcLength') ?? 2.0;
+    const arcDensity = this.getPropertyValue<number>('arcDensity') ?? 20;
+    const explosiveArcDuration = this.getPropertyValue<number>('explosiveArcDuration') ?? 2.5;
+    const explosiveArcExpansion = this.getPropertyValue<number>('explosiveArcExpansion') ?? 12.0;
+    const explosiveArcScale = this.getPropertyValue<number>('explosiveArcScale') ?? 1.5;
+    const explosiveArcGlow = this.getPropertyValue<number>('explosiveArcGlow') ?? 8.0;
+    
+    // Time since the last movement - use longer duration for explosive arcs
+    const timeSinceChange = time - lastNoteChangeTime;
+    if (timeSinceChange > explosiveArcDuration) return; // Arc has faded
+    
+    // Fade factor based on time since change
+    const fadeProgress = timeSinceChange / explosiveArcDuration;
+    const fadeAmount = 1 - fadeProgress;
+    
+    // Generate explosive arc points along the orbital path - centered on the arc, not ending at orb
+    for (let i = 0; i < arcDensity; i++) {
+      const arcProgress = i / (arcDensity - 1); // 0 to 1
+      const angleOffset = (arcProgress - 0.5) * arcLength; // Center the arc around the change position
+      const arcAngle = changeRotation + angleOffset;
+      
+      // Calculate position on orbital path
+      const basePos = this.calculateOrbitPosition(centerPos, orbitDistance, arcAngle, tilt, orbitType);
+      
+      // Radial expansion outward from the center position
+      const radiusExpansion = fadeProgress * explosiveArcExpansion * 3; // Triple expansion speed
+      
+      // Calculate direction from center to this arc point for radial expansion
+      const directionFromCenter = [
+        basePos[0] - centerPos[0],
+        basePos[1] - centerPos[1], 
+        basePos[2] - centerPos[2]
+      ];
+      
+      // Normalize the direction vector
+      const length = Math.sqrt(directionFromCenter[0] ** 2 + directionFromCenter[1] ** 2 + directionFromCenter[2] ** 2);
+      const normalizedDir = length > 0 ? [
+        directionFromCenter[0] / length,
+        directionFromCenter[1] / length,
+        directionFromCenter[2] / length
+      ] : [0, 0, 0];
+      
+      const finalPos: [number, number, number] = [
+        basePos[0] + normalizedDir[0] * radiusExpansion,
+        basePos[1] + normalizedDir[1] * radiusExpansion,
+        basePos[2] + normalizedDir[2] * radiusExpansion
+      ];
+      
+      // Visual properties - much larger and brighter, longer lasting
+      const opacity = fadeAmount * 0.95 * (1 - arcProgress * 0.5); // Higher opacity, slower fade
+      const scale = explosiveArcScale * fadeAmount * (1 - arcProgress * 0.2); // Much larger, slower shrink
+      const brightness = explosiveArcGlow * fadeAmount * (1 - arcProgress * 0.1); // Much more glow, slower dim
+      
+      if (opacity > 0.01) {
+        visuals.push({
+          type: 'sphere',
+          sourceNoteId: `explosive-arc-${orbitType}-${i}`,
+          properties: {
+            position: finalPos,
+            scale: [scale, scale, scale],
+            color: color,
+            opacity: opacity,
+            emissive: color,
+            emissiveIntensity: brightness
+          }
+        });
+      }
     }
   }
 
@@ -753,6 +855,12 @@ class BallPositionSynthesizer extends Synthesizer {
         const fTilt = Math.PI / 6;
         this.addOrbitalArcVisuals(visuals, this.arcCenterPosition, this.arcFRotation, fOrbitDistance, fTilt, 'f', '#ff66cc', this.fRotationAnimationStartTime, time);
       }
+    }
+
+    // Add explosive orbital arc effects (D orb only)
+    if (this.getPropertyValue<boolean>('explosiveArcEnabled') && dNotesThatHaveStarted > 0) {
+      const dTilt = Math.PI / 4;
+      this.addExplosiveOrbitalArcVisuals(visuals, this.arcCenterPosition, this.arcDRotation, dOrbitDistance, dTilt, 'd', '#ff9900', this.dRotationAnimationStartTime, time);
     }
 
     // Generate trail visuals
