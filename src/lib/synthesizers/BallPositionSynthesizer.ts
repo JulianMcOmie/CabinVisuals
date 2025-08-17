@@ -3,6 +3,12 @@ import { MIDIBlock, VisualObject, MIDINote } from '../types';
 import { Property } from '../properties/Property';
 import VisualObjectEngine, { MappingContext, MappingUtils, NoteContext } from '../VisualObjectEngine';
 
+interface TrailPoint {
+  position: [number, number, number];
+  timestamp: number;
+  age: number; // 0 to 1, where 1 is fully faded
+}
+
 class BallPositionSynthesizer extends Synthesizer {
   private activeBallPositions: Map<string, number> = new Map();
   private globalNoteCount: number = 0;
@@ -30,6 +36,17 @@ class BallPositionSynthesizer extends Synthesizer {
   private targetERotation: number = 0;
   private lastENoteCount: number = 0;
   private eRotationAnimationStartTime: number = 0;
+  
+  // F note orbit state (further out, pink orb, larger increments)
+  private currentFRotation: number = 0;
+  private targetFRotation: number = 0;
+  private lastFNoteCount: number = 0;
+  private fRotationAnimationStartTime: number = 0;
+
+  // Trail tracking
+  private dOrbTrail: TrailPoint[] = [];
+  private eOrbTrail: TrailPoint[] = [];
+  private fOrbTrail: TrailPoint[] = [];
 
   constructor() {
     super();
@@ -69,6 +86,18 @@ class BallPositionSynthesizer extends Synthesizer {
       })],
       ['idleRotationSpeed', new Property<number>('idleRotationSpeed', 0.1, {
         uiType: 'slider', label: 'Idle Rotation Speed', min: 0, max: 1, step: 0.01
+      })],
+      ['trailLength', new Property<number>('trailLength', 20, {
+        uiType: 'slider', label: 'Trail Length', min: 5, max: 50, step: 1
+      })],
+      ['trailFadeTime', new Property<number>('trailFadeTime', 1.0, {
+        uiType: 'slider', label: 'Trail Fade Time (s)', min: 0.2, max: 3.0, step: 0.1
+      })],
+      ['trailEnabled', new Property<boolean>('trailEnabled', true, {
+        uiType: 'dropdown', label: 'Enable Trails', options: [
+          { value: true, label: 'Enabled' },
+          { value: false, label: 'Disabled' }
+        ]
       })],
     ]);
   }
@@ -189,18 +218,61 @@ class BallPositionSynthesizer extends Synthesizer {
     ];
   }
 
+  private updateTrail(trail: TrailPoint[], currentPos: [number, number, number], currentTime: number, fadeTime: number, maxLength: number): void {
+    // Add current position
+    trail.unshift({
+      position: [...currentPos] as [number, number, number],
+      timestamp: currentTime,
+      age: 0
+    });
+
+    // Update ages and remove old points
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const point = trail[i];
+      const timeDiff = currentTime - point.timestamp;
+      point.age = Math.min(1, timeDiff / fadeTime);
+      
+      if (point.age >= 1 || i >= maxLength) {
+        trail.splice(i, 1);
+      }
+    }
+  }
+
+  private addTrailVisuals(visuals: VisualObject[], trail: TrailPoint[], baseColor: string, trailId: string): void {
+    trail.forEach((point, index) => {
+      const opacity = (1 - point.age) * 0.8; // Fade from 0.8 to 0
+      const scale = (1 - point.age) * 0.3; // Shrink from 0.3 to 0
+      
+      if (opacity > 0.01) { // Only render if visible
+        visuals.push({
+          type: 'sphere',
+          sourceNoteId: `${trailId}-${index}`,
+          properties: {
+            position: point.position,
+            scale: [scale, scale, scale],
+            color: baseColor,
+            opacity: opacity,
+            emissive: baseColor,
+            emissiveIntensity: opacity * 2
+          }
+        });
+      }
+    });
+  }
+
   getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
-    // Count C notes (pitch % 12 === 0), D notes (pitch % 12 === 2), and E notes (pitch % 12 === 4)
+    // Count C notes (pitch % 12 === 0), D notes (pitch % 12 === 2), E notes (pitch % 12 === 4), and F notes (pitch % 12 === 5)
     let cNotesThatHaveStarted = 0;
     let dNotesThatHaveStarted = 0;
     let eNotesThatHaveStarted = 0;
-    let hasAnyCDOrENotes = false;
+    let fNotesThatHaveStarted = 0;
+    let hasAnyCDEOrFNotes = false;
     
     for (const block of midiBlocks) {
       for (const note of block.notes) {
         const noteClass = note.pitch % 12;
-        if (noteClass === 0 || noteClass === 2 || noteClass === 4) { // C, D, or E note exists
-          hasAnyCDOrENotes = true;
+        if (noteClass === 0 || noteClass === 2 || noteClass === 4 || noteClass === 5) { // C, D, E, or F note exists
+          hasAnyCDEOrFNotes = true;
         }
         
         if (note.startBeat <= time) {
@@ -210,13 +282,15 @@ class BallPositionSynthesizer extends Synthesizer {
             dNotesThatHaveStarted++;
           } else if (noteClass === 4) { // E note
             eNotesThatHaveStarted++;
+          } else if (noteClass === 5) { // F note
+            fNotesThatHaveStarted++;
           }
         }
       }
     }
 
-    // If no C, D, or E notes exist at all, return empty
-    if (!hasAnyCDOrENotes) {
+    // If no C, D, E, or F notes exist at all, return empty
+    if (!hasAnyCDEOrFNotes) {
       return [];
     }
 
@@ -224,6 +298,8 @@ class BallPositionSynthesizer extends Synthesizer {
     const animationSpeed = this.getPropertyValue<number>('animationSpeed') ?? 2;
     const rotationSpeed = this.getPropertyValue<number>('rotationSpeed') ?? 1;
     const numPositions = this.getPropertyValue<number>('numPositions') ?? 4;
+    const trailFadeTime = this.getPropertyValue<number>('trailFadeTime') ?? 1.0;
+    const trailLength = this.getPropertyValue<number>('trailLength') ?? 20;
 
     // Generate positions dynamically based on current setting
     const currentPositions = this.generatePositions(numPositions);
@@ -268,6 +344,17 @@ class BallPositionSynthesizer extends Synthesizer {
       console.log(`E note! Adding cumulative rotation`);
     }
 
+    // Handle F note orbit changes (further out, pink orb, larger increments)
+    if (fNotesThatHaveStarted !== this.lastFNoteCount) {
+      this.currentFRotation = this.targetFRotation;
+      this.targetFRotation += Math.PI / 2; // 90 degree increments (cumulative, larger than E orb)
+      
+      this.lastFNoteCount = fNotesThatHaveStarted;
+      this.fRotationAnimationStartTime = time;
+      
+      console.log(`F note! Adding cumulative rotation`);
+    }
+
     // Calculate position animation
     const positionTimeSinceAnimation = time - this.positionAnimationStartTime;
     const positionAnimationDuration = 60 / (bpm * animationSpeed);
@@ -293,6 +380,14 @@ class BallPositionSynthesizer extends Synthesizer {
     const animatedERotation = this.lerp(this.currentERotation, this.targetERotation, eRotationEasedProgress) + 
                               (time * idleRotationSpeed * 0.7); // Add continuous idle rotation (slightly slower)
 
+    // Calculate F note orbit animation (further out, pink orb, very fast like E) with idle rotation
+    const fRotationTimeSinceAnimation = time - this.fRotationAnimationStartTime;
+    const fRotationAnimationDuration = 0.1; // Very small animation time (0.1 beats) like E orb
+    const fRotationLinearProgress = fRotationTimeSinceAnimation / fRotationAnimationDuration;
+    const fRotationEasedProgress = this.applyEasing(fRotationLinearProgress);
+    const animatedFRotation = this.lerp(this.currentFRotation, this.targetFRotation, fRotationEasedProgress) + 
+                              (time * idleRotationSpeed * 0.5); // Add continuous idle rotation (slightly slower than E)
+
     // Calculate D orb position (45 degree tilt around main sphere)
     const dOrbitDistance = 1.5;
     const tilt = Math.PI / 4; // 45 degrees
@@ -306,6 +401,24 @@ class BallPositionSynthesizer extends Synthesizer {
     const eOrbX = animatedPosition[0] + Math.sin(animatedERotation) * eOrbitDistance * Math.cos(eTilt);
     const eOrbY = animatedPosition[1] + Math.cos(animatedERotation) * eOrbitDistance * Math.sin(eTilt);
     const eOrbZ = animatedPosition[2] + Math.cos(animatedERotation) * eOrbitDistance * Math.cos(eTilt);
+
+    // Calculate F orb position (further out than E orb, different orbital plane)
+    const fOrbitDistance = 3.0; // Further out than E orb
+    const fTilt = Math.PI / 6; // 30 degrees, different tilt for variety
+    const fOrbX = animatedPosition[0] + Math.cos(animatedFRotation) * fOrbitDistance * Math.cos(fTilt);
+    const fOrbY = animatedPosition[1] + Math.sin(animatedFRotation) * fOrbitDistance;
+    const fOrbZ = animatedPosition[2] + Math.sin(animatedFRotation) * fOrbitDistance * Math.sin(fTilt);
+
+    // Update trails
+    if (dNotesThatHaveStarted > 0) {
+      this.updateTrail(this.dOrbTrail, [dOrbX, dOrbY, dOrbZ], time, trailFadeTime, trailLength);
+    }
+    if (eNotesThatHaveStarted > 0) {
+      this.updateTrail(this.eOrbTrail, [eOrbX, eOrbY, eOrbZ], time, trailFadeTime, trailLength);
+    }
+    if (fNotesThatHaveStarted > 0) {
+      this.updateTrail(this.fOrbTrail, [fOrbX, fOrbY, fOrbZ], time, trailFadeTime, trailLength);
+    }
 
     const visuals: VisualObject[] = [
       // Main ball
@@ -353,6 +466,29 @@ class BallPositionSynthesizer extends Synthesizer {
           emissiveIntensity: 1.5
         }
       });
+    }
+
+    // Add F orb if F notes exist
+    if (fNotesThatHaveStarted > 0) {
+      visuals.push({
+        type: 'sphere',
+        sourceNoteId: 'f-orbiting-satellite',
+        properties: {
+          position: [fOrbX, fOrbY, fOrbZ] as [number, number, number],
+          scale: [0.4, 0.4, 0.4],
+          color: '#ff66cc',
+          opacity: 1,
+          emissive: '#ff66cc',
+          emissiveIntensity: 1.5
+        }
+      });
+    }
+
+    // Generate trail visuals
+    if (this.getPropertyValue<boolean>('trailEnabled')) {
+      this.addTrailVisuals(visuals, this.dOrbTrail, '#ff9900', 'd-trail');
+      this.addTrailVisuals(visuals, this.eOrbTrail, '#0066ff', 'e-trail');
+      this.addTrailVisuals(visuals, this.fOrbTrail, '#ff66cc', 'f-trail');
     }
 
     return visuals;
