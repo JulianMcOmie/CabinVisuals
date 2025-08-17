@@ -16,8 +16,20 @@ class BallPositionSynthesizer extends Synthesizer {
   // Animation state
   private currentPosition: [number, number, number] = [0, 0, 0];
   private targetPosition: [number, number, number] = [0, 0, 0];
-  private lastNoteCount: number = 0;
-  private animationStartTime: number = 0;
+  private lastCNoteCount: number = 0;
+  private positionAnimationStartTime: number = 0;
+  
+  // D note orbit state (45 degree tilt)
+  private currentDRotation: number = 0;
+  private targetDRotation: number = 0;
+  private lastDNoteCount: number = 0;
+  private dRotationAnimationStartTime: number = 0;
+  
+  // E note orbit state (perpendicular, cumulative)
+  private currentERotation: number = 0;
+  private targetERotation: number = 0;
+  private lastENoteCount: number = 0;
+  private eRotationAnimationStartTime: number = 0;
 
   constructor() {
     super();
@@ -51,6 +63,12 @@ class BallPositionSynthesizer extends Synthesizer {
       })],
       ['numPositions', new Property<number>('numPositions', 4, {
         uiType: 'slider', label: 'Number of Positions', min: 2, max: 12, step: 1
+      })],
+      ['rotationSpeed', new Property<number>('rotationSpeed', 0.5, {
+        uiType: 'slider', label: 'Rotation Speed', min: 0.1, max: 5, step: 0.1
+      })],
+      ['idleRotationSpeed', new Property<number>('idleRotationSpeed', 0.1, {
+        uiType: 'slider', label: 'Idle Rotation Speed', min: 0, max: 1, step: 0.01
       })],
     ]);
   }
@@ -172,29 +190,49 @@ class BallPositionSynthesizer extends Synthesizer {
   }
 
   getObjectsAtTime(time: number, midiBlocks: MIDIBlock[], bpm: number): VisualObject[] {
-    // Count all notes that have started before current time
-    let notesThatHaveStarted = 0;
+    // Count C notes (pitch % 12 === 0), D notes (pitch % 12 === 2), and E notes (pitch % 12 === 4)
+    let cNotesThatHaveStarted = 0;
+    let dNotesThatHaveStarted = 0;
+    let eNotesThatHaveStarted = 0;
+    let hasAnyCDOrENotes = false;
+    
     for (const block of midiBlocks) {
       for (const note of block.notes) {
+        const noteClass = note.pitch % 12;
+        if (noteClass === 0 || noteClass === 2 || noteClass === 4) { // C, D, or E note exists
+          hasAnyCDOrENotes = true;
+        }
+        
         if (note.startBeat <= time) {
-          notesThatHaveStarted++;
+          if (noteClass === 0) { // C note
+            cNotesThatHaveStarted++;
+          } else if (noteClass === 2) { // D note
+            dNotesThatHaveStarted++;
+          } else if (noteClass === 4) { // E note
+            eNotesThatHaveStarted++;
+          }
         }
       }
     }
 
+    // If no C, D, or E notes exist at all, return empty
+    if (!hasAnyCDOrENotes) {
+      return [];
+    }
+
     const xOffset = this.getPropertyValue<number>('xOffset') ?? 5;
     const animationSpeed = this.getPropertyValue<number>('animationSpeed') ?? 2;
+    const rotationSpeed = this.getPropertyValue<number>('rotationSpeed') ?? 1;
     const numPositions = this.getPropertyValue<number>('numPositions') ?? 4;
 
     // Generate positions dynamically based on current setting
     const currentPositions = this.generatePositions(numPositions);
 
-    // Check if we need to move to a new target position
-    if (notesThatHaveStarted !== this.lastNoteCount) {
-      this.currentPosition = [...this.targetPosition]; // Set current to where we were going
+    // Handle position changes (C notes)
+    if (cNotesThatHaveStarted !== this.lastCNoteCount) {
+      this.currentPosition = [...this.targetPosition];
       
-      // Calculate new target position
-      const positionIndex = notesThatHaveStarted % currentPositions.length;
+      const positionIndex = cNotesThatHaveStarted % currentPositions.length;
       const basePosition = currentPositions[positionIndex];
       this.targetPosition = [
         basePosition[0] * xOffset,
@@ -202,35 +240,122 @@ class BallPositionSynthesizer extends Synthesizer {
         basePosition[2] * xOffset
       ];
       
-      this.lastNoteCount = notesThatHaveStarted;
-      this.animationStartTime = time;
+      this.lastCNoteCount = cNotesThatHaveStarted;
+      this.positionAnimationStartTime = time;
       
-      console.log(`New note! Moving from [${this.currentPosition}] to [${this.targetPosition}]`);
+      console.log(`C note! Moving to position ${positionIndex}`);
     }
 
-    // Calculate animation progress (0 to 1)
-    const timeSinceAnimation = time - this.animationStartTime;
-    const animationDuration = 60 / (bpm * animationSpeed); // Duration in beats
-    const linearProgress = timeSinceAnimation / animationDuration;
-    
-    // Apply physics-based easing curve (easeOutQuart for natural deceleration)
-    const easedProgress = this.applyEasing(linearProgress);
+    // Handle D note orbit changes (45 degree tilt)
+    if (dNotesThatHaveStarted !== this.lastDNoteCount) {
+      this.currentDRotation = this.targetDRotation;
+      this.targetDRotation += Math.PI * 2; // Full rotation
+      
+      this.lastDNoteCount = dNotesThatHaveStarted;
+      this.dRotationAnimationStartTime = time;
+      
+      console.log(`D note! Adding orbit rotation`);
+    }
 
-    // Interpolate between current and target position using eased progress
-    const animatedPosition = this.lerpPosition(this.currentPosition, this.targetPosition, easedProgress);
+    // Handle E note orbit changes (perpendicular, cumulative larger increments)
+    if (eNotesThatHaveStarted !== this.lastENoteCount) {
+      this.currentERotation = this.targetERotation;
+      this.targetERotation += Math.PI / 3; // 60 degree increments (cumulative)
+      
+      this.lastENoteCount = eNotesThatHaveStarted;
+      this.eRotationAnimationStartTime = time;
+      
+      console.log(`E note! Adding cumulative rotation`);
+    }
 
-    return [{
-      type: 'sphere',
-      sourceNoteId: 'moving-ball',
-      properties: {
-        position: animatedPosition,
-        scale: [2, 2, 2],
-        color: '#ff6600',
-        opacity: 1,
-        emissive: '#ff6600',
-        emissiveIntensity: 1
+    // Calculate position animation
+    const positionTimeSinceAnimation = time - this.positionAnimationStartTime;
+    const positionAnimationDuration = 60 / (bpm * animationSpeed);
+    const positionLinearProgress = positionTimeSinceAnimation / positionAnimationDuration;
+    const positionEasedProgress = this.applyEasing(positionLinearProgress);
+    const animatedPosition = this.lerpPosition(this.currentPosition, this.targetPosition, positionEasedProgress);
+
+    const idleRotationSpeed = this.getPropertyValue<number>('idleRotationSpeed') ?? 0.1;
+
+    // Calculate D note orbit animation (45 degree tilt) with idle rotation
+    const dRotationTimeSinceAnimation = time - this.dRotationAnimationStartTime;
+    const dRotationAnimationDuration = 60 / (bpm * rotationSpeed);
+    const dRotationLinearProgress = dRotationTimeSinceAnimation / dRotationAnimationDuration;
+    const dRotationEasedProgress = this.applyEasing(dRotationLinearProgress);
+    const animatedDRotation = this.lerp(this.currentDRotation, this.targetDRotation, dRotationEasedProgress) + 
+                              (time * idleRotationSpeed); // Add continuous idle rotation
+
+    // Calculate E note orbit animation (perpendicular, very fast) with idle rotation
+    const eRotationTimeSinceAnimation = time - this.eRotationAnimationStartTime;
+    const eRotationAnimationDuration = 0.1; // Very small animation time (0.1 beats)
+    const eRotationLinearProgress = eRotationTimeSinceAnimation / eRotationAnimationDuration;
+    const eRotationEasedProgress = this.applyEasing(eRotationLinearProgress);
+    const animatedERotation = this.lerp(this.currentERotation, this.targetERotation, eRotationEasedProgress) + 
+                              (time * idleRotationSpeed * 0.7); // Add continuous idle rotation (slightly slower)
+
+    // Calculate D orb position (45 degree tilt around main sphere)
+    const dOrbitDistance = 1.5;
+    const tilt = Math.PI / 4; // 45 degrees
+    const dOrbX = animatedPosition[0] + Math.cos(animatedDRotation) * dOrbitDistance * Math.cos(tilt);
+    const dOrbY = animatedPosition[1] + Math.sin(animatedDRotation) * dOrbitDistance * Math.sin(tilt);
+    const dOrbZ = animatedPosition[2] + Math.sin(animatedDRotation) * dOrbitDistance * Math.cos(tilt);
+
+    // Calculate E orb position (45 degree tilt perpendicular to D orb, further out)
+    const eOrbitDistance = 2.2; // Further out than D orb
+    const eTilt = Math.PI / 4; // 45 degrees, perpendicular to D orb
+    const eOrbX = animatedPosition[0] + Math.sin(animatedERotation) * eOrbitDistance * Math.cos(eTilt);
+    const eOrbY = animatedPosition[1] + Math.cos(animatedERotation) * eOrbitDistance * Math.sin(eTilt);
+    const eOrbZ = animatedPosition[2] + Math.cos(animatedERotation) * eOrbitDistance * Math.cos(eTilt);
+
+    const visuals: VisualObject[] = [
+      // Main ball
+      {
+        type: 'sphere',
+        sourceNoteId: 'moving-ball',
+        properties: {
+          position: animatedPosition,
+          scale: [2, 2, 2],
+          color: '#ff6600',
+          opacity: 1,
+          emissive: '#ff6600',
+          emissiveIntensity: 1
+        }
       }
-    }];
+    ];
+
+    // Add D orb if D notes exist
+    if (dNotesThatHaveStarted > 0) {
+      visuals.push({
+        type: 'sphere',
+        sourceNoteId: 'd-orbiting-satellite',
+        properties: {
+          position: [dOrbX, dOrbY, dOrbZ] as [number, number, number],
+          scale: [0.4, 0.4, 0.4],
+          color: '#ff9900',
+          opacity: 1,
+          emissive: '#ff9900',
+          emissiveIntensity: 1.5
+        }
+      });
+    }
+
+    // Add E orb if E notes exist
+    if (eNotesThatHaveStarted > 0) {
+      visuals.push({
+        type: 'sphere',
+        sourceNoteId: 'e-orbiting-satellite',
+        properties: {
+          position: [eOrbX, eOrbY, eOrbZ] as [number, number, number],
+          scale: [0.4, 0.4, 0.4],
+          color: '#0066ff',
+          opacity: 1,
+          emissive: '#0066ff',
+          emissiveIntensity: 1.5
+        }
+      });
+    }
+
+    return visuals;
   }
 
   clone(): this {
