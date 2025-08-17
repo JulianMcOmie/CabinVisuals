@@ -51,11 +51,12 @@ class BallPositionSynthesizer extends Synthesizer {
   private eOrbTrail: TrailPoint[] = [];
   private fOrbTrail: TrailPoint[] = [];
 
-  // Arc effect positions (frozen at time of change)
-  private arcCenterPosition: [number, number, number] = [0, 0, 0];
-  private arcDRotation: number = 0;
-  private arcERotation: number = 0;
-  private arcFRotation: number = 0;
+  // Multiple arc tracking - store creation time and historical positions for each arc
+  private mainBallArcs: Array<{time: number, startPos: [number, number, number], targetPos: [number, number, number]}> = [];
+  private dOrbArcs: Array<{time: number, centerPos: [number, number, number], rotation: number}> = [];
+  private eOrbArcs: Array<{time: number, centerPos: [number, number, number], rotation: number}> = [];
+  private fOrbArcs: Array<{time: number, centerPos: [number, number, number], rotation: number}> = [];
+
 
   constructor() {
     super();
@@ -419,16 +420,136 @@ class BallPositionSynthesizer extends Synthesizer {
     });
   }
 
+  private addOrbitalArcVisualsWithHistoricalData(
+    visuals: VisualObject[], 
+    historicalCenterPos: [number, number, number],
+    targetPos: [number, number, number] | null,
+    arcCreationTime: number,
+    currentTime: number,
+    orbitType: 'main' | 'd' | 'e' | 'f',
+    color: string,
+    orbitDistance?: number,
+    tilt?: number,
+    historicalRotation?: number
+  ): void {
+    if (!this.getPropertyValue<boolean>('arcEnabled')) return;
+    
+    const arcLength = this.getPropertyValue<number>('arcLength') ?? 2.0;
+    const arcDensity = this.getPropertyValue<number>('arcDensity') ?? 20;
+    const arcFadeTime = this.getPropertyValue<number>('arcFadeTime') ?? 1.0;
+    const arcRadiusMultiplier = this.getPropertyValue<number>('arcRadiusMultiplier') ?? 2.0;
+    
+    // Time since the arc was created
+    const timeSinceCreation = currentTime - arcCreationTime;
+    if (timeSinceCreation > arcFadeTime) return; // Arc has faded
+    
+    // Fade factor based on time since creation
+    const fadeProgress = timeSinceCreation / arcFadeTime;
+    const fadeAmount = 1 - fadeProgress;
+    
+    if (orbitType === 'main') {
+      // Main ball linear arc - from start to target position
+      if (!targetPos) return;
+      
+      for (let i = 0; i < arcDensity; i++) {
+        const arcProgress = i / (arcDensity - 1); // 0 to 1
+        const arcPos = this.lerpPosition(historicalCenterPos, targetPos, arcProgress);
+        
+        // Expand outward from the movement path (perpendicular to movement direction)
+        const moveDir = [
+          targetPos[0] - historicalCenterPos[0],
+          targetPos[1] - historicalCenterPos[1],
+          targetPos[2] - historicalCenterPos[2]
+        ];
+        const moveLength = Math.sqrt(moveDir[0] ** 2 + moveDir[1] ** 2 + moveDir[2] ** 2);
+        
+        // Use perpendicular direction for expansion (up/down from horizontal movement)
+        const expansionDir: [number, number, number] = [0, 1, 0];
+        const radiusExpansion = fadeProgress * arcRadiusMultiplier;
+        
+        const finalPos: [number, number, number] = [
+          arcPos[0] + expansionDir[0] * radiusExpansion,
+          arcPos[1] + expansionDir[1] * radiusExpansion,
+          arcPos[2] + expansionDir[2] * radiusExpansion
+        ];
+        
+        // Visual properties - brightest at target position (arcProgress = 1), fades toward start
+        const opacity = fadeAmount * 0.7 * arcProgress; // Fade from start to target
+        const scale = fadeAmount * 0.3 * (0.5 + arcProgress * 0.5); // Larger toward target
+        const brightness = fadeAmount * 4 * (0.7 + arcProgress * 0.3); // Brighter toward target
+        
+        if (opacity > 0.01) {
+          visuals.push({
+            type: 'sphere',
+            sourceNoteId: `arc-${orbitType}-${i}`,
+            properties: {
+              position: finalPos,
+              scale: [scale, scale, scale],
+              color: color,
+              opacity: opacity,
+              emissive: color,
+              emissiveIntensity: brightness
+            }
+          });
+        }
+      }
+    } else {
+      // Orbital arc using stored historical values
+      if (orbitDistance === undefined || tilt === undefined || historicalRotation === undefined) return;
+      
+      for (let i = 0; i < arcDensity; i++) {
+        const arcProgress = i / (arcDensity - 1); // 0 to 1
+        const angleOffset = -arcProgress * arcLength; // Arc trails behind
+        const arcAngle = historicalRotation + angleOffset;
+        
+        // Calculate position on orbital path using frozen historical values
+        const basePos = this.calculateOrbitPosition(historicalCenterPos, orbitDistance, arcAngle, tilt, orbitType);
+        
+        // Expand outward from the orbital path
+        const radiusExpansion = fadeProgress * arcRadiusMultiplier;
+        const expansionDir = this.getOrbitExpansionDirection(arcAngle, tilt, orbitType);
+        
+        const finalPos: [number, number, number] = [
+          basePos[0] + expansionDir[0] * radiusExpansion,
+          basePos[1] + expansionDir[1] * radiusExpansion,
+          basePos[2] + expansionDir[2] * radiusExpansion
+        ];
+        
+        // Visual properties - brightest at current position (arcProgress = 0), fades toward tail
+        const opacity = fadeAmount * 0.7 * (1 - arcProgress); // Fade from current position to tail
+        const scale = fadeAmount * 0.3 * (1 - arcProgress * 0.5); // Slightly smaller toward tail
+        const brightness = fadeAmount * 4 * (1 - arcProgress * 0.3); // Dimmer toward tail
+        
+        if (opacity > 0.01) {
+          visuals.push({
+            type: 'sphere',
+            sourceNoteId: `arc-${orbitType}-${i}`,
+            properties: {
+              position: finalPos,
+              scale: [scale, scale, scale],
+              color: color,
+              opacity: opacity,
+              emissive: color,
+              emissiveIntensity: brightness
+            }
+          });
+        }
+      }
+    }
+  }
+
   private addOrbitalArcVisuals(
     visuals: VisualObject[], 
-    centerPos: [number, number, number], 
-    changeRotation: number, 
     orbitDistance: number, 
     tilt: number, 
     orbitType: 'main' | 'd' | 'e' | 'f',
     color: string,
     lastNoteChangeTime: number,
-    time: number
+    time: number,
+    bpm: number,
+    animationSpeed: number,
+    rotationSpeed: number,
+    idleRotationSpeed: number
   ): void {
     if (!this.getPropertyValue<boolean>('arcEnabled')) return;
     
@@ -441,6 +562,51 @@ class BallPositionSynthesizer extends Synthesizer {
     const timeSinceChange = time - lastNoteChangeTime;
     if (timeSinceChange > arcFadeTime) return; // Arc has faded
     
+    // Calculate historical positions/rotations at lastNoteChangeTime
+    let historicalCenterPos: [number, number, number];
+    let historicalRotation: number;
+    
+    if (orbitType === 'main') {
+      // Calculate main ball position at lastNoteChangeTime
+      const timeSinceMainAnimation = lastNoteChangeTime - this.positionAnimationStartTime;
+      const mainAnimationDuration = 60 / (bpm * animationSpeed);
+      const mainProgress = Math.min(1, Math.max(0, timeSinceMainAnimation / mainAnimationDuration));
+      const mainEasedProgress = this.applyEasing(mainProgress);
+      historicalCenterPos = this.lerpPosition(this.currentPosition, this.targetPosition, mainEasedProgress);
+      historicalRotation = 0; // Main ball doesn't rotate
+    } else {
+      // Calculate main ball position at lastNoteChangeTime (center for orbital objects)
+      const timeSinceMainAnimation = lastNoteChangeTime - this.positionAnimationStartTime;
+      const mainAnimationDuration = 60 / (bpm * animationSpeed);
+      const mainProgress = Math.min(1, Math.max(0, timeSinceMainAnimation / mainAnimationDuration));
+      const mainEasedProgress = this.applyEasing(mainProgress);
+      historicalCenterPos = this.lerpPosition(this.currentPosition, this.targetPosition, mainEasedProgress);
+      
+      // Calculate orbital rotation at lastNoteChangeTime
+      if (orbitType === 'd') {
+        const timeSinceDAnimation = lastNoteChangeTime - this.dRotationAnimationStartTime;
+        const dAnimationDuration = 60 / (bpm * rotationSpeed);
+        const dProgress = Math.min(1, Math.max(0, timeSinceDAnimation / dAnimationDuration));
+        const dEasedProgress = this.applyEasing(dProgress);
+        historicalRotation = this.lerp(this.currentDRotation, this.targetDRotation, dEasedProgress) + 
+                           (lastNoteChangeTime * idleRotationSpeed);
+      } else if (orbitType === 'e') {
+        const timeSinceEAnimation = lastNoteChangeTime - this.eRotationAnimationStartTime;
+        const eAnimationDuration = 0.1;
+        const eProgress = Math.min(1, Math.max(0, timeSinceEAnimation / eAnimationDuration));
+        const eEasedProgress = this.applyEasing(eProgress);
+        historicalRotation = this.lerp(this.currentERotation, this.targetERotation, eEasedProgress) + 
+                           (lastNoteChangeTime * idleRotationSpeed * 0.7);
+      } else { // orbitType === 'f'
+        const timeSinceFAnimation = lastNoteChangeTime - this.fRotationAnimationStartTime;
+        const fAnimationDuration = 0.1;
+        const fProgress = Math.min(1, Math.max(0, timeSinceFAnimation / fAnimationDuration));
+        const fEasedProgress = this.applyEasing(fProgress);
+        historicalRotation = this.lerp(this.currentFRotation, this.targetFRotation, fEasedProgress) + 
+                           (lastNoteChangeTime * idleRotationSpeed * 0.5);
+      }
+    }
+    
     // Fade factor based on time since change
     const fadeProgress = timeSinceChange / arcFadeTime;
     const fadeAmount = 1 - fadeProgress;
@@ -449,10 +615,10 @@ class BallPositionSynthesizer extends Synthesizer {
     for (let i = 0; i < arcDensity; i++) {
       const arcProgress = i / (arcDensity - 1); // 0 to 1
       const angleOffset = -arcProgress * arcLength; // Arc trails behind, ending at change position
-      const arcAngle = changeRotation + angleOffset;
+      const arcAngle = historicalRotation + angleOffset;
       
-      // Calculate position on orbital path
-      const basePos = this.calculateOrbitPosition(centerPos, orbitDistance, arcAngle, tilt, orbitType);
+      // Calculate position on orbital path using historical values
+      const basePos = this.calculateOrbitPosition(historicalCenterPos, orbitDistance, arcAngle, tilt, orbitType);
       
       // Expand outward from the orbital path
       const radiusExpansion = fadeProgress * arcRadiusMultiplier;
@@ -639,6 +805,9 @@ class BallPositionSynthesizer extends Synthesizer {
 
     // Handle position changes (C notes)
     if (cNotesThatHaveStarted !== this.lastCNoteCount) {
+      // Store the current position (where we're ending up) for the arc
+      const arcEndPosition: [number, number, number] = [...this.targetPosition];
+      
       this.currentPosition = [...this.targetPosition];
       
       const positionIndex = cNotesThatHaveStarted % currentPositions.length;
@@ -649,53 +818,69 @@ class BallPositionSynthesizer extends Synthesizer {
         basePosition[2] * xOffset
       ];
       
-      // Store the target position for arc effect (where we're going to)
-      this.arcCenterPosition = [...this.targetPosition];
-      
       this.lastCNoteCount = cNotesThatHaveStarted;
       this.positionAnimationStartTime = time;
+      
+      // Store arc data with frozen positions
+      this.mainBallArcs.push({
+        time: time,
+        startPos: [...this.currentPosition],
+        targetPos: arcEndPosition
+      });
       
       console.log(`C note! Moving to position ${positionIndex}`);
     }
 
     // Handle D note orbit changes (45 degree tilt)
     if (dNotesThatHaveStarted !== this.lastDNoteCount) {
-      // Store rotation for arc effect before changing
-      this.arcDRotation = this.currentDRotation;
-      
       this.currentDRotation = this.targetDRotation;
       this.targetDRotation += Math.PI * 2; // Full rotation
       
       this.lastDNoteCount = dNotesThatHaveStarted;
       this.dRotationAnimationStartTime = time;
       
+      // Store arc data with NEW target rotation (where orb is moving to)
+      this.dOrbArcs.push({
+        time: time,
+        centerPos: [...animatedPosition],
+        rotation: this.targetDRotation  // Use NEW target position
+      });
+      
       console.log(`D note! Adding orbit rotation`);
     }
 
     // Handle E note orbit changes (perpendicular, cumulative larger increments)
     if (eNotesThatHaveStarted !== this.lastENoteCount) {
-      // Store rotation for arc effect before changing
-      this.arcERotation = this.currentERotation;
-      
       this.currentERotation = this.targetERotation;
       this.targetERotation += Math.PI / 3; // 60 degree increments (cumulative)
       
       this.lastENoteCount = eNotesThatHaveStarted;
       this.eRotationAnimationStartTime = time;
       
+      // Store arc data with NEW target rotation (where orb is moving to)
+      this.eOrbArcs.push({
+        time: time,
+        centerPos: [...animatedPosition],
+        rotation: this.targetERotation  // Use NEW target position
+      });
+      
       console.log(`E note! Adding cumulative rotation`);
     }
 
     // Handle F note orbit changes (further out, pink orb, larger increments)
     if (fNotesThatHaveStarted !== this.lastFNoteCount) {
-      // Store rotation for arc effect before changing
-      this.arcFRotation = this.currentFRotation;
-      
       this.currentFRotation = this.targetFRotation;
       this.targetFRotation += Math.PI / 2; // 90 degree increments (cumulative, larger than E orb)
       
       this.lastFNoteCount = fNotesThatHaveStarted;
       this.fRotationAnimationStartTime = time;
+      
+      // Store arc data with NEW target rotation (where orb is moving to)
+      this.fOrbArcs.push({
+        time: time,
+        centerPos: [...animatedPosition],
+        rotation: this.targetFRotation  // Use NEW target position
+      });
       
       console.log(`F note! Adding cumulative rotation`);
     }
@@ -833,34 +1018,55 @@ class BallPositionSynthesizer extends Synthesizer {
       });
     }
 
-    // Add orbital arc effects
+    // Add orbital arc effects - multiple arcs per orb type
     if (this.getPropertyValue<boolean>('arcEnabled')) {
-      // Main ball arc (when moving between positions)
-      this.addOrbitalArcVisuals(visuals, this.arcCenterPosition, 0, 0, 0, 'main', '#ff6600', this.positionAnimationStartTime, time);
+      const arcFadeTime = this.getPropertyValue<number>('arcFadeTime') ?? 1.0;
       
-      // D orb arc
+      // Clean up expired arcs and render multiple main ball arcs
+      this.mainBallArcs = this.mainBallArcs.filter(arc => time - arc.time <= arcFadeTime);
+      this.mainBallArcs.forEach(arc => {
+        this.addOrbitalArcVisualsWithHistoricalData(visuals, arc.startPos, arc.targetPos, arc.time, time, 'main', '#ff6600');
+      });
+      
+      // Clean up and render multiple D orb arcs
       if (dNotesThatHaveStarted > 0) {
+        this.dOrbArcs = this.dOrbArcs.filter(arc => time - arc.time <= arcFadeTime);
         const dTilt = Math.PI / 4;
-        this.addOrbitalArcVisuals(visuals, this.arcCenterPosition, this.arcDRotation, dOrbitDistance, dTilt, 'd', '#ff9900', this.dRotationAnimationStartTime, time);
+        this.dOrbArcs.forEach(arc => {
+          this.addOrbitalArcVisualsWithHistoricalData(visuals, arc.centerPos, null, arc.time, time, 'd', '#ff9900', dOrbitDistance, dTilt, arc.rotation);
+        });
       }
       
-      // E orb arc
+      // Clean up and render multiple E orb arcs
       if (eNotesThatHaveStarted > 0) {
+        this.eOrbArcs = this.eOrbArcs.filter(arc => time - arc.time <= arcFadeTime);
         const eTilt = Math.PI / 4;
-        this.addOrbitalArcVisuals(visuals, this.arcCenterPosition, this.arcERotation, eOrbitDistance, eTilt, 'e', '#0066ff', this.eRotationAnimationStartTime, time);
+        this.eOrbArcs.forEach(arc => {
+          this.addOrbitalArcVisualsWithHistoricalData(visuals, arc.centerPos, null, arc.time, time, 'e', '#0066ff', eOrbitDistance, eTilt, arc.rotation);
+        });
       }
       
-      // F orb arc
+      // Clean up and render multiple F orb arcs
       if (fNotesThatHaveStarted > 0) {
+        this.fOrbArcs = this.fOrbArcs.filter(arc => time - arc.time <= arcFadeTime);
         const fTilt = Math.PI / 6;
-        this.addOrbitalArcVisuals(visuals, this.arcCenterPosition, this.arcFRotation, fOrbitDistance, fTilt, 'f', '#ff66cc', this.fRotationAnimationStartTime, time);
+        this.fOrbArcs.forEach(arc => {
+          this.addOrbitalArcVisualsWithHistoricalData(visuals, arc.centerPos, null, arc.time, time, 'f', '#ff66cc', fOrbitDistance, fTilt, arc.rotation);
+        });
       }
     }
 
-    // Add explosive orbital arc effects (D orb only)
+    // Add explosive orbital arc effects (D orb only) - multiple arcs
     if (this.getPropertyValue<boolean>('explosiveArcEnabled') && dNotesThatHaveStarted > 0) {
+      const explosiveArcDuration = this.getPropertyValue<number>('explosiveArcDuration') ?? 2.5;
       const dTilt = Math.PI / 4;
-      this.addExplosiveOrbitalArcVisuals(visuals, this.arcCenterPosition, this.arcDRotation, dOrbitDistance, dTilt, 'd', '#ff9900', this.dRotationAnimationStartTime, time);
+      
+      // Render multiple explosive arcs for D orb using stored data
+      this.dOrbArcs.forEach(arc => {
+        if (time - arc.time <= explosiveArcDuration) {
+          this.addExplosiveOrbitalArcVisuals(visuals, arc.centerPos, arc.rotation, dOrbitDistance, dTilt, 'd', '#ff9900', arc.time, time);
+        }
+      });
     }
 
     // Generate trail visuals
