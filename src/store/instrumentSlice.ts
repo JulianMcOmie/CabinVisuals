@@ -21,6 +21,7 @@ import ViolinRingSynth from '../lib/synthesizers/ViolinRingSynth';
 import CircleOrbsSynth from '../lib/synthesizers/CircleOrbsSynth';
 import GlobalColorSynth from '../lib/synthesizers/GlobalColorSynth';
 import MountainRushSynth from '../lib/synthesizers/MountainRushSynth';
+import BallPositionSynthesizer from '../lib/synthesizers/BallPositionSynthesizer';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {
@@ -48,6 +49,7 @@ export const availableInstrumentsData: InstrumentCategories = {
   Melodic: [
     { id: 'ApproachingCubeSynth', name: 'Approaching Cube Synth', constructor: ApproachingCubeSynth },
     { id: 'BasicSynthesizer', name: 'Basic Synth', constructor: BasicSynthesizer },
+    { id: 'BallPositionSynthesizer', name: 'Ball Position', constructor: BallPositionSynthesizer },
     { id: 'SymmetricResonanceSynth', name: 'Symmetric Resonance', constructor: SymmetricResonanceSynth },
     { id: 'GlowSynth', name: 'Glow Synth', constructor: GlowSynth },
     { id: 'GlowingCubeSynth', name: 'Glowing Cube', constructor: GlowingCubeSynth },
