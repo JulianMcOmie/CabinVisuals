@@ -19,6 +19,7 @@ import PositionPulseSynth from '../lib/synthesizers/PositionPulseSynth';
 import BackgroundLightSynth from '../lib/synthesizers/BackgroundLightSynth';
 import ViolinRingSynth from '../lib/synthesizers/ViolinRingSynth';
 import CircleOrbsSynth from '../lib/synthesizers/CircleOrbsSynth';
+import CircleHitSynth from '../lib/synthesizers/CircleHitSynth';
 import GlobalColorSynth from '../lib/synthesizers/GlobalColorSynth';
 import MountainRushSynth from '../lib/synthesizers/MountainRushSynth';
 import BallPositionSynthesizer from '../lib/synthesizers/BallPositionSynthesizer';
@@ -56,6 +57,7 @@ export const availableInstrumentsData: InstrumentCategories = {
     { id: 'RadialDuplicateGlowSynth', name: 'Radial Glow Dup', constructor: RadialDuplicateGlowSynth },
     { id: 'ViolinRingSynth', name: 'Violin Ring', constructor: ViolinRingSynth },
     { id: 'CircleOrbsSynth', name: 'Circle Orbs', constructor: CircleOrbsSynth },
+    { id: 'CircleHitSynth', name: 'Circle Hit', constructor: CircleHitSynth },
   ],
   Percussive: [
     { id: 'ConvergingSpheresSynth', name: 'Converging Spheres', constructor: ConvergingSpheresSynth },

@@ -14,6 +14,7 @@ interface TrailPoint {
 class BallPositionSynthesizer extends Synthesizer {
   private activeBallPositions: Map<string, number> = new Map();
   private globalNoteCount: number = 0;
+  private midiBlocks: MIDIBlock[] = [];
   private positions: [number, number, number][] = [
     [0, 0, 0],    // center
     [-1, 0, 0],   // left
@@ -144,6 +145,18 @@ class BallPositionSynthesizer extends Synthesizer {
       })],
       ['explosiveArcGlow', new Property<number>('explosiveArcGlow', 8.0, {
         uiType: 'slider', label: 'Explosive Arc Glow', min: 3.0, max: 20.0, step: 0.5
+      })],
+      ['futureArcSpheresEnabled', new Property<boolean>('futureArcSpheresEnabled', true, {
+        uiType: 'dropdown', label: 'Show Future Arc Positions', options: [
+          { value: true, label: 'Enabled' },
+          { value: false, label: 'Disabled' }
+        ]
+      })],
+      ['futureArcLookahead', new Property<number>('futureArcLookahead', 16.0, {
+        uiType: 'slider', label: 'Future Arc Lookahead (beats)', min: 2.0, max: 32.0, step: 1.0
+      })],
+      ['futureArcSphereSize', new Property<number>('futureArcSphereSize', 1.0, {
+        uiType: 'slider', label: 'Future Arc Sphere Size', min: 0.2, max: 3.0, step: 0.1
       })],
     ]);
   }
@@ -669,6 +682,206 @@ class BallPositionSynthesizer extends Synthesizer {
     }
   }
 
+  private calculateFutureArcCenter(arcType: 'd' | 'e' | 'f', futureTime: number, futureBpm: number): [number, number, number] {
+    const animationSpeed = this.getPropertyValue<number>('animationSpeed') ?? 2;
+    const rotationSpeed = this.getPropertyValue<number>('rotationSpeed') ?? 1;
+    const idleRotationSpeed = this.getPropertyValue<number>('idleRotationSpeed') ?? 0.1;
+    
+    // Calculate what the main ball position will be at futureTime
+    const futureMainTimeSinceAnimation = futureTime - this.positionAnimationStartTime;
+    const mainAnimationDuration = 60 / (futureBpm * animationSpeed);
+    const mainProgress = Math.min(1, Math.max(0, futureMainTimeSinceAnimation / mainAnimationDuration));
+    const mainEasedProgress = this.applyEasing(mainProgress);
+    const futureMainPosition = this.lerpPosition(this.currentPosition, this.targetPosition, mainEasedProgress);
+    
+    // Calculate orbital rotations at futureTime
+    switch(arcType) {
+      case 'd': {
+        const dOrbitDistance = 1.5;
+        const dTilt = Math.PI / 4;
+        const futureTimeSinceAnimation = futureTime - this.dRotationAnimationStartTime;
+        const dAnimationDuration = 60 / (futureBpm * rotationSpeed);
+        const dProgress = Math.min(1, Math.max(0, futureTimeSinceAnimation / dAnimationDuration));
+        const dEasedProgress = this.applyEasing(dProgress);
+        const futureRotation = this.lerp(this.currentDRotation, this.targetDRotation, dEasedProgress) + 
+                              (futureTime * idleRotationSpeed);
+        
+        return [
+          futureMainPosition[0] + Math.cos(futureRotation) * dOrbitDistance * Math.cos(dTilt),
+          futureMainPosition[1] + Math.sin(futureRotation) * dOrbitDistance * Math.sin(dTilt),
+          futureMainPosition[2] + Math.sin(futureRotation) * dOrbitDistance * Math.cos(dTilt)
+        ];
+      }
+      case 'e': {
+        const eOrbitDistance = 2.2;
+        const eTilt = Math.PI / 4;
+        const futureTimeSinceAnimation = futureTime - this.eRotationAnimationStartTime;
+        const eAnimationDuration = 0.1;
+        const eProgress = Math.min(1, Math.max(0, futureTimeSinceAnimation / eAnimationDuration));
+        const eEasedProgress = this.applyEasing(eProgress);
+        const futureRotation = this.lerp(this.currentERotation, this.targetERotation, eEasedProgress) + 
+                              (futureTime * idleRotationSpeed * 0.7);
+        
+        return [
+          futureMainPosition[0] + Math.sin(futureRotation) * eOrbitDistance * Math.cos(eTilt),
+          futureMainPosition[1] + Math.cos(futureRotation) * eOrbitDistance * Math.sin(eTilt),
+          futureMainPosition[2] + Math.cos(futureRotation) * eOrbitDistance * Math.cos(eTilt)
+        ];
+      }
+      case 'f': {
+        const fOrbitDistance = 3.0;
+        const fTilt = Math.PI / 6;
+        const futureTimeSinceAnimation = futureTime - this.fRotationAnimationStartTime;
+        const fAnimationDuration = 0.1;
+        const fProgress = Math.min(1, Math.max(0, futureTimeSinceAnimation / fAnimationDuration));
+        const fEasedProgress = this.applyEasing(fProgress);
+        const futureRotation = this.lerp(this.currentFRotation, this.targetFRotation, fEasedProgress) + 
+                              (futureTime * idleRotationSpeed * 0.5);
+        
+        return [
+          futureMainPosition[0] + Math.cos(futureRotation) * fOrbitDistance * Math.cos(fTilt),
+          futureMainPosition[1] + Math.sin(futureRotation) * fOrbitDistance,
+          futureMainPosition[2] + Math.sin(futureRotation) * fOrbitDistance * Math.sin(fTilt)
+        ];
+      }
+    }
+  }
+
+
+  private calculateAbsoluteArcPosition(arcType: 'd' | 'e' | 'f', noteStartBeat: number, bpm: number): [number, number, number] {
+    // Calculate absolute positions based on note timing, independent of current state
+    const xOffset = this.getPropertyValue<number>('xOffset') ?? 5;
+    const animationSpeed = this.getPropertyValue<number>('animationSpeed') ?? 2;
+    const rotationSpeed = this.getPropertyValue<number>('rotationSpeed') ?? 1;
+    const idleRotationSpeed = this.getPropertyValue<number>('idleRotationSpeed') ?? 0.1;
+    
+    // Count how many C notes will have occurred by noteStartBeat to determine main ball position
+    let cNotesAtTime = 0;
+    for (const block of this.midiBlocks || []) {
+      for (const note of block.notes) {
+        if ((note.pitch % 12) === 0 && note.startBeat <= noteStartBeat) { // C notes
+          cNotesAtTime++;
+        }
+      }
+    }
+    
+    // Calculate main ball position at noteStartBeat
+    const numPositions = this.getPropertyValue<number>('numPositions') ?? 4;
+    const positions = this.generatePositions(numPositions);
+    const positionIndex = cNotesAtTime % positions.length;
+    const basePosition = positions[positionIndex];
+    const mainBallPosition: [number, number, number] = [
+      basePosition[0] * xOffset,
+      basePosition[1],
+      basePosition[2] * xOffset
+    ];
+    
+    // Calculate absolute rotation at noteStartBeat (independent of current state)
+    let absoluteRotation = noteStartBeat * idleRotationSpeed;
+    
+    // Count rotation increments from D/E/F notes up to noteStartBeat
+    for (const block of this.midiBlocks || []) {
+      for (const note of block.notes) {
+        if (note.startBeat <= noteStartBeat) {
+          const noteClass = note.pitch % 12;
+          if (noteClass === 2 && arcType === 'd') { // D note for D orb
+            absoluteRotation += Math.PI * 2; // Full rotation per D note
+          } else if (noteClass === 4 && arcType === 'e') { // E note for E orb
+            absoluteRotation += Math.PI / 3; // 60 degree increments
+          } else if (noteClass === 5 && arcType === 'f') { // F note for F orb
+            absoluteRotation += Math.PI / 2; // 90 degree increments
+          }
+        }
+      }
+    }
+    
+    // Calculate orb position using absolute values
+    switch(arcType) {
+      case 'd': {
+        const dOrbitDistance = 1.5;
+        const dTilt = Math.PI / 4;
+        return [
+          mainBallPosition[0] + Math.cos(absoluteRotation) * dOrbitDistance * Math.cos(dTilt),
+          mainBallPosition[1] + Math.sin(absoluteRotation) * dOrbitDistance * Math.sin(dTilt),
+          mainBallPosition[2] + Math.sin(absoluteRotation) * dOrbitDistance * Math.cos(dTilt)
+        ];
+      }
+      case 'e': {
+        const eOrbitDistance = 2.2;
+        const eTilt = Math.PI / 4;
+        return [
+          mainBallPosition[0] + Math.sin(absoluteRotation) * eOrbitDistance * Math.cos(eTilt),
+          mainBallPosition[1] + Math.cos(absoluteRotation) * eOrbitDistance * Math.sin(eTilt),
+          mainBallPosition[2] + Math.cos(absoluteRotation) * eOrbitDistance * Math.cos(eTilt)
+        ];
+      }
+      case 'f': {
+        const fOrbitDistance = 3.0;
+        const fTilt = Math.PI / 6;
+        return [
+          mainBallPosition[0] + Math.cos(absoluteRotation) * fOrbitDistance * Math.cos(fTilt),
+          mainBallPosition[1] + Math.sin(absoluteRotation) * fOrbitDistance,
+          mainBallPosition[2] + Math.sin(absoluteRotation) * fOrbitDistance * Math.sin(fTilt)
+        ];
+      }
+    }
+  }
+
+  private addFutureArcSpheres(visuals: VisualObject[], time: number, midiBlocks: MIDIBlock[], bpm: number): void {
+    if (!this.getPropertyValue<boolean>('futureArcSpheresEnabled')) return;
+    
+    const lookaheadTime = this.getPropertyValue<number>('futureArcLookahead') ?? 16.0;
+    const sphereSize = this.getPropertyValue<number>('futureArcSphereSize') ?? 1.0;
+    
+    // Store midiBlocks for absolute calculations
+    this.midiBlocks = midiBlocks;
+    
+    // Look for upcoming notes that will create arcs
+    for (const block of midiBlocks) {
+      for (const note of block.notes) {
+        const noteClass = note.pitch % 12;
+        
+        // Check if this note will create an arc in the near future 
+        // Use a small buffer to ensure spheres disappear right when the note hits
+        const noteBuffer = 0.01; // Small buffer to ensure clean disappearance
+        if (note.startBeat > time + noteBuffer && note.startBeat <= time + lookaheadTime) {
+          let arcType: 'd' | 'e' | 'f' | null = null;
+          let color = '#ffffff';
+          
+          if (noteClass === 2) { // D note
+            arcType = 'd';
+            color = '#ff9900';
+          } else if (noteClass === 4) { // E note
+            arcType = 'e';
+            color = '#0066ff';
+          } else if (noteClass === 5) { // F note
+            arcType = 'f';
+            color = '#ff66cc';
+          }
+          
+          if (arcType) {
+            // Calculate ABSOLUTE position where this arc will be (doesn't change)
+            const absoluteArcPosition = this.calculateAbsoluteArcPosition(arcType, note.startBeat, bpm);
+            
+            // Add static sphere at that absolute position
+            visuals.push({
+              type: 'sphere',
+              sourceNoteId: `future-arc-${arcType}-${note.id}`,
+              properties: {
+                position: absoluteArcPosition,
+                scale: [sphereSize, sphereSize, sphereSize],
+                color: color,
+                opacity: 0.6,
+                emissive: color,
+                emissiveIntensity: 1.5
+              }
+            });
+          }
+        }
+      }
+    }
+  }
+
   private addExplosiveOrbitalArcVisuals(
     visuals: VisualObject[], 
     centerPos: [number, number, number], 
@@ -1076,6 +1289,9 @@ class BallPositionSynthesizer extends Synthesizer {
       this.addTrailVisuals(visuals, this.eOrbTrail, '#0066ff', 'e-trail');
       this.addTrailVisuals(visuals, this.fOrbTrail, '#ff66cc', 'f-trail');
     }
+
+    // Add static spheres showing future arc positions
+    this.addFutureArcSpheres(visuals, time, midiBlocks, bpm);
 
     return visuals;
   }
