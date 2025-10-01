@@ -422,3 +422,14 @@ export async function saveMidiNotesBatch(notes: MidiNoteData[], blockId: string)
     console.log(`Notes batch saved for block ${blockId}.`); return true;
 }
 
+export async function deleteTrack(trackId: string): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId) return false;
+    console.log(`Deleting track ${trackId} from Supabase...`);
+    const { error } = await supabase.from('tracks').delete().eq('id', trackId);
+    // RLS ensures ownership. Cascade delete handles related synth, effects, blocks, notes.
+    if (error) { console.error("Error deleting track from Supabase:", error); return false; }
+    // Cascade delete handles related synth, effects, blocks, notes.
+    console.log("Track deleted (cascade initiated)."); return true;
+}
+
