@@ -433,3 +433,12 @@ export async function deleteTrack(trackId: string): Promise<boolean> {
     console.log("Track deleted (cascade initiated)."); return true;
 }
 
+export async function deleteEffect(effectId: string): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId) return false;
+    console.log(`Deleting effect ${effectId} from Supabase...`);
+    const { error } = await supabase.from('track_effects').delete().eq('id', effectId);
+    if (error) { console.error(`Error deleting effect ${effectId}:`, error); return false; }
+    console.log(`Effect ${effectId} deleted.`); return true;
+}
+
