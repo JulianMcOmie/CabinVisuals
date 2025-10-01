@@ -355,3 +355,18 @@ export async function saveTrack(track: TrackData): Promise<boolean> {
     console.log(`Track ${track.id} saved.`); return true;
 }
 
+export async function saveSynth(synth: SynthData): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId) return false;
+    console.log(`Saving synth for track ${synth.trackId}...`);
+    const dbData = {
+        track_id: synth.trackId, // Primary Key for upsert
+        user_id: userId,
+        type: synth.type,
+        settings: synth.settings
+    };
+    const { error } = await supabase.from('track_synths').upsert(dbData);
+    if (error) { console.error(`Error saving synth for track ${synth.trackId}:`, error); return false; }
+    console.log(`Synth for track ${synth.trackId} saved.`); return true;
+}
+
