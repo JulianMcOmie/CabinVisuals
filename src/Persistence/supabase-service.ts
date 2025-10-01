@@ -403,3 +403,22 @@ export async function saveMidiBlock(block: Omit<MidiBlockData, 'notes'>): Promis
     console.log(`MIDI block ${block.id} saved.`); return true;
 }
 
+export async function saveMidiNotesBatch(notes: MidiNoteData[], blockId: string): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId || notes.length === 0) return false;
+    console.log(`Saving batch of ${notes.length} notes for block ${blockId}...`);
+    const dbData = notes.map(note => ({
+        id: note.id, // Primary Key for upsert
+        block_id: blockId,
+        user_id: userId,
+        start_beat: note.startBeat,
+        duration: note.duration,
+        velocity: note.velocity,
+        pitch: note.pitch
+    }));
+    // Upsert multiple notes in one go
+    const { error } = await supabase.from('midi_notes').upsert(dbData);
+    if (error) { console.error(`Error saving notes batch for block ${blockId}:`, error); return false; }
+    console.log(`Notes batch saved for block ${blockId}.`); return true;
+}
+
