@@ -124,19 +124,49 @@ export async function createSupabaseProject(name: string): Promise<string | null
     }
 
     const projectName = name || 'Untitled Project';
-    console.log(`Calling RPC to create Supabase project '${projectName}'...`);
+    console.log(`Creating Supabase project '${projectName}'...`);
 
-    const { data: newProjectId, error } = await supabase.rpc('create_new_project_rpc', {
-        p_user_id: userId,
-        p_project_name: projectName
-    });
+    try {
+        // First, create the project
+        const { data: projectData, error: projectError } = await supabase
+            .from('projects')
+            .insert({ user_id: userId, name: projectName })
+            .select('id')
+            .single();
 
-    if (error || !newProjectId) {
-         console.error("Error creating Supabase project via RPC:", error);
-         return null; // Indicate failure
+        if (projectError || !projectData) {
+            console.error("Error creating project:", projectError);
+            return null;
+        }
+
+        const projectId = projectData.id;
+
+        // Then, create the default settings
+        const { error: settingsError } = await supabase
+            .from('project_settings')
+            .insert({
+                project_id: projectId,
+                user_id: userId,
+                bpm: 120,
+                num_measures: 16,
+                is_playing: false,
+                loop_enabled: false,
+                is_instrument_sidebar_visible: true
+            });
+
+        if (settingsError) {
+            console.error("Error creating project settings:", settingsError);
+            // Clean up the project if settings creation failed
+            await supabase.from('projects').delete().eq('id', projectId);
+            return null;
+        }
+
+        console.log(`Successfully created Supabase project: ${projectId}`);
+        return projectId;
+    } catch (error) {
+        console.error("Error creating Supabase project:", error);
+        return null;
     }
-    console.log(`Successfully created Supabase project via RPC: ${newProjectId}`);
-    return newProjectId; // Return the new project's UUID
 }
 
 export async function deleteSupabaseProject(projectId: string): Promise<boolean> {
