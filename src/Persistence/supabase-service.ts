@@ -337,3 +337,21 @@ export async function saveProjectSettings(settings: ProjectSettings): Promise<bo
     return true;
 }
 
+export async function saveTrack(track: TrackData): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId) return false;
+    console.log(`Saving track ${track.id} to Supabase...`);
+    const dbData = {
+        id: track.id, // Primary Key for upsert
+        project_id: track.projectId,
+        user_id: userId,
+        name: track.name,
+        is_muted: track.isMuted,
+        is_soloed: track.isSoloed,
+        "order": track.order
+    };
+    const { error } = await supabase.from('tracks').upsert(dbData);
+    if (error) { console.error(`Error saving track ${track.id}:`, error); return false; }
+    console.log(`Track ${track.id} saved.`); return true;
+}
+
