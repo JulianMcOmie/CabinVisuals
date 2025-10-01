@@ -1,7 +1,7 @@
 // src/Persistence/supabase-service.ts
 
 // Import the Supabase client creator function (adjust path as needed)
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '../../src/utils/supabase/client';
 
 // Define TypeScript interfaces representing the structure of your application's data.
 // These should match how data is used in Zustand and UI components (e.g., using camelCase).
@@ -86,3 +86,30 @@ async function getUserId(): Promise<string | null> {
     const { data: { user } } = await supabase.auth.getUser();
     return user?.id ?? null;
 }
+
+export async function getSupabaseProjectList(): Promise<ProjectMetadata[]> {
+    const userId = await getUserId();
+    if (!userId) {
+        console.warn("getSupabaseProjectList: No user logged in.");
+        return [];
+    }
+
+    const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, updated_at') // Select needed columns
+        .eq('user_id', userId)         // Filter by this user
+        .order('updated_at', { ascending: false }); // Show newest first
+
+    if (error) {
+        console.error("Error fetching Supabase project list:", error);
+        return []; // Return empty on error
+    }
+    // Map database result (snake_case) to application interface (camelCase if necessary)
+    return (data || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        updated_at: p.updated_at // Pass through if needed
+    }));
+}
+
+
