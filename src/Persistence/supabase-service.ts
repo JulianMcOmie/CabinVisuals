@@ -112,4 +112,30 @@ export async function getSupabaseProjectList(): Promise<ProjectMetadata[]> {
     }));
 }
 
+/**
+ * Creates a new project and its default settings in Supabase using an RPC function.
+ * Returns the new project's UUID on success, or null on failure.
+ */
+export async function createSupabaseProject(name: string): Promise<string | null> {
+    const userId = await getUserId();
+    if (!userId) {
+        console.error("createSupabaseProject: User not logged in.");
+        return null;
+    }
+
+    const projectName = name || 'Untitled Project';
+    console.log(`Calling RPC to create Supabase project '${projectName}'...`);
+
+    const { data: newProjectId, error } = await supabase.rpc('create_new_project_rpc', {
+        p_user_id: userId,
+        p_project_name: projectName
+    });
+
+    if (error || !newProjectId) {
+         console.error("Error creating Supabase project via RPC:", error);
+         return null; // Indicate failure
+    }
+    console.log(`Successfully created Supabase project via RPC: ${newProjectId}`);
+    return newProjectId; // Return the new project's UUID
+}
 
