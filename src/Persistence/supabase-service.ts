@@ -452,3 +452,11 @@ export async function deleteMidiBlock(blockId: string): Promise<boolean> {
     console.log(`MIDI block ${blockId} deleted.`); return true;
 }
 
+export async function deleteMidiNote(noteId: string): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId) return false;
+    console.log(`Deleting MIDI note ${noteId} from Supabase...`);
+    const { error } = await supabase.from('midi_notes').delete().eq('id', noteId);
+    if (error) { console.error(`Error deleting MIDI note ${noteId}:`, error); return false; }
+    console.log(`MIDI note ${noteId} deleted.`); return true;
+}
