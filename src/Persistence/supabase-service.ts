@@ -370,3 +370,20 @@ export async function saveSynth(synth: SynthData): Promise<boolean> {
     console.log(`Synth for track ${synth.trackId} saved.`); return true;
 }
 
+export async function saveEffect(effect: EffectData): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId) return false;
+    console.log(`Saving effect ${effect.id} for track ${effect.trackId}...`);
+    const dbData = {
+        id: effect.id, // Primary Key for upsert
+        track_id: effect.trackId,
+        user_id: userId,
+        type: effect.type,
+        settings: effect.settings,
+        "order": effect.order
+    };
+    const { error } = await supabase.from('track_effects').upsert(dbData);
+    if (error) { console.error(`Error saving effect ${effect.id}:`, error); return false; }
+    console.log(`Effect ${effect.id} saved.`); return true;
+}
+
