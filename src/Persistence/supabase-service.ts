@@ -387,3 +387,19 @@ export async function saveEffect(effect: EffectData): Promise<boolean> {
     console.log(`Effect ${effect.id} saved.`); return true;
 }
 
+export async function saveMidiBlock(block: Omit<MidiBlockData, 'notes'>): Promise<boolean> { // Exclude notes here
+    const userId = await getUserId();
+    if (!userId) return false;
+    console.log(`Saving MIDI block ${block.id} for track ${block.trackId}...`);
+    const dbData = {
+        id: block.id, // Primary Key for upsert
+        track_id: block.trackId,
+        user_id: userId,
+        start_beat: block.startBeat,
+        end_beat: block.endBeat
+    };
+    const { error } = await supabase.from('midi_blocks').upsert(dbData);
+    if (error) { console.error(`Error saving MIDI block ${block.id}:`, error); return false; }
+    console.log(`MIDI block ${block.id} saved.`); return true;
+}
+
