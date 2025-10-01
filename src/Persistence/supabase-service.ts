@@ -139,3 +139,26 @@ export async function createSupabaseProject(name: string): Promise<string | null
     return newProjectId; // Return the new project's UUID
 }
 
+export async function deleteSupabaseProject(projectId: string): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId) {
+         console.warn("deleteSupabaseProject: User not logged in.");
+         return false;
+    }
+
+    console.log(`Deleting Supabase project ${projectId}...`);
+    // RLS policy ensures only the owner can perform this delete.
+    const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+
+    if (error) {
+        console.error(`Error deleting Supabase project ${projectId}:`, error);
+        return false; // Indicate failure
+    }
+    // Cascade delete defined in Phase 1 handles related data (settings, tracks, etc.)
+    console.log(`Successfully deleted Supabase project ${projectId}.`);
+    return true; // Indicate success
+}
+
