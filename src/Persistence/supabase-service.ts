@@ -306,3 +306,34 @@ export async function loadFullProjectFromSupabase(projectId: string): Promise<Ap
     }
 }
 
+export async function saveProjectSettings(settings: ProjectSettings): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId) return false;
+
+    console.log(`Saving settings for Supabase project ${settings.projectId}...`);
+    // Map application state (camelCase) to database columns (snake_case)
+    const dbData = {
+        project_id: settings.projectId, // The primary key for upsert
+        user_id: userId,                // Include user_id for RLS checks
+        bpm: settings.bpm,
+        is_playing: settings.isPlaying,
+        loop_enabled: settings.loopEnabled,
+        loop_start_beat: settings.loopStartBeat,
+        loop_end_beat: settings.loopEndBeat,
+        num_measures: settings.numMeasures,
+        is_instrument_sidebar_visible: settings.isInstrumentSidebarVisible,
+        selected_window: settings.selectedWindow,
+        // updated_at is handled by trigger, no need to set here unless forcing
+    };
+
+    // upsert = insert if project_id doesn't exist, update if it does
+    const { error } = await supabase.from('project_settings').upsert(dbData);
+
+    if (error) {
+        console.error("Error saving project settings to Supabase:", error);
+        return false;
+    }
+    console.log("Project settings saved to Supabase.");
+    return true;
+}
+
