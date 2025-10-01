@@ -442,3 +442,13 @@ export async function deleteEffect(effectId: string): Promise<boolean> {
     console.log(`Effect ${effectId} deleted.`); return true;
 }
 
+export async function deleteMidiBlock(blockId: string): Promise<boolean> {
+    const userId = await getUserId();
+    if (!userId) return false;
+    console.log(`Deleting MIDI block ${blockId} from Supabase...`);
+    const { error } = await supabase.from('midi_blocks').delete().eq('id', blockId);
+    // Cascade delete handles related notes
+    if (error) { console.error(`Error deleting MIDI block ${blockId}:`, error); return false; }
+    console.log(`MIDI block ${blockId} deleted.`); return true;
+}
+
