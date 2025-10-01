@@ -162,3 +162,147 @@ export async function deleteSupabaseProject(projectId: string): Promise<boolean>
     return true; // Indicate success
 }
 
+
+/**
+ * Loads a complete project state (including settings, tracks, synths, effects, blocks, notes)
+ * from Supabase for a given project ID. Performs necessary data transformation.
+ * Returns the structured AppProjectState or null if not found/error.
+ */
+export async function loadFullProjectFromSupabase(projectId: string): Promise<AppProjectState | null> {
+    const userId = await getUserId();
+    if (!userId) {
+         console.warn("loadFullProjectFromSupabase: User not logged in.");
+         return null;
+    }
+
+    console.log(`Loading full project ${projectId} from Supabase...`);
+    const { data: dbData, error } = await supabase
+        .from('projects') // Start query from the 'projects' table
+        .select(`
+            id, name,
+            project_settings ( * ),
+            tracks (
+                id, name, project_id, is_muted, is_soloed, "order",
+                track_synths ( * ),
+                track_effects ( *, "order" ),
+                midi_blocks (
+                    id, track_id, start_beat, end_beat,
+                    midi_notes ( * )
+                )
+            )
+        `) // Define the nested structure and columns to retrieve
+        .eq('id', projectId) // Filter for the specific project
+        // .eq('user_id', userId) // RLS handles this, but redundant check is ok
+        .maybeSingle(); // Important: returns null if no matching row found (0 results), errors only for >1 result
+
+    if (error) {
+        console.error(`Error loading full project ${projectId} from Supabase:`, error);
+        throw error; // Propagate error for the caller (e.g., Zustand store) to handle
+    }
+    if (!dbData) {
+        console.warn(`Project ${projectId} not found in Supabase or RLS prevented access.`);
+        return null; // Project doesn't exist for this user
+    }
+
+    console.log("Fetched Supabase data for project:", dbData);
+
+    // **Data Transformation: Map Supabase snake_case to App camelCase interfaces**
+    try {
+        const settingsData = dbData.project_settings;
+        const tracksData = dbData.tracks || [];
+
+        if (!settingsData) {
+            throw new Error("Project settings data is missing from Supabase response.");
+        }
+
+        // Transform project settings
+        const transformedSettings: ProjectSettings = {
+             projectId: dbData.id, // Use the main project ID
+             bpm: settingsData.bpm,
+             isPlaying: settingsData.is_playing,
+             loopEnabled: settingsData.loop_enabled,
+             loopStartBeat: settingsData.loop_start_beat,
+             loopEndBeat: settingsData.loop_end_beat,
+             numMeasures: settingsData.num_measures,
+             isInstrumentSidebarVisible: settingsData.is_instrument_sidebar_visible,
+             selectedWindow: settingsData.selected_window,
+        };
+
+        // Transform tracks and their nested data
+        const transformedTracks: TrackData[] = tracksData
+            .sort((a: any, b: any) => a.order - b.order) // Sort tracks by order
+            .map((track: any) => {
+                const synthData = track.track_synths; // Supabase returns object or null for one-to-one
+                const effectsData = track.track_effects || []; // Supabase returns array for one-to-many
+                const blocksData = track.midi_blocks || [];
+
+                // Transform synth
+                const transformedSynth: SynthData | null = synthData ? {
+                    trackId: track.id, // Synth primary key is the track ID
+                    type: synthData.type,
+                    settings: synthData.settings || {} // Ensure settings is an object
+                } : null;
+
+                // Transform effects
+                const transformedEffects: EffectData[] = effectsData
+                    .sort((a: any, b: any) => a.order - b.order) // Sort effects by order
+                    .map((effect: any) => ({
+                        id: effect.id,
+                        trackId: effect.track_id,
+                        type: effect.type,
+                        settings: effect.settings || {},
+                        order: effect.order
+                    }));
+
+                // Transform blocks and their notes
+                const transformedBlocks: MidiBlockData[] = blocksData
+                    .sort((a: any, b: any) => a.start_beat - b.start_beat) // Sort blocks by start beat
+                    .map((block: any) => {
+                        const notesData = block.midi_notes || [];
+                        const transformedNotes: MidiNoteData[] = notesData.map((note: any) => ({
+                            id: note.id,
+                            // blockId: block.id, // Not needed in nested structure
+                            startBeat: note.start_beat,
+                            duration: note.duration,
+                            velocity: note.velocity,
+                            pitch: note.pitch
+                        }));
+                        return {
+                            id: block.id,
+                            trackId: block.track_id,
+                            startBeat: block.start_beat,
+                            endBeat: block.end_beat,
+                            notes: transformedNotes // Assign mapped notes
+                        };
+                    });
+
+                // Assemble the transformed track data
+                return {
+                     id: track.id,
+                     projectId: track.project_id,
+                     name: track.name,
+                     isMuted: track.is_muted,
+                     isSoloed: track.is_soloed,
+                     order: track.order,
+                     synth: transformedSynth,
+                     effects: transformedEffects,
+                     midiBlocks: transformedBlocks
+                };
+        }); // End map tracks
+
+        // Assemble the final application state structure
+        const transformedState: AppProjectState = {
+             projectSettings: transformedSettings,
+             tracks: transformedTracks
+        };
+
+        console.log("Transformed project state:", transformedState);
+        return transformedState;
+
+    } catch (transformError) {
+         console.error(`Error transforming Supabase data for project ${projectId}:`, transformError);
+         // This likely indicates a mismatch between your interfaces and the actual DB structure/query
+         throw new Error("Failed to process project data structure from Supabase.");
+    }
+}
+
