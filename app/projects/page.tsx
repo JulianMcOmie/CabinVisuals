@@ -23,6 +23,7 @@ export default function ProjectsPage() {
   const projects = useStore((state) => state.projectList);
   const createNewProject = useStore((state) => state.createNewProject);
   const switchProject = useStore((state) => state.switchProject);
+  const loadProjectList = useStore((state) => state.loadProjectList);
 
   useEffect(() => {
     let isMounted = true;
@@ -57,6 +58,8 @@ export default function ProjectsPage() {
         console.log("Initializing store...");
         await initializeStore();
         console.log("Store initialized.");
+        // Fetch Supabase-backed project list
+        await loadProjectList();
         if (!isMounted) return;
 
         // 4. Now set up listener for subsequent changes
@@ -145,7 +148,7 @@ export default function ProjectsPage() {
 
   const handleSelectProject = async (projectId: string) => {
      await switchProject(projectId);
-     router.push('/alpha'); 
+     router.push(`/alpha?project=${projectId}`); 
   };
 
   if (isLoading) {

@@ -7,8 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import styles from '@/app/projects/projects.module.css' // Assuming styles are specific to this display
+} from "../../components/ui/dropdown-menu"
+import styles from '../../app/projects/projects.module.css'
 import { ProjectMetadata } from '../store/projectSlice'; // Import the type
 import type { User } from '@supabase/supabase-js'; // Import User type
 import { logout } from "../../app/(auth)/logout/actions"; // Corrected relative path

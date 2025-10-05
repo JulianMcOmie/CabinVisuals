@@ -1,4 +1,4 @@
-import LandingPage from '@/src/components/LandingPage';
+import LandingPage from '@/components/LandingPage';
 import { redirect } from 'next/navigation';
 
 export default function HomePage() {

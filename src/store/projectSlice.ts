@@ -1,7 +1,9 @@
 import { StateCreator } from 'zustand';
 import { AppState } from './store';
-import * as P from '../Persistence/persistence-service'; // Need getProjectMetadataList
-import * as PersistProjectFns from './persistStore/persistProjectSlice'; // Import project persistence functions
+import * as supabaseService from '@/Persistence/supabase-service';
+import type { AppProjectState } from '@/Persistence/supabase-service';
+import { deserializeSynth, deserializeEffect } from '@/utils/persistenceUtils';
+import type { Track as TrackType } from '@/lib/types';
 
 export interface ProjectMetadata {
   id: string;
@@ -13,7 +15,8 @@ export interface ProjectSlice {
     currentLoadedProjectId: string | null;
     // Actions that involve persistence:
     loadProjectList: () => Promise<void>;
-    switchProject: (projectId: string) => void; // Action is now synchronous
+    switchProject: (projectId: string) => void; // Temporary: kept for compatibility
+    loadProject: (projectId: string) => Promise<void>;
     createNewProject: (name: string) => Promise<string | null>; // Renamed for clarity, returns ID
     renameProject: (projectId: string, newName: string) => Promise<void>; // Added
     deleteProject: (projectId: string) => Promise<void>; // Added
@@ -31,27 +34,97 @@ export const createProjectSlice: StateCreator<
     currentLoadedProjectId: null, // This will be set during initialization
     loadProjectList: async () => {
         try {
-            const list = await P.getProjectMetadataList();
+            const list = await supabaseService.getSupabaseProjectList();
             set({ projectList: list });
         } catch (error) {
-             console.error("Failed to load project list:", error);
-             set({ projectList: [] }); // Set to empty on error
+            console.error("Zustand/ProjectSlice: Failed to fetch project list:", error);
+            set({ projectList: [] });
         }
     },
     switchProject: (projectId: string) => {
-        // 1. Persist the change asynchronously (fire-and-forget)
-        PersistProjectFns.persistSwitchProject(get, projectId).catch(err => {
-             console.error("Failed to persist switched project ID:", err);
-        });
-
-        // 2. Update the state synchronously
         set({ currentLoadedProjectId: projectId });
         console.log(`Switched currentLoadedProjectId in state to: ${projectId}`);
         // Navigation is now handled by the calling component (page.tsx)
     },
+    loadProject: async (projectId: string) => {
+        // Load full project from Supabase and hydrate store
+        try {
+            const fullState: AppProjectState | null = await supabaseService.loadFullProjectFromSupabase(projectId);
+            if (!fullState) {
+                console.warn(`loadProject: No data returned for project ${projectId}`);
+                set({ currentLoadedProjectId: null });
+                return;
+            }
+
+            // Map ProjectSettings to relevant slices
+            const {
+                bpm,
+                loopEnabled,
+                loopStartBeat,
+                loopEndBeat,
+                numMeasures,
+                isInstrumentSidebarVisible,
+                selectedWindow,
+            } = fullState.projectSettings;
+
+            // Map and deserialize tracks
+            const hydratedTracks: TrackType[] = fullState.tracks.map(trackData => {
+                const synthInstance = trackData.synth ? deserializeSynth(trackData.synth) : null;
+                const effectInstances = (trackData.effects || [])
+                    .map(effectData => deserializeEffect(effectData))
+                    .filter(instance => instance !== null) as any[];
+
+                const hydratedMidiBlocks = (trackData.midiBlocks || []).map(blockData => ({
+                    id: blockData.id,
+                    startBeat: blockData.startBeat,
+                    endBeat: blockData.endBeat,
+                    notes: (blockData.notes || []).map(noteData => ({
+                        id: noteData.id,
+                        pitch: noteData.pitch,
+                        velocity: noteData.velocity,
+                        startBeat: noteData.startBeat,
+                        duration: noteData.duration,
+                    })),
+                    color: 'lightblue',
+                    name: '',
+                }));
+
+                const hydratedTrack: TrackType = {
+                    id: trackData.id,
+                    name: trackData.name,
+                    midiBlocks: hydratedMidiBlocks,
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    synthesizer: synthInstance!,
+                    effects: effectInstances as any,
+                    isMuted: trackData.isMuted,
+                    isSoloed: trackData.isSoloed,
+                };
+                return hydratedTrack;
+            });
+
+            set(state => ({
+                currentLoadedProjectId: projectId,
+                bpm,
+                isPlaying: false,
+                loopEnabled,
+                loopStartBeat,
+                loopEndBeat,
+                numMeasures,
+                isInstrumentSidebarVisible,
+                selectedWindow: selectedWindow as any,
+                selectedTrackId: null,
+                selectedBlockId: null,
+                selectedNotes: null,
+                tracks: hydratedTracks,
+            }));
+        } catch (error) {
+            console.error('loadProject: Failed to load project from Supabase:', error);
+            set({ currentLoadedProjectId: null, tracks: [] });
+        }
+    },
     createNewProject: async (name: string): Promise<string | null> => {
-        // Create in DB first to get the ID
-        const newProjectId = await PersistProjectFns.persistCreateNewProject(get, name);
+        // Create in Supabase to get the ID
+        const newProjectId = await supabaseService.createSupabaseProject(name);
         
         if (newProjectId) {
             // Update state *after* successful persistence
@@ -71,7 +144,7 @@ export const createProjectSlice: StateCreator<
              )
          }));
          // Persist change *after* state update
-         await PersistProjectFns.persistRenameProject(get, projectId, newName);
+         // Implement rename in Supabase (optional future work)
     },
     deleteProject: async (projectId: string) => {
         // Get current ID before state update
@@ -81,9 +154,8 @@ export const createProjectSlice: StateCreator<
         set(state => ({ 
             projectList: state.projectList.filter(p => p.id !== projectId)
         }));
-
         // Persist change *after* state update
-        await PersistProjectFns.persistDeleteProject(get, projectId);
+        await supabaseService.deleteSupabaseProject(projectId);
         
         // Handle reload if the active project was deleted
         if (currentId === projectId) {

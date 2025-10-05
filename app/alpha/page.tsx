@@ -18,6 +18,7 @@ import { loadAudioFile } from '../../src/lib/idbHelper';
 import { initializeStore } from '../../src/store/store';
 import styles from './alpha.module.css';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '../../src/utils/supabase/client';
 //import { logout } from './actions';
 import type { User } from '@supabase/supabase-js';
@@ -33,7 +34,10 @@ export default function AlphaPage() {
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const isInstrumentSidebarVisible = useStore((state) => state.isInstrumentSidebarVisible);
   const loadAudioAction = useStore((state) => state.loadAudio);
+  const loadProject = useStore((state) => state.loadProject);
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   useEffect(() => {
     const getUser = async () => {
@@ -64,6 +68,17 @@ export default function AlphaPage() {
       setIsLoading(true);
       try {
         await initializeStore();
+
+        // After initializing the store, determine which project to load from URL
+        const projectId = searchParams.get('project');
+        if (projectId) {
+          console.log('AlphaPage: Detected project in URL, loading', projectId);
+          await loadProject(projectId);
+        } else {
+          console.log('AlphaPage: No project in URL, redirecting to /projects');
+          router.push('/projects');
+          return;
+        }
         console.log('Attempting to load persisted audio from IndexedDB...');
         const persistedFile = await loadAudioFile();
         if (persistedFile) {
@@ -82,7 +97,7 @@ export default function AlphaPage() {
       }
     };
     loadInitialData();
-  }, [loadAudioAction]);
+  }, [loadAudioAction, searchParams, loadProject, router]);
 
   if (isLoading) {
       return (
