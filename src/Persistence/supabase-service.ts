@@ -436,7 +436,7 @@ export async function saveMidiBlock(block: Omit<MidiBlockData, 'notes'>): Promis
 export async function saveMidiNotesBatch(notes: MidiNoteData[], blockId: string): Promise<boolean> {
     const userId = await getUserId();
     if (!userId || notes.length === 0) return false;
-    console.log(`Saving batch of ${notes.length} notes for block ${blockId}...`);
+    // console.log(`Saving batch of ${notes.length} notes for block ${blockId}...`);
     const dbData = notes.map(note => ({
         id: note.id, // Primary Key for upsert
         block_id: blockId,
@@ -446,15 +446,15 @@ export async function saveMidiNotesBatch(notes: MidiNoteData[], blockId: string)
         velocity: note.velocity,
         pitch: note.pitch
     }));
-    console.log(`DEBUG: dbData being sent to Supabase:`, JSON.stringify(dbData, null, 2));
+    // console.log(`DEBUG: dbData being sent to Supabase:`, JSON.stringify(dbData, null, 2));
     // Upsert multiple notes in one go
     const { error } = await supabase.from('midi_notes').upsert(dbData);
-    if (error) { 
+    if (error) {
         console.error(`Error saving notes batch for block ${blockId}:`, error);
-        console.error(`Full error details:`, JSON.stringify(error, null, 2));
-        return false; 
+        // console.error(`Full error details:`, JSON.stringify(error, null, 2));
+        return false;
     }
-    console.log(`Notes batch saved for block ${blockId}.`); return true;
+    // console.log(`Notes batch saved for block ${blockId}.`); return true;
 }
 
 export async function deleteTrack(trackId: string): Promise<boolean> {

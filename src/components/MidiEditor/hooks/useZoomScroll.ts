@@ -200,7 +200,7 @@ export const useZoomScroll = ({
 
     // Scroll handler for the grid element
     const handleGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-        console.log('[useZoomScroll] handleGridScroll fired. isAdjusting:', zoomScrollAdjustmentRef.current.isAdjusting);
+        // console.log('[useZoomScroll] handleGridScroll fired. isAdjusting:', zoomScrollAdjustmentRef.current.isAdjusting);
         // Prevent scroll state update if we are programmatically adjusting scroll during zoom
         if (zoomScrollAdjustmentRef.current.isAdjusting) {
             // console.log("Ignoring scroll event during zoom adjustment");
@@ -209,7 +209,7 @@ export const useZoomScroll = ({
         // Update the state based on the scroll event
         const currentScrollX = e.currentTarget.scrollLeft;
         const currentScrollY = e.currentTarget.scrollTop;
-        console.log(`[useZoomScroll] Setting scroll state: X=${currentScrollX}, Y=${currentScrollY}`);
+        // console.log(`[useZoomScroll] Setting scroll state: X=${currentScrollX}, Y=${currentScrollY}`);
         setScrollX(currentScrollX);
         setScrollY(currentScrollY);
     }, []); // No dependencies needed as it only uses the ref and setters
