@@ -13,6 +13,10 @@ export interface ProjectMetadata {
 export interface ProjectSlice {
     projectList: ProjectMetadata[];
     currentLoadedProjectId: string | null;
+    isLoadingProject: boolean;
+    isLoadingProjectList: boolean;
+    loadError: string | null;
+    saveError: { itemId: string | null; message: string } | null;
     // Actions that involve persistence:
     loadProjectList: () => Promise<void>;
     switchProject: (projectId: string) => void; // Temporary: kept for compatibility
@@ -32,13 +36,18 @@ export const createProjectSlice: StateCreator<
 > = (set, get) => ({
     projectList: [],
     currentLoadedProjectId: null, // This will be set during initialization
+    isLoadingProject: false,
+    isLoadingProjectList: false,
+    loadError: null,
+    saveError: null,
     loadProjectList: async () => {
+        set({ isLoadingProjectList: true, loadError: null });
         try {
             const list = await supabaseService.getSupabaseProjectList();
-            set({ projectList: list });
+            set({ projectList: list, isLoadingProjectList: false });
         } catch (error) {
             console.error("Zustand/ProjectSlice: Failed to fetch project list:", error);
-            set({ projectList: [] });
+            set({ projectList: [], isLoadingProjectList: false, loadError: 'Could not load project list.' });
         }
     },
     switchProject: (projectId: string) => {
@@ -48,11 +57,12 @@ export const createProjectSlice: StateCreator<
     },
     loadProject: async (projectId: string) => {
         // Load full project from Supabase and hydrate store
+        set({ isLoadingProject: true, loadError: null, currentLoadedProjectId: projectId });
         try {
             const fullState: AppProjectState | null = await supabaseService.loadFullProjectFromSupabase(projectId);
             if (!fullState) {
                 console.warn(`loadProject: No data returned for project ${projectId}`);
-                set({ currentLoadedProjectId: null });
+                set({ currentLoadedProjectId: null, isLoadingProject: false, loadError: 'Project not found.' });
                 return;
             }
 
@@ -116,10 +126,11 @@ export const createProjectSlice: StateCreator<
                 selectedBlockId: null,
                 selectedNotes: null,
                 tracks: hydratedTracks,
+                isLoadingProject: false,
             }));
         } catch (error) {
             console.error('loadProject: Failed to load project from Supabase:', error);
-            set({ currentLoadedProjectId: null, tracks: [] });
+            set({ currentLoadedProjectId: null, tracks: [], isLoadingProject: false, loadError: 'Failed to load project.' });
         }
     },
     createNewProject: async (name: string): Promise<string | null> => {

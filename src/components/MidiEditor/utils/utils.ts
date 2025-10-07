@@ -6,6 +6,7 @@ import {
   LOWEST_NOTE,
   RESIZE_HANDLE_WIDTH
 } from './constants';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Checks if a note is within the boundaries of a selection box
@@ -42,7 +43,7 @@ export const isNoteInSelectionBox = (
  * Generates a unique ID for a new note
  */
 export const generateNoteId = (blockId?: string): string => {
-  return Math.random().toString(36).substring(2, 15);
+  return uuidv4();
 };
 
 /**

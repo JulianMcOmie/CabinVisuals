@@ -2,8 +2,8 @@ import { StateCreator } from 'zustand';
 import { Track, MIDIBlock, MIDINote } from '../lib/types';
 import { AppState } from './store'; // Import the combined AppState
 import Effect from '../lib/Effect'; // Import Effect class
-import { v4 as uuidv4 } from 'uuid';
-import * as PersistFns from './persistStore/persistTrackSlice'; // Import persistence functions
+import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
+import * as supabaseService from '@/Persistence/supabase-service';
 
 // Track Slice
 export interface TrackState {
@@ -62,6 +62,10 @@ export const createTrackSlice: StateCreator<
   };
 
   return {
+    // --- helpers ---
+    // Ensure IDs are UUIDs to satisfy Supabase uuid PKs
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _ensureUuid: (id: any): string => (typeof id === 'string' && uuidValidate(id) ? id : uuidv4()),
     tracks: [],
     selectedTrackId: null,
     selectedBlockId: null,
@@ -130,9 +134,11 @@ export const createTrackSlice: StateCreator<
       }
     },
     addTrack: (track: Track) => {
+      const ensureUuid = (get() as any)._ensureUuid as (id: string) => string;
+      const ensuredTrack: Track = { ...track, id: ensureUuid(track.id) };
       set((state: TrackState & { tracks: Track[] }) => {
-        const newTracks = [...state.tracks, track];
-        const newSelectedTrackId = track.id;
+        const newTracks = [...state.tracks, ensuredTrack];
+        const newSelectedTrackId = ensuredTrack.id;
         const newSelectedBlockId = null;
         const selections = getUpdatedSelections(newTracks, newSelectedTrackId, newSelectedBlockId);
         return { 
@@ -144,8 +150,19 @@ export const createTrackSlice: StateCreator<
           selectedNotes: null
         };
       });
-      // Call persistence function after state update
-      PersistFns.persistAddTrack(get, track);
+      // Persist to Supabase
+      const projectId = get().currentLoadedProjectId;
+      const order = get().tracks.findIndex(t => t.id === ensuredTrack.id);
+      if (projectId && order >= 0) {
+        void supabaseService.saveTrack({
+          id: ensuredTrack.id,
+          projectId,
+          name: ensuredTrack.name,
+          isMuted: ensuredTrack.isMuted,
+          isSoloed: ensuredTrack.isSoloed,
+          order,
+        });
+      }
     },
     removeTrack: (trackId: string) => {
        set((state: TrackState & { tracks: Track[] }) => {
@@ -169,16 +186,20 @@ export const createTrackSlice: StateCreator<
             selectedNotes: selections.selectedTrack ? state.selectedNotes : null
           };
        });
-       // Call persistence function after state update
-       PersistFns.persistRemoveTrack(get, trackId);
+       // Persist to Supabase
+       void supabaseService.deleteTrack(trackId);
     },
     addMidiBlock: (trackId: string, block: MIDIBlock) => {
+       const ensureUuid = (get() as any)._ensureUuid as (id: string) => string;
+       const ensuredBlockId = ensureUuid(block.id);
+       const ensuredNotes = (block.notes || []).map(n => ({ ...n, id: ensureUuid(n.id) }));
+       const ensuredBlock: MIDIBlock = { ...block, id: ensuredBlockId, notes: ensuredNotes };
        set((state: TrackState & { tracks: Track[] }) => {
            let trackFound = false;
            const newTracks = state.tracks.map((t: Track) => {
                if (t.id === trackId) {
                    trackFound = true;
-                   return { ...t, midiBlocks: [...t.midiBlocks, block] };
+                   return { ...t, midiBlocks: [...t.midiBlocks, ensuredBlock] };
                }
                return t;
            });
@@ -193,10 +214,32 @@ export const createTrackSlice: StateCreator<
                 selectedBlock: selections.selectedBlock,
             };
        });
-       // Call persistence function after state update
-       PersistFns.persistAddMidiBlock(get, trackId, block);
+       // Persist to Supabase: ensure block is saved before notes to satisfy FK/RLS
+       (async () => {
+         await supabaseService.saveMidiBlock({
+           id: ensuredBlockId,
+           trackId,
+           startBeat: ensuredBlock.startBeat,
+           endBeat: ensuredBlock.endBeat,
+         });
+         if (ensuredNotes && ensuredNotes.length > 0) {
+           await supabaseService.saveMidiNotesBatch(
+             ensuredNotes.map(n => ({ id: n.id, startBeat: n.startBeat, duration: n.duration, velocity: n.velocity, pitch: n.pitch })),
+             ensuredBlockId
+           );
+         }
+       })();
     },
     updateMidiBlock: (trackId: string, updatedBlockData: MIDIBlock) => {
+        // Determine notes removed (Supabase upsert won't delete missing notes)
+        const prevTracks = get().tracks;
+        const prevBlock = prevTracks
+          .find(t => t.id === trackId)?.midiBlocks
+          .find(b => b.id === updatedBlockData.id);
+        const prevNoteIds = new Set((prevBlock?.notes || []).map(n => String(n.id)));
+        const nextNoteIds = new Set((updatedBlockData.notes || []).map(n => String(n.id)));
+        const removedNoteIds: string[] = Array.from(prevNoteIds).filter(id => !nextNoteIds.has(id));
+
         set((state) => {
             let trackUpdated = false;
             const newTracks = state.tracks.map((t: Track) => {
@@ -238,8 +281,23 @@ export const createTrackSlice: StateCreator<
                 selectedBlock: updatedSelections.selectedBlock 
             };
         });
-        // Call persistence function after state update
-        PersistFns.persistUpdateMidiBlock(get, trackId, updatedBlockData);
+        // Persist to Supabase: block and notes
+        (async () => {
+          await supabaseService.saveMidiBlock({
+            id: updatedBlockData.id,
+            trackId,
+            startBeat: updatedBlockData.startBeat,
+            endBeat: updatedBlockData.endBeat,
+          });
+          if (updatedBlockData.notes) {
+            const notesPayload = updatedBlockData.notes.map(n => ({ id: String(n.id), startBeat: n.startBeat, duration: n.duration, velocity: n.velocity, pitch: n.pitch }));
+            await supabaseService.saveMidiNotesBatch(notesPayload, updatedBlockData.id);
+          }
+        })();
+        // Explicitly delete removed notes
+        if (removedNoteIds.length > 0) {
+          removedNoteIds.forEach(id => { void supabaseService.deleteMidiNote(id); });
+        }
     },
     removeMidiBlock: (trackId: string, blockId: string) => {
         set((state: TrackState & { tracks: Track[] }) => {
@@ -275,8 +333,8 @@ export const createTrackSlice: StateCreator<
                  selectedBlock: selections.selectedBlock,
              };
         });
-        // Call persistence function after state update
-        PersistFns.persistRemoveMidiBlock(get, blockId);
+        // Persist to Supabase
+        void supabaseService.deleteMidiBlock(blockId);
     },
     moveMidiBlock: (blockId: string, oldTrackId: string, newTrackId: string, newStartBeat: number, newEndBeat: number) => {
       set((state) => {
@@ -327,8 +385,17 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
-      // Call persistence function after state update
-      PersistFns.persistMoveMidiBlock(get, blockId, oldTrackId, newTrackId);
+      // Persist to Supabase: update moved block position
+      const moved = get().tracks.find(t => t.id === newTrackId)?.midiBlocks.find(b => b.id === blockId);
+      if (moved) {
+        (async () => {
+          await supabaseService.saveMidiBlock({ id: moved.id, trackId: newTrackId, startBeat: moved.startBeat, endBeat: moved.endBeat });
+          if (moved.notes && moved.notes.length > 0) {
+            const notesPayload = moved.notes.map(n => ({ id: String(n.id), startBeat: n.startBeat, duration: n.duration, velocity: n.velocity, pitch: n.pitch }));
+            await supabaseService.saveMidiNotesBatch(notesPayload, moved.id);
+          }
+        })();
+      }
     },
     selectNotes: (notes: MIDINote[]) => {
       set({ selectedNotes: notes });
@@ -354,8 +421,20 @@ export const createTrackSlice: StateCreator<
                  selectedBlock: selections.selectedBlock 
              };
        });
-       // Call persistence function after state update
-       PersistFns.persistUpdateTrack(get, trackId, updatedProperties);
+       // Persist to Supabase
+       const projectId = get().currentLoadedProjectId;
+       const t = get().tracks.find(t => t.id === trackId);
+       if (projectId && t) {
+         const order = get().tracks.findIndex(tt => tt.id === trackId);
+         void supabaseService.saveTrack({
+           id: trackId,
+           projectId,
+           name: t.name,
+           isMuted: t.isMuted,
+           isSoloed: t.isSoloed,
+           order,
+         });
+       }
     },
     reorderTracks: (draggedTrackId: string, targetTrackId: string | null) => {
       set((state: TrackState & { tracks: Track[] }) => {
@@ -394,8 +473,21 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
-      // Call persistence function after state update
-      PersistFns.persistReorderTracks(get);
+      // Persist new order to Supabase
+      const projectId = get().currentLoadedProjectId;
+      if (projectId) {
+        const tracksNow = get().tracks;
+        tracksNow.forEach((t, idx) => {
+          void supabaseService.saveTrack({
+            id: t.id,
+            projectId,
+            name: t.name,
+            isMuted: t.isMuted,
+            isSoloed: t.isSoloed,
+            order: idx,
+          });
+        });
+      }
     },
     setClipboardBlock: (block: MIDIBlock | null) => {
         set({ clipboardBlock: block });
@@ -418,9 +510,21 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
-      // Call persistence function after state update
-      // We pass trackId, the effect instance isn't needed by the persist fn
-      PersistFns.persistAddEffectToTrack(get, trackId);
+      // Persist effect to Supabase
+      const track = get().tracks.find(t => t.id === trackId);
+      const effectIndex = track?.effects ? track.effects.length - 1 : -1;
+      const effect = track?.effects?.[effectIndex];
+      if (effect && effectIndex >= 0) {
+        const settings: Record<string, any> = {};
+        effect.properties.forEach((prop, key) => { settings[key] = prop.value; });
+        void supabaseService.saveEffect({
+          id: effect.id,
+          trackId,
+          type: effect.constructor.name,
+          settings,
+          order: effectIndex,
+        });
+      }
     },
     removeEffectFromTrack: (trackId: string, effectIndex: number) => {
       let deletedEffectId: string | null = null;
@@ -451,9 +555,9 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
-      // Call persistence function after state update
+      // Persist to Supabase
       if (deletedEffectId) {
-          PersistFns.persistRemoveEffectFromTrack(get, trackId, deletedEffectId);
+          void supabaseService.deleteEffect(deletedEffectId);
       } else {
            console.warn("Could not determine effect ID to delete for persistence in removeEffectFromTrack action.");
       }
@@ -487,8 +591,20 @@ export const createTrackSlice: StateCreator<
           selectedBlock: selections.selectedBlock
         };
       });
-      // Call persistence function after state update
-      PersistFns.persistUpdateEffectPropertyOnTrack(get, trackId, effectIndex);
+      // Persist to Supabase
+      const track = get().tracks.find(t => t.id === trackId);
+      const eff = track?.effects?.[effectIndex];
+      if (eff) {
+        const settings: Record<string, any> = {};
+        eff.properties.forEach((prop, key) => { settings[key] = prop.value; });
+        void supabaseService.saveEffect({
+          id: eff.id,
+          trackId,
+          type: eff.constructor.name,
+          settings,
+          order: effectIndex,
+        });
+      }
     },
     reorderEffectsOnTrack: (trackId: string, draggedIndex: number, targetIndex: number) => {
       set((state) => {
@@ -524,8 +640,21 @@ export const createTrackSlice: StateCreator<
               selectedBlock: selections.selectedBlock
           };
       });
-      // Call persistence function after state update
-      PersistFns.persistReorderEffectsOnTrack(get, trackId);
+      // Persist new order to Supabase
+      const track = get().tracks.find(t => t.id === trackId);
+      if (track?.effects) {
+        track.effects.forEach((eff, idx) => {
+          const settings: Record<string, any> = {};
+          eff.properties.forEach((prop, key) => { settings[key] = prop.value; });
+          void supabaseService.saveEffect({
+            id: eff.id,
+            trackId,
+            type: eff.constructor.name,
+            settings,
+            order: idx,
+          });
+        });
+      }
     },
     splitMidiBlock: (trackId: string, blockId: string, splitBeat: number) => {
       let newBlockId2: string | null = null; // Need to capture the ID of the second block generated
@@ -604,10 +733,29 @@ export const createTrackSlice: StateCreator<
           selectedNotes: null, // Clear note selection after split
         };
       });
-      // Call persistence function after state update
-      if (newBlockId2) {
-          PersistFns.persistSplitMidiBlock(get, trackId, blockId, newBlockId2);
-      } else {
+      // Persist to Supabase: save both new blocks and their notes
+      const track = get().tracks.find(t => t.id === trackId);
+      const newBlock1 = track?.midiBlocks.find(b => b.id === blockId);
+      const newBlock2 = track?.midiBlocks.find(b => b.id === newBlockId2!);
+      if (newBlock1) {
+        (async () => {
+          await supabaseService.saveMidiBlock({ id: newBlock1.id, trackId, startBeat: newBlock1.startBeat, endBeat: newBlock1.endBeat });
+          if (newBlock1.notes?.length) {
+            const notesPayload = newBlock1.notes.map(n => ({ id: String(n.id), startBeat: n.startBeat, duration: n.duration, velocity: n.velocity, pitch: n.pitch }));
+            await supabaseService.saveMidiNotesBatch(notesPayload, newBlock1.id);
+          }
+        })();
+      }
+      if (newBlock2) {
+        (async () => {
+          await supabaseService.saveMidiBlock({ id: newBlock2.id, trackId, startBeat: newBlock2.startBeat, endBeat: newBlock2.endBeat });
+          if (newBlock2.notes?.length) {
+            const notesPayload = newBlock2.notes.map(n => ({ id: String(n.id), startBeat: n.startBeat, duration: n.duration, velocity: n.velocity, pitch: n.pitch }));
+            await supabaseService.saveMidiNotesBatch(notesPayload, newBlock2.id);
+          }
+        })();
+      }
+      if (!newBlock2) {
            console.error("Could not determine ID of second block after split for persistence.");
       }
     },

@@ -2,7 +2,8 @@ import { StateCreator } from 'zustand';
 import TimeManager from '../lib/TimeManager';
 import { AppState } from './store'; // Import the combined AppState
 import { AudioManager } from '../lib/AudioManager'; // Need AudioManager for cross-slice access
-import { persistProjectSettings } from './persistStore/persistProjectSettings'; // Import the persistence function
+import * as supabaseService from '@/Persistence/supabase-service';
+import type { ProjectSettings } from '@/Persistence/supabase-service';
 
 // Time Slice
 export interface TimeState {
@@ -103,21 +104,21 @@ export const createTimeSlice: StateCreator<
       timeManager.seekTo(startBeat);
       timeManager.play(); // Start TimeManager from the correct beat
       set({ isPlaying: true });
-      persistProjectSettings(get); // Persist isPlaying and other settings
+      void saveSettingsToSupabase();
     },
     pause: () => {
       const { audioManager } = get();
       timeManager.pause();
       audioManager.pause();
       set({ isPlaying: false });
-      persistProjectSettings(get); // Persist isPlaying
+      void saveSettingsToSupabase();
     },
     stop: () => {
       const { audioManager } = get();
       timeManager.stop();
       audioManager.stop();
       set({ isPlaying: false, currentBeat: 0 });
-      persistProjectSettings(get); // Persist isPlaying
+      void saveSettingsToSupabase();
     },
     setBPM: (bpm: number) => {
       const { audioManager, isPlaying, isAudioLoaded, currentBeat } = get();
@@ -130,7 +131,7 @@ export const createTimeSlice: StateCreator<
       
       timeManager.setBPM(bpm);
       set({ bpm });
-      persistProjectSettings(get); // Persist new BPM
+      void saveSettingsToSupabase();
 
       if (wasPlaying) {
           timeManager.play();
@@ -143,7 +144,7 @@ export const createTimeSlice: StateCreator<
     },
     setNumMeasures: (measures: number) => {
         set({ numMeasures: Math.max(1, measures) });
-        persistProjectSettings(get); // Persist new numMeasures
+        void saveSettingsToSupabase();
     },
     seekTo: (beat: number) => {
       const { audioManager, isPlaying, isAudioLoaded } = get();
@@ -165,7 +166,7 @@ export const createTimeSlice: StateCreator<
     // --- Loop Action Implementations ---
     toggleLoop: () => {
       set((state) => ({ loopEnabled: !state.loopEnabled }));
-      persistProjectSettings(get); // Persist loopEnabled
+      void saveSettingsToSupabase();
     },
     setLoopRange: (startBeat: number, endBeat: number) => {
        const validStart = Math.max(0, Math.min(startBeat, endBeat));
@@ -176,11 +177,30 @@ export const createTimeSlice: StateCreator<
        const clampedEnd = Math.min(validEnd, maxBeat);
 
        set({ loopStartBeat: clampedStart, loopEndBeat: clampedEnd, loopEnabled: true });
-       persistProjectSettings(get); // Persist loop range and enabled status
+       void saveSettingsToSupabase();
     },
     clearLoop: () => {
       set({ loopStartBeat: null, loopEndBeat: null, loopEnabled: false });
-      persistProjectSettings(get); // Persist loop cleared status
+      void saveSettingsToSupabase();
     },
+  }
+  
+  // Helper to persist current settings to Supabase
+  async function saveSettingsToSupabase() {
+    const state = get();
+    const projectId = state.currentLoadedProjectId;
+    if (!projectId) return;
+    const settings: ProjectSettings = {
+      projectId,
+      bpm: state.bpm,
+      isPlaying: state.isPlaying,
+      loopEnabled: state.loopEnabled,
+      loopStartBeat: state.loopStartBeat,
+      loopEndBeat: state.loopEndBeat,
+      numMeasures: state.numMeasures,
+      isInstrumentSidebarVisible: state.isInstrumentSidebarVisible,
+      selectedWindow: state.selectedWindow as any,
+    };
+    await supabaseService.saveProjectSettings(settings);
   }
 } 

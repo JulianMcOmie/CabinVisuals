@@ -446,9 +446,14 @@ export async function saveMidiNotesBatch(notes: MidiNoteData[], blockId: string)
         velocity: note.velocity,
         pitch: note.pitch
     }));
+    console.log(`DEBUG: dbData being sent to Supabase:`, JSON.stringify(dbData, null, 2));
     // Upsert multiple notes in one go
     const { error } = await supabase.from('midi_notes').upsert(dbData);
-    if (error) { console.error(`Error saving notes batch for block ${blockId}:`, error); return false; }
+    if (error) { 
+        console.error(`Error saving notes batch for block ${blockId}:`, error);
+        console.error(`Full error details:`, JSON.stringify(error, null, 2));
+        return false; 
+    }
     console.log(`Notes batch saved for block ${blockId}.`); return true;
 }
 
@@ -456,7 +461,11 @@ export async function deleteTrack(trackId: string): Promise<boolean> {
     const userId = await getUserId();
     if (!userId) return false;
     console.log(`Deleting track ${trackId} from Supabase...`);
-    const { error } = await supabase.from('tracks').delete().eq('id', trackId);
+    const { error } = await supabase
+        .from('tracks')
+        .delete()
+        .eq('id', trackId)
+        .eq('user_id', userId);
     // RLS ensures ownership. Cascade delete handles related synth, effects, blocks, notes.
     if (error) { console.error("Error deleting track from Supabase:", error); return false; }
     // Cascade delete handles related synth, effects, blocks, notes.
@@ -476,7 +485,11 @@ export async function deleteMidiBlock(blockId: string): Promise<boolean> {
     const userId = await getUserId();
     if (!userId) return false;
     console.log(`Deleting MIDI block ${blockId} from Supabase...`);
-    const { error } = await supabase.from('midi_blocks').delete().eq('id', blockId);
+    const { error } = await supabase
+        .from('midi_blocks')
+        .delete()
+        .eq('id', blockId)
+        .eq('user_id', userId);
     // Cascade delete handles related notes
     if (error) { console.error(`Error deleting MIDI block ${blockId}:`, error); return false; }
     console.log(`MIDI block ${blockId} deleted.`); return true;
@@ -486,7 +499,11 @@ export async function deleteMidiNote(noteId: string): Promise<boolean> {
     const userId = await getUserId();
     if (!userId) return false;
     console.log(`Deleting MIDI note ${noteId} from Supabase...`);
-    const { error } = await supabase.from('midi_notes').delete().eq('id', noteId);
+    const { error } = await supabase
+        .from('midi_notes')
+        .delete()
+        .eq('id', noteId)
+        .eq('user_id', userId);
     if (error) { console.error(`Error deleting MIDI note ${noteId}:`, error); return false; }
     console.log(`MIDI note ${noteId} deleted.`); return true;
 }
