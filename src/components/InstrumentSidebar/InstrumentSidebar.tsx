@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../../store/store'; // Import the actual store hook
-import { InstrumentDefinition } from '@/src/store/instrumentSlice';
+import { InstrumentDefinition } from '@/store/instrumentSlice';
 import AccordionMenu, { AccordionItem } from '../AccordionMenu/AccordionMenu';
 import styles from './InstrumentSidebar.module.css';
 

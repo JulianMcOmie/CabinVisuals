@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import {
   Panel,
   PanelGroup,
@@ -28,7 +28,7 @@ interface PanelRef {
   expand: () => void;
 }
 
-export default function AlphaPage() {
+function AlphaPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
@@ -189,5 +189,13 @@ export default function AlphaPage() {
         </PanelGroup>
       </main>
     </div>
+  );
+}
+
+export default function AlphaPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AlphaPageContent />
+    </Suspense>
   );
 } 

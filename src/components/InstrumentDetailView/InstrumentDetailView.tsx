@@ -11,10 +11,11 @@ interface InstrumentDetailViewProps {
 }
 
 function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
+  const { setSelectedWindow } = useStore();
+  
   if (!track || !track.synthesizer) {
     return null;
-  }
-  const { setSelectedWindow } = useStore(); 
+  } 
 
   // This handler now simply closes the detail view if clicked outside specific controls
   const handleViewClick = (event: React.MouseEvent<HTMLDivElement>) => {
