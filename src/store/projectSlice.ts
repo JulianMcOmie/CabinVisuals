@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from './store';
-import * as supabaseService from '@/Persistence/supabase-service';
+import * as SupabasePersist from './persistStore/supabase/persistProjectSlice';
 import type { AppProjectState } from '@/Persistence/supabase-service';
 import { deserializeSynth, deserializeEffect } from '@/utils/persistenceUtils';
 import type { Track as TrackType } from '@/lib/types';
@@ -43,7 +43,7 @@ export const createProjectSlice: StateCreator<
     loadProjectList: async () => {
         set({ isLoadingProjectList: true, loadError: null });
         try {
-            const list = await supabaseService.getSupabaseProjectList();
+            const list = await SupabasePersist.persistLoadProjectList();
             set({ projectList: list, isLoadingProjectList: false });
         } catch (error) {
             console.error("Zustand/ProjectSlice: Failed to fetch project list:", error);
@@ -59,7 +59,7 @@ export const createProjectSlice: StateCreator<
         // Load full project from Supabase and hydrate store
         set({ isLoadingProject: true, loadError: null, currentLoadedProjectId: projectId });
         try {
-            const fullState: AppProjectState | null = await supabaseService.loadFullProjectFromSupabase(projectId);
+            const fullState: AppProjectState | null = await SupabasePersist.persistLoadProject(projectId);
             if (!fullState) {
                 console.warn(`loadProject: No data returned for project ${projectId}`);
                 set({ currentLoadedProjectId: null, isLoadingProject: false, loadError: 'Project not found.' });
@@ -135,7 +135,7 @@ export const createProjectSlice: StateCreator<
     },
     createNewProject: async (name: string): Promise<string | null> => {
         // Create in Supabase to get the ID
-        const newProjectId = await supabaseService.createSupabaseProject(name);
+        const newProjectId = await SupabasePersist.persistCreateNewProject(get, name);
         
         if (newProjectId) {
             // Update state *after* successful persistence
@@ -166,7 +166,7 @@ export const createProjectSlice: StateCreator<
             projectList: state.projectList.filter(p => p.id !== projectId)
         }));
         // Persist change *after* state update
-        await supabaseService.deleteSupabaseProject(projectId);
+        await SupabasePersist.persistDeleteProject(get, projectId);
         
         // Handle reload if the active project was deleted
         if (currentId === projectId) {

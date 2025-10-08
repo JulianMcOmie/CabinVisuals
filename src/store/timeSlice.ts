@@ -2,8 +2,7 @@ import { StateCreator } from 'zustand';
 import TimeManager from '../lib/TimeManager';
 import { AppState } from './store'; // Import the combined AppState
 import { AudioManager } from '../lib/AudioManager'; // Need AudioManager for cross-slice access
-import * as supabaseService from '@/Persistence/supabase-service';
-import type { ProjectSettings } from '@/Persistence/supabase-service';
+import * as SupabasePersist from './persistStore/supabase/persistProjectSettings';
 
 // Time Slice
 export interface TimeState {
@@ -187,20 +186,6 @@ export const createTimeSlice: StateCreator<
   
   // Helper to persist current settings to Supabase
   async function saveSettingsToSupabase() {
-    const state = get();
-    const projectId = state.currentLoadedProjectId;
-    if (!projectId) return;
-    const settings: ProjectSettings = {
-      projectId,
-      bpm: state.bpm,
-      isPlaying: state.isPlaying,
-      loopEnabled: state.loopEnabled,
-      loopStartBeat: state.loopStartBeat,
-      loopEndBeat: state.loopEndBeat,
-      numMeasures: state.numMeasures,
-      isInstrumentSidebarVisible: state.isInstrumentSidebarVisible,
-      selectedWindow: state.selectedWindow as any,
-    };
-    await supabaseService.saveProjectSettings(settings);
+    await SupabasePersist.persistProjectSettings(get);
   }
 } 

@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from './store';
-import { persistProjectSettings } from './persistStore/persistProjectSettings';
+import * as SupabasePersist from './persistStore/supabase/persistProjectSettings';
 
 export type SelectedWindowType = 'midiEditor' | 'timelineView' | 'instrumentsView' |null;
 export type DetailViewModeType = "instrument" | "midi" | "effects";
@@ -32,14 +32,14 @@ export const createUISlice: StateCreator<
     set((state) => ({ 
       isInstrumentSidebarVisible: !state.isInstrumentSidebarVisible 
     }));
-    persistProjectSettings(get);
+    void SupabasePersist.persistProjectSettings(get);
   },
   setSelectedWindow: (window: SelectedWindowType) => {
     set({ selectedWindow: window });
-    persistProjectSettings(get);
+    void SupabasePersist.persistProjectSettings(get);
   },
   setDetailViewMode: (mode: DetailViewModeType) => {
     set({ detailViewMode: mode });
-    persistProjectSettings(get);
+    void SupabasePersist.persistProjectSettings(get);
   },
 }); 
