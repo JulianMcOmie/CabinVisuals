@@ -1,7 +1,7 @@
 // src/Persistence/supabase-service.ts
 
 // Import the Supabase client creator function (adjust path as needed)
-import { createClient } from '../../src/utils/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 
 // Define TypeScript interfaces representing the structure of your application's data.
 // These should match how data is used in Zustand and UI components (e.g., using camelCase).
@@ -238,8 +238,9 @@ export async function loadFullProjectFromSupabase(projectId: string): Promise<Ap
 
     // **Data Transformation: Map Supabase snake_case to App camelCase interfaces**
     try {
-        const settingsData = dbData.project_settings;
-        const tracksData = dbData.tracks || [];
+        // Type assertion: project_settings is a single object (one-to-one), not an array
+        const settingsData = dbData.project_settings as any;
+        const tracksData = (dbData.tracks || []) as any[];
 
         if (!settingsData) {
             throw new Error("Project settings data is missing from Supabase response.");
@@ -454,6 +455,7 @@ export async function saveMidiNotesBatch(notes: MidiNoteData[], blockId: string)
         // console.error(`Full error details:`, JSON.stringify(error, null, 2));
         return false;
     }
+    return true;
     // console.log(`Notes batch saved for block ${blockId}.`); return true;
 }
 

@@ -1,19 +1,19 @@
 import { StateCreator } from 'zustand';
-import Effect from '../lib/Effect'; // Import the base Effect class
+import Effect from '@/lib/Effect'; // Import the base Effect class
 import { AppState } from './store'; // Import the combined AppState
 
 // Import Effect implementations
-import ScaleEffect from '../lib/effects/ScaleEffect';
-import DelayEffect from '../lib/effects/DelayEffect';
-import RadialDuplicateEffect from '../lib/effects/RadialDuplicateEffect';
-import GravityEffect from '../lib/effects/GravityEffect';
-import PositionOffsetEffect from '../lib/effects/PositionOffsetEffect';
-import RescalePositionEffect from '../lib/effects/RescalePositionEffect';
-import Rotate3DEffect from '../lib/effects/Rotate3DEffect';
-import PanEffect from '../lib/effects/PanEffect';
-import ColorEffect from '../lib/effects/ColorEffect';
-import GlobalRotateEffect from '../lib/effects/GlobalRotateEffect'; // Import the new effect
-import HorizontalDuplicateEffect from '../lib/effects/HorizontalDuplicateEffect'; // Import the new effect
+import ScaleEffect from '@/lib/effects/ScaleEffect';
+import DelayEffect from '@/lib/effects/DelayEffect';
+import RadialDuplicateEffect from '@/lib/effects/RadialDuplicateEffect';
+import GravityEffect from '@/lib/effects/GravityEffect';
+import PositionOffsetEffect from '@/lib/effects/PositionOffsetEffect';
+import RescalePositionEffect from '@/lib/effects/RescalePositionEffect';
+import Rotate3DEffect from '@/lib/effects/Rotate3DEffect';
+import PanEffect from '@/lib/effects/PanEffect';
+import ColorEffect from '@/lib/effects/ColorEffect';
+import GlobalRotateEffect from '@/lib/effects/GlobalRotateEffect'; // Import the new effect
+import HorizontalDuplicateEffect from '@/lib/effects/HorizontalDuplicateEffect'; // Import the new effect
 
 // Define Effect structures
 export interface EffectDefinition {

@@ -1,27 +1,27 @@
 import { StateCreator } from 'zustand';
-import Synthesizer from '../lib/Synthesizer';
+import Synthesizer from '@/lib/Synthesizer';
 import { AppState } from './store'; // Import the combined AppState
 
 // Import Synthesizer Classes
-import SineWaveSynth from '../lib/synthesizers/SineWaveSynth';
-import MelodicOrbitSynth from '../lib/synthesizers/MelodicOrbitSynth';
-import ApproachingCubeSynth from '../lib/synthesizers/ApproachingCubeSynth';
-import BackgroundPlaneSynth from '../lib/synthesizers/BackgroundPlaneSynth';
-import BasicSynthesizer from '../lib/synthesizers/BasicSynthesizer';
-import PitchSphereSynth from '../lib/synthesizers/PitchSphereSynth';
-import KickDrumSynth from '../lib/synthesizers/KickDrumSynth';
-import SnareDrumSynth from '../lib/synthesizers/SnareDrumSynth';
-import HiHatSynth from '../lib/synthesizers/HiHatSynth';
-import ShakerSynth from '../lib/synthesizers/ShakerSynth';
-import ReverseKickEngineSynth from '../lib/synthesizers/ReverseKickEngineSynth';
-import RadialPulseSynth from '../lib/synthesizers/RadialPulseSynth';
-import RadialDrumSynth from '../lib/synthesizers/RadialDrumSynth';
-import SymmetricResonanceSynth from '../lib/synthesizers/SymmetricResonanceSynth';
-import GlowSynth from '../lib/synthesizers/GlowSynth';
-import OscillatingGlowRowSynth from '../lib/synthesizers/OscillatingGlowRowSynth';
-import OscillatingCubeRowSynth from '../lib/synthesizers/OscillatingCubeRowSynth';
-import FireworkSynth from '../lib/synthesizers/FireworkSynth';
-import GlowingCubeSynth from '../lib/synthesizers/glowingCubeSynth';
+import SineWaveSynth from '@/lib/synthesizers/SineWaveSynth';
+import MelodicOrbitSynth from '@/lib/synthesizers/MelodicOrbitSynth';
+import ApproachingCubeSynth from '@/lib/synthesizers/ApproachingCubeSynth';
+import BackgroundPlaneSynth from '@/lib/synthesizers/BackgroundPlaneSynth';
+import BasicSynthesizer from '@/lib/synthesizers/BasicSynthesizer';
+import PitchSphereSynth from '@/lib/synthesizers/PitchSphereSynth';
+import KickDrumSynth from '@/lib/synthesizers/KickDrumSynth';
+import SnareDrumSynth from '@/lib/synthesizers/SnareDrumSynth';
+import HiHatSynth from '@/lib/synthesizers/HiHatSynth';
+import ShakerSynth from '@/lib/synthesizers/ShakerSynth';
+import ReverseKickEngineSynth from '@/lib/synthesizers/ReverseKickEngineSynth';
+import RadialPulseSynth from '@/lib/synthesizers/RadialPulseSynth';
+import RadialDrumSynth from '@/lib/synthesizers/RadialDrumSynth';
+import SymmetricResonanceSynth from '@/lib/synthesizers/SymmetricResonanceSynth';
+import GlowSynth from '@/lib/synthesizers/GlowSynth';
+import OscillatingGlowRowSynth from '@/lib/synthesizers/OscillatingGlowRowSynth';
+import OscillatingCubeRowSynth from '@/lib/synthesizers/OscillatingCubeRowSynth';
+import FireworkSynth from '@/lib/synthesizers/FireworkSynth';
+import GlowingCubeSynth from '@/lib/synthesizers/glowingCubeSynth';
 
 // Define Instrument structures (moved here as they are specific to this slice)
 export interface InstrumentDefinition {

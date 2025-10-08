@@ -1,12 +1,12 @@
 import { AppState } from '../../store'; 
-import { Track, MIDIBlock, MIDINote } from '../../../lib/types';
-import * as P from '../../../Persistence/persistence-service';
+import { Track, MIDIBlock, MIDINote } from '@/lib/types';
+import * as P from '@/Persistence/persistence-service';
 import {
     trackToTrackData,
     midiBlockToData,
     serializeSynth,
     serializeEffect
-} from '../../../utils/persistenceUtils';
+} from '@/utils/persistenceUtils';
 
 
 

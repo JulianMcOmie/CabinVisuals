@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AudioManager } from '../lib/AudioManager';
+import { AudioManager } from '@/lib/AudioManager';
 import { AppState } from './store'; // Import the combined AppState
 
 // Audio Slice

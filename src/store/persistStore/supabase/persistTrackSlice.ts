@@ -1,7 +1,8 @@
 import { AppState } from '../../store';
-import { Track, MIDIBlock } from '../../../lib/types';
-import * as supabaseService from '../../../Persistence/supabase-service';
+import { Track, MIDIBlock } from '@/lib/types';
+import * as supabaseService from '@/Persistence/supabase-service';
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
+import { serializeSynth, serializeEffect } from '@/utils/persistenceUtils';
 
 const logError = (action: string, error: any) => {
     console.error(`Supabase Persistence Error [${action}]:`, error);
@@ -30,11 +31,14 @@ export const persistAddTrack = async (get: () => AppState, track: Track) => {
         });
 
         if (track.synthesizer) {
-            await supabaseService.saveSynth({
-                trackId: track.id,
-                type: track.synthesizer.constructor.name,
-                params: track.synthesizer.get(),
-            });
+            const synthData = serializeSynth(track.synthesizer, track.id);
+            if (synthData) {
+                await supabaseService.saveSynth({
+                    trackId: track.id,
+                    type: synthData.type,
+                    settings: synthData.settings,
+                });
+            }
         }
     } catch (error) {
         logError('addTrack', error);
@@ -184,11 +188,14 @@ export const persistUpdateTrack = async (get: () => AppState, trackId: string, u
         });
 
         if ('synthesizer' in updatedProperties && updatedTrack.synthesizer) {
-            await supabaseService.saveSynth({
-                trackId,
-                type: updatedTrack.synthesizer.constructor.name,
-                params: updatedTrack.synthesizer.get(),
-            });
+            const synthData = serializeSynth(updatedTrack.synthesizer, trackId);
+            if (synthData) {
+                await supabaseService.saveSynth({
+                    trackId,
+                    type: synthData.type,
+                    settings: synthData.settings,
+                });
+            }
         }
     } catch (error) {
         logError('updateTrack', error);
@@ -228,11 +235,14 @@ export const persistAddEffectToTrack = async (get: () => AppState, trackId: stri
 
         if (!addedEffectInstance.id) throw new Error("Added effect has no ID");
 
+        const effectData = serializeEffect(addedEffectInstance, trackId, order);
+        if (!effectData) throw new Error("Failed to serialize added effect");
+
         await supabaseService.saveEffect({
             id: addedEffectInstance.id,
             trackId,
-            type: addedEffectInstance.constructor.name,
-            params: addedEffectInstance.get(),
+            type: effectData.type,
+            settings: effectData.settings,
             order,
         });
     } catch (error) {
@@ -250,11 +260,14 @@ export const persistRemoveEffectFromTrack = async (get: () => AppState, trackId:
             const updatePromises = finalTrackState.effects.map((effect, index) => {
                 if (!effect.id) throw new Error("Effect in list has no ID during order update");
 
+                const effectData = serializeEffect(effect, trackId, index);
+                if (!effectData) throw new Error("Failed to serialize effect during order update");
+
                 return supabaseService.saveEffect({
                     id: effect.id,
                     trackId,
-                    type: effect.constructor.name,
-                    params: effect.get(),
+                    type: effectData.type,
+                    settings: effectData.settings,
                     order: index,
                 });
             });
@@ -276,11 +289,14 @@ export const persistUpdateEffectPropertyOnTrack = async (get: () => AppState, tr
 
         if (!updatedEffectInstance.id) throw new Error("Updated effect has no ID");
 
+        const effectData = serializeEffect(updatedEffectInstance, trackId, effectIndex);
+        if (!effectData) throw new Error("Failed to serialize updated effect");
+
         await supabaseService.saveEffect({
             id: updatedEffectInstance.id,
             trackId,
-            type: updatedEffectInstance.constructor.name,
-            params: updatedEffectInstance.get(),
+            type: effectData.type,
+            settings: effectData.settings,
             order: effectIndex,
         });
     } catch (error) {
@@ -300,11 +316,14 @@ export const persistReorderEffectsOnTrack = async (get: () => AppState, trackId:
         const savePromises = track.effects.map((effect, index) => {
             if (!effect.id) throw new Error(`Effect at index ${index} missing ID during reorder persistence`);
 
+            const effectData = serializeEffect(effect, trackId, index);
+            if (!effectData) throw new Error(`Failed to serialize effect ${effect.id} during reorder persistence`);
+
             return supabaseService.saveEffect({
                 id: effect.id,
                 trackId,
-                type: effect.constructor.name,
-                params: effect.get(),
+                type: effectData.type,
+                settings: effectData.settings,
                 order: index,
             });
         });

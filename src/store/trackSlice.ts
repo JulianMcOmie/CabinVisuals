@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
-import { Track, MIDIBlock, MIDINote } from '../lib/types';
+import { Track, MIDIBlock, MIDINote } from '@/lib/types';
 import { AppState } from './store'; // Import the combined AppState
-import Effect from '../lib/Effect'; // Import Effect class
+import Effect from '@/lib/Effect'; // Import Effect class
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 import * as SupabasePersist from './persistStore/supabase/persistTrackSlice';
 

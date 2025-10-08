@@ -1,8 +1,7 @@
-import { Track, MIDIBlock, MIDINote } from '../lib/types';
-import { TrackData, MidiBlockData, MidiNoteData, SynthData, EffectData } from '../Persistence/persistence-service';
-import Synthesizer from '../lib/Synthesizer';
-import Effect from '../lib/Effect';
-import * as P from '../Persistence/persistence-service';
+import { Track, MIDIBlock, MIDINote } from '@/lib/types';
+import { TrackData, MidiBlockData, MidiNoteData, SynthData, EffectData } from '@/Persistence/supabase-service';
+import Synthesizer from '@/lib/Synthesizer';
+import Effect from '@/lib/Effect';
 
 import { synthesizerConstructors, effectConstructors } from '../store/store';
 
@@ -159,7 +158,7 @@ export function serializeEffect(instance: Effect, trackId: string, order: number
      };
 }
 
-export function deserializeEffect(data: P.EffectData): Effect | null {
+export function deserializeEffect(data: EffectData): Effect | null {
      const Constructor = effectConstructors.get(data.type);
      if (!Constructor) {
          console.error(`No effect constructor found for type: ${data.type}`);

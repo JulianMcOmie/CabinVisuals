@@ -1,5 +1,5 @@
 import { AppState } from '../../store';
-import * as P from '../../../Persistence/persistence-service';
+import * as P from '@/Persistence/persistence-service';
 
 const logError = (action: string, error: any) => {
     console.error(`Persistence Error [${action}]:`, error);

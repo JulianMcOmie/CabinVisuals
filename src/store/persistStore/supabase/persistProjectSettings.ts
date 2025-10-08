@@ -1,6 +1,6 @@
 import { AppState } from '../../store';
-import * as supabaseService from '../../../Persistence/supabase-service';
-import type { ProjectSettings } from '../../../Persistence/supabase-service';
+import * as supabaseService from '@/Persistence/supabase-service';
+import type { ProjectSettings } from '@/Persistence/supabase-service';
 
 const logError = (action: string, error: any) => {
     console.error(`Supabase Persistence Error [${action}]:`, error);
