@@ -139,7 +139,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     
     ctx.save();
     ctx.scale(dpr, dpr);
-    //ctx.translate(-scrollX, -scrollY);
     
     drawMidiEditor(
       ctx,
@@ -228,7 +227,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                 onMouseUp={handleCanvasMouseUp}
                 onMouseMove={handleCanvasMouseMove}
                 onContextMenu={handleCanvasContextMenu}
-                // onMouseLeave={...} // Add if needed
                 style={{
                   position: 'relative', // Or static (default) - NOT absolute
                   width: `${totalGridWidth}px`, // Full scrollable width
@@ -237,12 +235,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                   cursor: hoverCursor,
                 }}
             />
-            {/* No canvas here anymore */}
           </div>
-        
-        {/* Header/Keys would need similar absolute positioning if re-enabled */}
-        {/* <div className="piano-roll flex flex-col h-full"> ... */}
-        
     </div>
   );
 }
