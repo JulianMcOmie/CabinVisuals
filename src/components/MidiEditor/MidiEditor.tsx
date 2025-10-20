@@ -133,6 +133,9 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     // Set bitmap resolution based on visible dimensions
     canvas.width = editorDimensions.width * dpr;
     canvas.height = editorDimensions.height * dpr;
+    // Set CSS dimensions to match (prevents stretching)
+    canvas.style.width = `${editorDimensions.width}px`;
+    canvas.style.height = `${editorDimensions.height}px`;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -194,14 +197,11 @@ function MidiEditor({ block, track }: MidiEditorProps) {
               position: 'absolute',
               top: 0,
               left: 0,
-              width: '100%', // Fill parent width
-              height: '100%',// Fill parent height
               display: 'block',
               zIndex: 1, // Lower z-index
               pointerEvents: 'none' // Ignore mouse events
+              // width/height are set programmatically in useEffect
             }}
-            // width/height attributes (for resolution) set in useEffect
-            // should use editorDimensions, not totalGridWidth/blockHeight
           />
 
         {/* Scrollable Grid Layer (Top) - Positioned absolutely to fill parent */}
@@ -229,7 +229,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                 onContextMenu={handleCanvasContextMenu}
                 style={{
                   position: 'relative', // Or static (default) - NOT absolute
-                  width: `${totalGridWidth}px`, // Full scrollable width
+                  width: `${totalGridWidth}px`, // `${totalGridWidth}px`, // Full scrollable width
                   height: `${blockHeight}px`,  // Full scrollable height
                   backgroundColor: 'transparent',
                   cursor: hoverCursor,
