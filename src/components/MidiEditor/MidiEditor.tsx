@@ -52,20 +52,34 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     if (!editorElement) return;
 
     const updateDimensions = () => {
+      const newWidth = editorElement.clientWidth;
+      const newHeight = editorElement.clientHeight;
+      
+      console.log('🔄 Dimension Update Triggered:', {
+        newWidth,
+        newHeight,
+        elementExists: !!editorElement
+      });
+      
       setEditorDimensions({
-        width: editorElement.clientWidth,
-        height: editorElement.clientHeight,
+        width: newWidth,
+        height: newHeight,
       });
     };
 
+    console.log('🎬 Setting up dimension tracking with ResizeObserver');
     updateDimensions();
 
-    const handleResize = debounce(updateDimensions, 100);
-
-    window.addEventListener('resize', handleResize);
+    // Use ResizeObserver to watch the actual element size
+    const resizeObserver = new ResizeObserver(() => {
+      updateDimensions();
+    });
+    
+    resizeObserver.observe(editorElement);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      console.log('🛑 Cleaning up dimension tracking');
+      resizeObserver.unobserve(editorElement);
     };
   }, []);
 
@@ -130,6 +144,17 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     if (!editorDimensions.width || !editorDimensions.height) return;
     
     const dpr = window.devicePixelRatio || 1;
+    
+    console.log('📐 MIDI Editor Dimensions:', {
+      editorWidth: editorDimensions.width,
+      editorHeight: editorDimensions.height,
+      canvasBitmapWidth: editorDimensions.width * dpr,
+      canvasBitmapHeight: editorDimensions.height * dpr,
+      canvasCSSWidth: `${editorDimensions.width}px`,
+      canvasCSSHeight: `${editorDimensions.height}px`,
+      dpr: dpr
+    });
+    
     // Set bitmap resolution based on visible dimensions
     canvas.width = editorDimensions.width * dpr;
     canvas.height = editorDimensions.height * dpr;
@@ -230,7 +255,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
                 style={{
                   position: 'relative', // Or static (default) - NOT absolute
                   width: `${totalGridWidth}px`, // `${totalGridWidth}px`, // Full scrollable width
-                  height: `${blockHeight}px`,  // Full scrollable height
+                  height: `${totalGridHeight}px`,  // Full scrollable height
                   backgroundColor: 'transparent',
                   cursor: hoverCursor,
                 }}
