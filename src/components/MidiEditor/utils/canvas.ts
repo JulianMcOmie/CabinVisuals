@@ -180,7 +180,7 @@ const drawMidiBlock = (
   // Add soft light green border
   ctx.strokeStyle = 'rgba(144, 238, 144, 0.8)';
   ctx.lineWidth = 1;
-  ctx.strokeRect(blockStartBeat * pixelsPerBeat - scrollX, 0, blockDuration * pixelsPerBeat, canvasHeight);
+  ctx.strokeRect(blockStartBeat * pixelsPerBeat - scrollX, 0, blockDuration * pixelsPerBeat, canvasHeight + 30);
   
   // Add thicker transparent soft green rectangle at the top
   ctx.fillStyle = 'rgba(144, 238, 144, 0.8)';
