@@ -63,18 +63,11 @@ export default function LandingPage() {
             </p>
           </div>
           <div className="w-full max-w-md space-y-8">
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link href="/login" className="w-full sm:w-auto cursor-pointer">
-                <Button
-                  className="w-full sm:w-auto rounded-full px-10 py-6 text-lg font-semibold bg-white/10 backdrop-blur-md border-2 border-white/40 text-white hover:bg-white/20 hover:border-white/60 hover:scale-105 transition-all shadow-2xl cursor-pointer"
-                >
-                  Log In
-                </Button>
-              </Link>
-              <Link href="/signup" className="w-full sm:w-auto cursor-pointer">
+            <div className="flex justify-center items-center">
+              <Link href="/signup" className="cursor-pointer">
                 <Button
                   style={{ backgroundColor: '#00a8ff', boxShadow: '0 20px 40px rgba(0, 168, 255, 0.6)' }}
-                  className="w-full sm:w-auto rounded-full px-10 py-6 text-lg font-semibold text-white hover:opacity-80 hover:scale-105 transition-all border-0 cursor-pointer"
+                  className="rounded-full px-12 py-7 text-xl font-bold text-white hover:opacity-80 hover:scale-105 transition-all border-0 cursor-pointer"
                   onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 20px 50px rgba(0, 168, 255, 0.8)'}
                   onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 168, 255, 0.6)'}
                 >
