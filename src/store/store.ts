@@ -53,7 +53,7 @@ const useStore = create<AppState>()((...a) => ({
 
 /**
  * Initializes the Zustand store with default values.
- * Projects are now loaded via URL-based routing (see app/alpha/page.tsx).
+ * Projects are now loaded via URL-based routing (see app/editor/page.tsx).
  * No longer loads from IndexedDB - all data comes from Supabase.
  */
 export const initializeStore = async () => {

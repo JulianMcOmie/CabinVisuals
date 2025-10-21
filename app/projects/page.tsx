@@ -148,7 +148,7 @@ export default function ProjectsPage() {
 
   const handleSelectProject = async (projectId: string) => {
      await switchProject(projectId);
-     router.push(`/alpha?project=${projectId}`); 
+     router.push(`/editor?project=${projectId}`); 
   };
 
   if (isLoading) {
