@@ -2,75 +2,16 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useRef } from "react"
 import Link from "next/link"
-import { ArrowDown, ArrowRight, AlertCircle, Twitter, Instagram, Youtube, Github } from "lucide-react"
+import { ArrowDown } from "lucide-react"
 import { Button } from "../components/ui/button" // Ensure path alias @/ is configured
 
 export default function LandingPage() {
   const videoSectionRef = useRef<HTMLElement>(null)
-  const emailInputRef = useRef<HTMLInputElement>(null)
-  const [email, setEmail] = useState("")
-  const [emailState, setEmailState] = useState<"idle" | "error" | "success" | "submitting">("idle")
-  const [errorMessage, setErrorMessage] = useState("")
-
-  const validateEmail = (email: string) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return re.test(email)
-  }
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (emailState === "error") {
-        setErrorMessage("");
-        setEmailState("idle");
-    }
-
-    if (!email.trim()) {
-      setEmailState("error")
-      setErrorMessage("Please enter your email")
-      return
-    }
-
-    if (!validateEmail(email)) {
-      setEmailState("error")
-      setErrorMessage("Please enter a valid email")
-      return
-    }
-
-    setEmailState("submitting")
-    setErrorMessage("")
-
-    try {
-        const response = await fetch('/api/add-email', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email: email.trim() }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            setErrorMessage(data.error || `Error: ${response.statusText}`);
-            setEmailState("error");
-        } else {
-            setEmailState("success");
-        }
-    } catch (error) {
-        console.error("Failed to submit email:", error);
-        setErrorMessage("An unexpected error occurred. Please try again.");
-        setEmailState("error");
-    }
-  }
 
   const scrollToVideo = () => {
     videoSectionRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  const focusEmailInput = () => {
-    emailInputRef.current?.focus()
   }
 
   return (
@@ -84,16 +25,27 @@ export default function LandingPage() {
       </div>
 
       <header className="container flex h-20 items-center justify-between py-6 relative z-10 mx-auto px-4">
-        <Link href="/" className="font-medium text-xl">
+        <Link href="/" className="font-medium text-xl cursor-pointer hover:text-electric-blue transition-colors">
           Cabin Visuals
         </Link>
-        <nav className="flex items-center gap-6">
-          <Button
-            onClick={focusEmailInput}
-            className="btn-header-waitlist rounded-full bg-transparent border border-white text-white transition-colors"
-          >
-            Join Waitlist
-          </Button>
+        <nav className="flex items-center gap-3">
+          <Link href="/login" className="cursor-pointer">
+            <Button
+              className="rounded-full bg-white/10 backdrop-blur-sm border border-white/30 text-white hover:bg-white/20 hover:border-white/50 transition-all shadow-lg cursor-pointer"
+            >
+              Log In
+            </Button>
+          </Link>
+          <Link href="/signup" className="cursor-pointer">
+            <Button
+              style={{ backgroundColor: '#00a8ff', boxShadow: '0 10px 25px rgba(0, 168, 255, 0.5)' }}
+              className="rounded-full text-white hover:opacity-80 transition-all border-0 cursor-pointer"
+              onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 168, 255, 0.7)'}
+              onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 168, 255, 0.5)'}
+            >
+              Sign Up
+            </Button>
+          </Link>
         </nav>
       </header>
 
@@ -111,78 +63,30 @@ export default function LandingPage() {
             </p>
           </div>
           <div className="w-full max-w-md space-y-8">
-            <form onSubmit={handleEmailSubmit} className="relative w-full">
-              {emailState !== "success" && ( // Show form if not success
-                <>
-                  <input
-                    ref={emailInputRef}
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value)
-                      if (emailState === "error") setEmailState("idle")
-                    }}
-                    placeholder="Enter your email"
-                    aria-label="Enter your email"
-                    className={`email-input-field w-full rounded-full bg-black/50 border ${
-                      emailState === "error" ? "border-red-500" : "border-gray-700"
-                    } px-6 py-4 pr-12 text-white focus:border-electric-blue focus:ring-electric-blue focus:outline-none focus:glow-input transition-all`}
-                    // @ts-expect-error State comparison causes type error
-                    disabled={emailState === "submitting" || emailState === "success"}
-                  />
-                  <button
-                    type="submit"
-                    // @ts-expect-error State comparison causes type error
-                    disabled={!email.trim() || !validateEmail(email) || emailState === "submitting" || emailState === "success"}
-                    aria-label="Submit email"
-                    className={`btn-email-submit absolute right-2 top-1/2 -translate-y-1/2 rounded-full h-10 w-10 flex items-center justify-center transition-colors ${
-                      // @ts-expect-error State comparison causes type error
-                      email.trim() && validateEmail(email) && emailState !== "submitting" && emailState !== "success"
-                        ? "bg-transparent text-electric-blue hover:bg-electric-blue/10"
-                        : "bg-transparent text-gray-500 cursor-not-allowed"
-                    }`}
-                  >
-                    {emailState === "submitting" ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    ) : (
-                        <ArrowRight className="h-5 w-5" />
-                    )}
-                  </button>
-                  {emailState === "error" && (
-                    <div className="absolute -bottom-6 left-0 flex items-center text-red-500 text-sm">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      {errorMessage}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {emailState === "success" && (
-                <div className="success-animation">
-                  <div className="flex items-center justify-center bg-black/50 border border-electric-blue rounded-full px-6 py-4 text-white">
-                    <div className="checkmark-container mr-3">
-                      <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-                        <circle className="checkmark__circle" cx="26" cy="26" r="25" fill="none" />
-                        <path className="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
-                      </svg>
-                    </div>
-                    <span className="font-medium">Thank you!</span>
-                  </div>
-                  <div className="mt-3 text-center space-y-1">
-                    <p className="text-sm text-electric-blue font-medium">You&apos;re on the waitlist!</p>
-                    <p className="text-sm text-gray-400">
-                      We can&apos;t wait to see the amazing visuals you&apos;ll create with Cabin Visuals.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </form>
-             {/* Keep button group outside the form state */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link href="/login" className="w-full sm:w-auto cursor-pointer">
+                <Button
+                  className="w-full sm:w-auto rounded-full px-10 py-6 text-lg font-semibold bg-white/10 backdrop-blur-md border-2 border-white/40 text-white hover:bg-white/20 hover:border-white/60 hover:scale-105 transition-all shadow-2xl cursor-pointer"
+                >
+                  Log In
+                </Button>
+              </Link>
+              <Link href="/signup" className="w-full sm:w-auto cursor-pointer">
+                <Button
+                  style={{ backgroundColor: '#00a8ff', boxShadow: '0 20px 40px rgba(0, 168, 255, 0.6)' }}
+                  className="w-full sm:w-auto rounded-full px-10 py-6 text-lg font-semibold text-white hover:opacity-80 hover:scale-105 transition-all border-0 cursor-pointer"
+                  onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 20px 50px rgba(0, 168, 255, 0.8)'}
+                  onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 168, 255, 0.6)'}
+                >
+                  Sign Up
+                </Button>
+              </Link>
+            </div>
             <div className="space-y-8">
               <Button
                 variant="outline"
                 onClick={scrollToVideo}
-                className="btn-main-demo rounded-full px-8 border-gray-700 text-white transition-all"
+                className="btn-main-demo rounded-full px-8 py-3 border-2 border-gray-600 bg-gray-900/50 backdrop-blur-sm text-white hover:bg-gray-800/50 hover:border-gray-500 transition-all shadow-lg cursor-pointer"
               >
                 Watch Demo
               </Button>
