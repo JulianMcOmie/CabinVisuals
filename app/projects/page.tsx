@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation'; // Import useRouter
 import ProjectsDisplay from "../../src/components/ProjectsDisplay";
 import { initializeStore } from '../../src/store/store'; // Import the initializer
@@ -19,6 +19,7 @@ export default function ProjectsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const router = useRouter();
+  const initAttemptCountRef = useRef(0);
   
   const projects = useStore((state) => state.projectList);
   const createNewProject = useStore((state) => state.createNewProject);
@@ -26,18 +27,30 @@ export default function ProjectsPage() {
   const loadProjectList = useStore((state) => state.loadProjectList);
 
   useEffect(() => {
+    initAttemptCountRef.current += 1;
+    const currentAttempt = initAttemptCountRef.current;
+    
+    console.log(`ProjectsPage: useEffect run #${currentAttempt}`);
+    
+    // If we've tried too many times, something is wrong - just stop loading
+    if (currentAttempt > 3) {
+      console.error("ProjectsPage: Too many initialization attempts, stopping");
+      setIsLoading(false);
+      return;
+    }
+    
     let isMounted = true;
     let authSubscription: Subscription | null = null;
     const supabase = createClient();
 
     const initializeData = async () => {
-      // Don't set loading true here, do it before calling initializeData
+      console.log(`ProjectsPage: initializeData START (attempt #${currentAttempt})`);
       try {
         // 1. Fetch initial user
         const { data: { user: initialUser } } = await supabase.auth.getUser();
         if (!isMounted) return;
         setUser(initialUser);
-        console.log("Initial user fetched:", initialUser?.id);
+        console.log("User fetched:", initialUser?.id);
 
         // 2. Fetch initial profile if user exists
         if (initialUser) {
@@ -47,7 +60,6 @@ export default function ProjectsPage() {
             .eq('user_id', initialUser.id)
             .single();
           if (isMounted) {
-            console.log("Initial profile fetched:", profileData, "Error:", profileError);
             setProfile(profileError ? null : profileData);
           }
         } else {
@@ -57,49 +69,38 @@ export default function ProjectsPage() {
         // 3. Initialize store
         console.log("Initializing store...");
         await initializeStore();
-        console.log("Store initialized.");
+        console.log("Store initialized");
+        
         // Fetch Supabase-backed project list
         await loadProjectList();
+        console.log("Projects loaded");
         if (!isMounted) return;
 
         // 4. Now set up listener for subsequent changes
-        console.log("Setting up auth listener...");
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (_event, session) => {
-            // Handle subsequent auth changes
             const currentUser = session?.user ?? null;
-            console.log("Auth State Change Listener Fired:", _event, currentUser?.id);
             
             if (isMounted) {
-              // Avoid setting state if user hasn't actually changed
-              // This comparison might need adjustment based on how session objects behave
-              // For simplicity, let's just update for now, but could be optimized
               setUser(currentUser); 
 
               // Re-fetch profile based on new state
               if (currentUser) {
-                console.log("Auth listener fetching profile for:", currentUser.id);
                 const { data: profileData, error: profileError } = await supabase
                   .from('profiles')
                   .select('first_name, last_name')
                   .eq('user_id', currentUser.id)
                   .single();
                  if (isMounted) {
-                    console.log("Auth listener profile result:", profileData, "Error:", profileError);
                     setProfile(profileError ? null : profileData);
                  }
               } else {
-                // Clear profile if logged out
-                if (profile !== null) { // Only update if profile isn't already null
-                   console.log("Auth listener clearing profile.");
-                   setProfile(null); 
-                }
+                setProfile(null);
               }
             }
           }
         );
         authSubscription = subscription;
-        console.log("Auth listener set up.");
 
       } catch (error) {
         console.error("Initialization or data fetching failed:", error);
@@ -110,22 +111,21 @@ export default function ProjectsPage() {
       } finally {
         // 5. Set loading false after all initial setup attempts
         if (isMounted) {
-          console.log("Setting loading to false.");
+          console.log("Initialization complete, stopping loading");
           setIsLoading(false);
         }
       }
     };
 
-    setIsLoading(true); // Set loading true initially
+    setIsLoading(true);
     initializeData();
 
     // Cleanup function
     return () => {
-      console.log("ProjectsPage unmounting - cleaning up listener.");
+      console.log(`Unmounting (attempt #${currentAttempt})`);
       isMounted = false;
       if (authSubscription) {
         authSubscription.unsubscribe();
-        console.log("Unsubscribed from auth changes");
       }
     };
   }, []); // Empty dependency array ensures this runs only once on mount

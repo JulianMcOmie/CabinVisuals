@@ -2,17 +2,127 @@
 
 import type React from "react"
 
-import { useRef } from "react"
+import { useRef, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowDown } from "lucide-react"
-import { Button } from "../components/ui/button" // Ensure path alias @/ is configured
+import { useRouter } from "next/navigation"
+import { ArrowDown, LogOut, ExternalLink } from "lucide-react"
+import { Button } from "../components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu"
+import { createClient } from "../utils/supabase/client"
+import { logout } from "../../app/(auth)/logout/actions"
+import type { User } from '@supabase/supabase-js'
+
+interface ProfileData {
+  first_name: string | null;
+  last_name: string | null;
+}
+
+const getInitials = (firstName: string | null | undefined, lastName: string | null | undefined): string => {
+  const firstInitial = firstName?.[0]?.toUpperCase() || '';
+  const lastInitial = lastName?.[0]?.toUpperCase() || '';
+  return firstInitial && lastInitial ? `${firstInitial}${lastInitial}` : (firstInitial || lastInitial || '?');
+};
 
 export default function LandingPage() {
   const videoSectionRef = useRef<HTMLElement>(null)
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    const supabase = createClient()
+    
+    // Get initial user and profile
+    const getUser = async () => {
+      const { data: { user: initialUser } } = await supabase.auth.getUser()
+      
+      if (!isMounted) return
+      setUser(initialUser)
+      
+      // Fetch profile if user exists
+      if (initialUser) {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('user_id', initialUser.id)
+          .single()
+        
+        if (!isMounted) return
+        
+        if (error) {
+          console.error('Error fetching profile:', error)
+        } else if (profileData) {
+          setProfile(profileData)
+        }
+      }
+    }
+    
+    getUser()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (!isMounted) return
+        
+        const currentUser = session?.user ?? null
+        setUser(currentUser)
+        
+        if (currentUser) {
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('user_id', currentUser.id)
+            .single()
+          
+          if (!isMounted) return
+          
+          if (error) {
+            console.error('Error fetching profile on auth change:', error)
+          } else if (profileData) {
+            setProfile(profileData)
+          }
+        } else {
+          setProfile(null)
+        }
+      }
+    )
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const handleLogout = async () => {
+    console.log('handleLogout called')
+    if (isLoggingOut) return
+    
+    setIsLoggingOut(true)
+    
+    try {
+      console.log('Calling server logout action')
+      // Just call the server action directly - it will clear cookies and redirect
+      await logout()
+    } catch (error) {
+      console.error("Logout error:", error)
+      // Force logout on error
+      window.location.href = '/'
+    }
+  }
 
   const scrollToVideo = () => {
     videoSectionRef.current?.scrollIntoView({ behavior: "smooth" })
   }
+
+  const userInitials = getInitials(profile?.first_name, profile?.last_name)
 
   return (
     // Ensure custom CSS classes like electric-blue, glow-*, blob-*, success-*, checkmark* are defined elsewhere
@@ -29,23 +139,67 @@ export default function LandingPage() {
           Cabin Visuals
         </Link>
         <nav className="flex items-center gap-3">
-          <Link href="/login" className="cursor-pointer">
-            <Button
-              className="rounded-full bg-white/10 backdrop-blur-sm border border-white/30 text-white hover:bg-white/20 hover:border-white/50 transition-all shadow-lg cursor-pointer"
-            >
-              Log In
-            </Button>
-          </Link>
-          <Link href="/signup" className="cursor-pointer">
-            <Button
-              style={{ backgroundColor: '#00a8ff', boxShadow: '0 10px 25px rgba(0, 168, 255, 0.5)' }}
-              className="rounded-full text-white hover:opacity-80 transition-all border-0 cursor-pointer"
-              onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 168, 255, 0.7)'}
-              onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 168, 255, 0.5)'}
-            >
-              Sign Up
-            </Button>
-          </Link>
+          {user ? (
+            // Show profile dropdown if user is logged in
+            <DropdownMenu>
+              <DropdownMenuTrigger 
+                className="h-10 w-10 rounded-full bg-electric-blue/20 hover:bg-electric-blue/30 flex items-center justify-center text-white font-semibold transition-all cursor-pointer"
+                disabled={isLoggingOut}
+              >
+                <span>{userInitials}</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800">
+                {(user || profile) && (
+                  <div className="px-3 py-2 text-sm text-white">
+                    {profile && (profile.first_name || profile.last_name) && (
+                      <p className="font-medium truncate">{`${profile.first_name || ''} ${profile.last_name || ''}`.trim()}</p>
+                    )}
+                    {user && (
+                      <p className="text-gray-300 truncate">{user.email}</p>
+                    )}
+                  </div>
+                )}
+                <DropdownMenuSeparator className="bg-gray-800" />
+                <DropdownMenuItem className="flex items-center cursor-pointer text-white hover:bg-gray-700">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  <span>Discord Community</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-gray-800" />
+                <DropdownMenuItem
+                  className={`flex items-center w-full text-red-400 cursor-pointer hover:bg-gray-700 rounded-sm text-sm p-1.5 focus:bg-gray-700 focus:text-red-400 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={isLoggingOut}
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    handleLogout()
+                  }}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            // Show login/signup buttons if not logged in
+            <>
+              <Link href="/login" className="cursor-pointer">
+                <Button
+                  className="rounded-full bg-white/10 backdrop-blur-sm border border-white/30 text-white hover:bg-white/20 hover:border-white/50 transition-all shadow-lg cursor-pointer"
+                >
+                  Log In
+                </Button>
+              </Link>
+              <Link href="/signup" className="cursor-pointer">
+                <Button
+                  style={{ backgroundColor: '#00a8ff', boxShadow: '0 10px 25px rgba(0, 168, 255, 0.5)' }}
+                  className="rounded-full text-white hover:opacity-80 transition-all border-0 cursor-pointer"
+                  onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 168, 255, 0.7)'}
+                  onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 168, 255, 0.5)'}
+                >
+                  Sign Up
+                </Button>
+              </Link>
+            </>
+          )}
         </nav>
       </header>
 
@@ -64,16 +218,30 @@ export default function LandingPage() {
           </div>
           <div className="w-full max-w-md space-y-8">
             <div className="flex justify-center items-center">
-              <Link href="/signup" className="cursor-pointer">
+              {user ? (
+                // Show "Take me to my projects" if user is logged in
                 <Button
+                  onClick={() => router.push('/projects')}
                   style={{ backgroundColor: '#00a8ff', boxShadow: '0 20px 40px rgba(0, 168, 255, 0.6)' }}
                   className="rounded-full px-12 py-7 text-xl font-bold text-white hover:opacity-80 hover:scale-105 transition-all border-0 cursor-pointer"
                   onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 20px 50px rgba(0, 168, 255, 0.8)'}
                   onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 168, 255, 0.6)'}
                 >
-                  Sign Up
+                  Take me to my projects
                 </Button>
-              </Link>
+              ) : (
+                // Show "Sign Up" if not logged in
+                <Link href="/signup" className="cursor-pointer">
+                  <Button
+                    style={{ backgroundColor: '#00a8ff', boxShadow: '0 20px 40px rgba(0, 168, 255, 0.6)' }}
+                    className="rounded-full px-12 py-7 text-xl font-bold text-white hover:opacity-80 hover:scale-105 transition-all border-0 cursor-pointer"
+                    onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 20px 50px rgba(0, 168, 255, 0.8)'}
+                    onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 168, 255, 0.6)'}
+                  >
+                    Sign Up
+                  </Button>
+                </Link>
+              )}
             </div>
             <div className="space-y-8">
               <Button
