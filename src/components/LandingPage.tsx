@@ -67,29 +67,14 @@ export default function LandingPage() {
     
     getUser()
 
-    // Listen for auth changes
+    // Listen ONLY for sign out events to update UI
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (event, _session) => {
         if (!isMounted) return
         
-        const currentUser = session?.user ?? null
-        setUser(currentUser)
-        
-        if (currentUser) {
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('user_id', currentUser.id)
-            .single()
-          
-          if (!isMounted) return
-          
-          if (error) {
-            console.error('Error fetching profile on auth change:', error)
-          } else if (profileData) {
-            setProfile(profileData)
-          }
-        } else {
+        // Only handle SIGNED_OUT event to clear state
+        if (event === 'SIGNED_OUT') {
+          setUser(null)
           setProfile(null)
         }
       }
@@ -102,18 +87,14 @@ export default function LandingPage() {
   }, [])
 
   const handleLogout = async () => {
-    console.log('handleLogout called')
     if (isLoggingOut) return
-    
     setIsLoggingOut(true)
     
     try {
-      console.log('Calling server logout action')
-      // Just call the server action directly - it will clear cookies and redirect
+      // Call server action - it will trigger SIGNED_OUT event and redirect
       await logout()
     } catch (error) {
       console.error("Logout error:", error)
-      // Force logout on error
       window.location.href = '/'
     }
   }
