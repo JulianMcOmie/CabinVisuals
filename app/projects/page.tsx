@@ -29,40 +29,72 @@ export default function ProjectsPage() {
   useEffect(() => {
     initAttemptCountRef.current += 1;
     const currentAttempt = initAttemptCountRef.current;
+    const mountTime = Date.now();
     
-    console.log(`ProjectsPage: useEffect run #${currentAttempt}`);
+    console.log(`📁 [${mountTime}] ProjectsPage: useEffect run #${currentAttempt} STARTING`);
     
     // If we've tried too many times, something is wrong - just stop loading
     if (currentAttempt > 3) {
-      console.error("ProjectsPage: Too many initialization attempts, stopping");
+      console.error(`📁 [${mountTime}] ProjectsPage: Too many initialization attempts, stopping`);
       setIsLoading(false);
       return;
     }
     
     let isMounted = true;
     let authSubscription: Subscription | null = null;
+    
+    console.log(`📁 [${mountTime}] ProjectsPage: About to create Supabase client`);
     const supabase = createClient();
+    console.log(`📁 [${mountTime}] ProjectsPage: Supabase client created`);
+    
+    // Check storage state
+    if (typeof window !== 'undefined') {
+      const cookies = document.cookie.split('; ').filter(c => c.includes('supabase'));
+      const storageKeys = Object.keys(localStorage).filter(k => k.includes('supabase'));
+      console.log(`📁 [${mountTime}] ProjectsPage: Storage check`, {
+        cookies: cookies.length,
+        cookieNames: cookies.map(c => c.split('=')[0]),
+        localStorageKeys: storageKeys.length,
+        keys: storageKeys
+      });
+      
+      // Try to access session directly
+      storageKeys.forEach(key => {
+        const value = localStorage.getItem(key);
+        console.log(`📁 [${mountTime}] ProjectsPage: Storage[${key}]:`, value ? `${value.substring(0, 50)}...` : 'null');
+      });
+    }
 
     const initializeData = async () => {
-      console.log(`ProjectsPage: initializeData START (attempt #${currentAttempt})`);
+      const initStartTime = Date.now();
+      console.log(`📁 [${initStartTime}] ProjectsPage: initializeData START (attempt #${currentAttempt})`);
+      
       try {
         // 1. Fetch initial user
-        console.log("ProjectsPage: About to call supabase.auth.getUser()...");
+        const getUserStartTime = Date.now();
+        console.log(`📁 [${getUserStartTime}] ProjectsPage: About to call supabase.auth.getUser()...`);
+        console.log(`📁 [${getUserStartTime}] ProjectsPage: Auth client exists:`, !!supabase.auth);
+        console.log(`📁 [${getUserStartTime}] ProjectsPage: Client instance:`, supabase);
         
         // Add timeout to detect if it's hanging
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('getUser() timed out after 10 seconds')), 10000)
+          setTimeout(() => {
+            console.error(`📁 [${Date.now()}] ProjectsPage: getUser() TIMEOUT - took more than 10 seconds`);
+            reject(new Error('getUser() timed out after 10 seconds'));
+          }, 10000)
         );
         
+        console.log(`📁 [${getUserStartTime}] ProjectsPage: Starting Promise.race with getUser() and timeout`);
         const userResponse = await Promise.race([
           supabase.auth.getUser(),
           timeoutPromise
         ]) as any;
         
-        console.log("ProjectsPage: getUser() response received:", userResponse);
+        const getUserEndTime = Date.now();
+        console.log(`📁 [${getUserEndTime}] ProjectsPage: getUser() response received (took ${getUserEndTime - getUserStartTime}ms):`, userResponse);
         
         const initialUser = userResponse.data?.user || null;
-        console.log("ProjectsPage: Parsed user:", initialUser ? {
+        console.log(`📁 [${getUserEndTime}] ProjectsPage: Parsed user:`, initialUser ? {
           id: initialUser.id,
           email: initialUser.email,
           role: initialUser.role,
@@ -70,12 +102,12 @@ export default function ProjectsPage() {
         } : "NULL");
         
         if (!isMounted) {
-          console.log("ProjectsPage: Component unmounted after getUser, aborting");
+          console.log(`📁 [${getUserEndTime}] ProjectsPage: Component unmounted after getUser, aborting`);
           return;
         }
         
         setUser(initialUser);
-        console.log("ProjectsPage: User state set");
+        console.log(`📁 [${getUserEndTime}] ProjectsPage: User state set`);
 
         // 2. Fetch initial profile if user exists
         if (initialUser) {
@@ -163,22 +195,28 @@ export default function ProjectsPage() {
       }
     };
 
-    console.log("ProjectsPage: Setting loading to true and calling initializeData...");
+    console.log(`📁 [${mountTime}] ProjectsPage: Setting loading to true and calling initializeData...`);
     setIsLoading(true);
+    console.log(`📁 [${mountTime}] ProjectsPage: Invoking initializeData()`);
     initializeData();
+    console.log(`📁 [${mountTime}] ProjectsPage: initializeData() invoked (running async)`);
 
     // Cleanup function
     return () => {
-      console.log(`ProjectsPage: Unmounting (attempt #${currentAttempt})`);
+      const unmountTime = Date.now();
+      console.log(`📁 [${unmountTime}] ProjectsPage: CLEANUP starting (attempt #${currentAttempt}, mounted for ${unmountTime - mountTime}ms)`);
       isMounted = false;
       if (authSubscription) {
-        console.log("ProjectsPage: Unsubscribing from auth listener");
+        console.log(`📁 [${unmountTime}] ProjectsPage: Unsubscribing from auth listener`);
         authSubscription.unsubscribe();
+        console.log(`📁 [${unmountTime}] ProjectsPage: Auth listener unsubscribed`);
       }
+      console.log(`📁 [${unmountTime}] ProjectsPage: CLEANUP complete`);
     };
   }, []); // Empty dependency array ensures this runs only once on mount
 
-  console.log("ProjectsPage: Render - isLoading:", isLoading, "user:", user?.id, "projects count:", projects.length);
+  const renderTime = Date.now();
+  console.log(`📁 [${renderTime}] ProjectsPage: RENDER - isLoading:`, isLoading, "user:", user?.id, "projects count:", projects.length);
 
   const handleCreateProject = async () => {
     // Prompt for project name or use a default
