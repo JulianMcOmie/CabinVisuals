@@ -48,7 +48,17 @@ export default function ProjectsPage() {
       try {
         // 1. Fetch initial user
         console.log("ProjectsPage: About to call supabase.auth.getUser()...");
-        const userResponse = await supabase.auth.getUser();
+        
+        // Add timeout to detect if it's hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('getUser() timed out after 10 seconds')), 10000)
+        );
+        
+        const userResponse = await Promise.race([
+          supabase.auth.getUser(),
+          timeoutPromise
+        ]) as any;
+        
         console.log("ProjectsPage: getUser() response received:", userResponse);
         
         const initialUser = userResponse.data?.user || null;
