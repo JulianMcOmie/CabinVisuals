@@ -4,6 +4,8 @@ import Synthesizer from '@/lib/Synthesizer';
 import Effect from '@/lib/Effect';
 
 import { synthesizerConstructors, effectConstructors } from '../store/store';
+import BasicSynthesizer from '@/lib/synthesizers/BasicSynthesizer';
+import ScaleEffect from '@/lib/effects/ScaleEffect';
 
 /**
  * Converts a live Track object from the Zustand state into the
@@ -103,18 +105,27 @@ export function serializeSynth(instance: Synthesizer, trackId: string): SynthDat
 }
 
 export function deserializeSynth(data: { type: string; settings: any }): Synthesizer | null {
-    const Constructor = synthesizerConstructors.get(data.type);
+    let Constructor = synthesizerConstructors.get(data.type);
+    
     if (!Constructor) {
-        console.error(`No synthesizer constructor found for type: ${data.type}`);
-        return null;
+        console.warn(`No synthesizer constructor found for type: "${data.type}". Falling back to BasicSynthesizer.`);
+        console.warn(`This likely means you have old project data. The synthesizer will be replaced with a default one.`);
+        Constructor = BasicSynthesizer;
     }
+    
     try {
         const instance = new Constructor(); // Pass settings to constructor if needed/supported
         applySettings(instance, data.settings);
         return instance;
     } catch (error) {
         console.error(`Error deserializing synthesizer type ${data.type}:`, error);
-        return null;
+        // Even on error, try to return a basic synthesizer as last resort
+        try {
+            return new BasicSynthesizer();
+        } catch (fallbackError) {
+            console.error('Failed to create fallback BasicSynthesizer:', fallbackError);
+            return null;
+        }
     }
 }
 
@@ -159,18 +170,27 @@ export function serializeEffect(instance: Effect, trackId: string, order: number
 }
 
 export function deserializeEffect(data: EffectData): Effect | null {
-     const Constructor = effectConstructors.get(data.type);
+     let Constructor = effectConstructors.get(data.type);
+     
      if (!Constructor) {
-         console.error(`No effect constructor found for type: ${data.type}`);
-         return null;
+         console.warn(`No effect constructor found for type: "${data.type}". Falling back to ScaleEffect.`);
+         console.warn(`This likely means you have old project data. The effect will be replaced with a default one.`);
+         Constructor = ScaleEffect;
      }
+     
      try {
          const instance = new Constructor(data.id); 
          applySettings(instance, data.settings);
          return instance;
      } catch (error) {
          console.error(`Error deserializing effect type ${data.type}:`, error);
-         return null;
+         // Even on error, try to return a basic effect as last resort
+         try {
+             return new ScaleEffect(data.id);
+         } catch (fallbackError) {
+             console.error('Failed to create fallback ScaleEffect:', fallbackError);
+             return null;
+         }
      }
 } 
 
