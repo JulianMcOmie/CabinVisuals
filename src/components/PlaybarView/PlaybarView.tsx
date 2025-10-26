@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../../store/store';
 import styles from './PlaybarView.module.css';
-import { Repeat, Upload, Play, Square, PanelLeft } from 'lucide-react';
+import { Repeat, Upload, Play, Pause, Square, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { User } from '@supabase/supabase-js'; // Import User type
 import LogInButton from '../AuthButtons/LogInButton'; // Import new component
@@ -71,11 +71,19 @@ const PlaybarView: React.FC<PlaybarViewProps> = ({ user }) => { // Destructure u
           size="icon"
           className={isPlaying ? styles.playButtonActive : styles.playButtonInactive}
           onClick={() => {
-            play();
+            if (isPlaying) {
+              pause();
+            } else {
+              play();
+            }
             setSelectedWindow(null);
           }}
         >
-          <Play className="h-5 w-5 fill-current" />
+          {isPlaying ? (
+            <Pause className="h-5 w-5 fill-current" />
+          ) : (
+            <Play className="h-5 w-5 fill-current" />
+          )}
         </Button>
         <Button
           variant="ghost"
