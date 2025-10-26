@@ -29,126 +29,56 @@ export default function ProjectsPage() {
   useEffect(() => {
     initAttemptCountRef.current += 1;
     const currentAttempt = initAttemptCountRef.current;
-    const mountTime = Date.now();
     
-    console.log(`📁 [${mountTime}] ProjectsPage: useEffect run #${currentAttempt} STARTING`);
+    console.log(`ProjectsPage: useEffect run #${currentAttempt}`);
     
     // If we've tried too many times, something is wrong - just stop loading
     if (currentAttempt > 3) {
-      console.error(`📁 [${mountTime}] ProjectsPage: Too many initialization attempts, stopping`);
+      console.error("ProjectsPage: Too many initialization attempts, stopping");
       setIsLoading(false);
       return;
     }
     
     let isMounted = true;
     let authSubscription: Subscription | null = null;
-    
-    console.log(`📁 [${mountTime}] ProjectsPage: About to create Supabase client`);
     const supabase = createClient();
-    console.log(`📁 [${mountTime}] ProjectsPage: Supabase client created`);
-    
-    // Check storage state
-    if (typeof window !== 'undefined') {
-      const cookies = document.cookie.split('; ').filter(c => c.includes('supabase'));
-      const storageKeys = Object.keys(localStorage).filter(k => k.includes('supabase'));
-      console.log(`📁 [${mountTime}] ProjectsPage: Storage check`, {
-        cookies: cookies.length,
-        cookieNames: cookies.map(c => c.split('=')[0]),
-        localStorageKeys: storageKeys.length,
-        keys: storageKeys
-      });
-      
-      // Try to access session directly
-      storageKeys.forEach(key => {
-        const value = localStorage.getItem(key);
-        console.log(`📁 [${mountTime}] ProjectsPage: Storage[${key}]:`, value ? `${value.substring(0, 50)}...` : 'null');
-      });
-    }
 
     const initializeData = async () => {
-      const initStartTime = Date.now();
-      console.log(`📁 [${initStartTime}] ProjectsPage: initializeData START (attempt #${currentAttempt})`);
-      
+      console.log(`ProjectsPage: initializeData START (attempt #${currentAttempt})`);
       try {
         // 1. Fetch initial user
-        const getUserStartTime = Date.now();
-        console.log(`📁 [${getUserStartTime}] ProjectsPage: About to call supabase.auth.getUser()...`);
-        console.log(`📁 [${getUserStartTime}] ProjectsPage: Auth client exists:`, !!supabase.auth);
-        console.log(`📁 [${getUserStartTime}] ProjectsPage: Client instance:`, supabase);
-        
-        // Add timeout to detect if it's hanging
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => {
-            console.error(`📁 [${Date.now()}] ProjectsPage: getUser() TIMEOUT - took more than 10 seconds`);
-            reject(new Error('getUser() timed out after 10 seconds'));
-          }, 10000)
-        );
-        
-        console.log(`📁 [${getUserStartTime}] ProjectsPage: Starting Promise.race with getUser() and timeout`);
-        const userResponse = await Promise.race([
-          supabase.auth.getUser(),
-          timeoutPromise
-        ]) as any;
-        
-        const getUserEndTime = Date.now();
-        console.log(`📁 [${getUserEndTime}] ProjectsPage: getUser() response received (took ${getUserEndTime - getUserStartTime}ms):`, userResponse);
-        
-        const initialUser = userResponse.data?.user || null;
-        console.log(`📁 [${getUserEndTime}] ProjectsPage: Parsed user:`, initialUser ? {
-          id: initialUser.id,
-          email: initialUser.email,
-          role: initialUser.role,
-          created_at: initialUser.created_at
-        } : "NULL");
-        
-        if (!isMounted) {
-          console.log(`📁 [${getUserEndTime}] ProjectsPage: Component unmounted after getUser, aborting`);
-          return;
-        }
-        
+        const { data: { user: initialUser } } = await supabase.auth.getUser();
+        if (!isMounted) return;
         setUser(initialUser);
-        console.log(`📁 [${getUserEndTime}] ProjectsPage: User state set`);
+        console.log("User fetched:", initialUser?.id);
 
         // 2. Fetch initial profile if user exists
         if (initialUser) {
-          console.log(`ProjectsPage: Fetching profile for user ${initialUser.id}...`);
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('first_name, last_name')
             .eq('user_id', initialUser.id)
             .single();
-          
-          console.log("ProjectsPage: Profile fetch result:", { profileData, profileError });
-          
           if (isMounted) {
             setProfile(profileError ? null : profileData);
-            console.log("ProjectsPage: Profile state set:", profileError ? "NULL (error)" : profileData);
           }
         } else {
-          console.log("ProjectsPage: No user, setting profile to null");
           if (isMounted) setProfile(null);
         }
 
         // 3. Initialize store
-        console.log("ProjectsPage: Initializing store...");
+        console.log("Initializing store...");
         await initializeStore();
-        console.log("ProjectsPage: Store initialized successfully");
+        console.log("Store initialized");
         
         // Fetch Supabase-backed project list
-        console.log("ProjectsPage: Loading project list...");
         await loadProjectList();
-        console.log("ProjectsPage: Projects loaded successfully");
-        
-        if (!isMounted) {
-          console.log("ProjectsPage: Component unmounted after loading projects, aborting");
-          return;
-        }
+        console.log("Projects loaded");
+        if (!isMounted) return;
 
         // 4. Now set up listener for subsequent changes
-        console.log("ProjectsPage: Setting up auth state change listener...");
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (_event, session) => {
-            console.log("ProjectsPage: Auth state changed, event:", _event);
             const currentUser = session?.user ?? null;
             
             if (isMounted) {
@@ -171,15 +101,9 @@ export default function ProjectsPage() {
           }
         );
         authSubscription = subscription;
-        console.log("ProjectsPage: Auth state change listener set up successfully");
 
       } catch (error) {
-        console.error("ProjectsPage: Initialization or data fetching failed:", error);
-        console.error("ProjectsPage: Error details:", {
-          name: error instanceof Error ? error.name : 'Unknown',
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined
-        });
+        console.error("Initialization or data fetching failed:", error);
         if (isMounted) {
           setUser(null);
           setProfile(null);
@@ -187,36 +111,24 @@ export default function ProjectsPage() {
       } finally {
         // 5. Set loading false after all initial setup attempts
         if (isMounted) {
-          console.log("ProjectsPage: Initialization complete, stopping loading");
+          console.log("Initialization complete, stopping loading");
           setIsLoading(false);
-        } else {
-          console.log("ProjectsPage: Component unmounted, not setting loading state");
         }
       }
     };
 
-    console.log(`📁 [${mountTime}] ProjectsPage: Setting loading to true and calling initializeData...`);
     setIsLoading(true);
-    console.log(`📁 [${mountTime}] ProjectsPage: Invoking initializeData()`);
     initializeData();
-    console.log(`📁 [${mountTime}] ProjectsPage: initializeData() invoked (running async)`);
 
     // Cleanup function
     return () => {
-      const unmountTime = Date.now();
-      console.log(`📁 [${unmountTime}] ProjectsPage: CLEANUP starting (attempt #${currentAttempt}, mounted for ${unmountTime - mountTime}ms)`);
+      console.log(`Unmounting (attempt #${currentAttempt})`);
       isMounted = false;
       if (authSubscription) {
-        console.log(`📁 [${unmountTime}] ProjectsPage: Unsubscribing from auth listener`);
         authSubscription.unsubscribe();
-        console.log(`📁 [${unmountTime}] ProjectsPage: Auth listener unsubscribed`);
       }
-      console.log(`📁 [${unmountTime}] ProjectsPage: CLEANUP complete`);
     };
   }, []); // Empty dependency array ensures this runs only once on mount
-
-  const renderTime = Date.now();
-  console.log(`📁 [${renderTime}] ProjectsPage: RENDER - isLoading:`, isLoading, "user:", user?.id, "projects count:", projects.length);
 
   const handleCreateProject = async () => {
     // Prompt for project name or use a default

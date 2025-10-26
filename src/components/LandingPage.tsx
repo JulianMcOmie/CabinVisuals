@@ -30,132 +30,59 @@ const getInitials = (firstName: string | null | undefined, lastName: string | nu
 };
 
 export default function LandingPage() {
-  const renderTime = Date.now();
-  console.log(`🏠 [${renderTime}] LandingPage: RENDER starting`);
-  
   const videoSectionRef = useRef<HTMLElement>(null)
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  
-  console.log(`🏠 [${renderTime}] LandingPage: RENDER state`, {
-    hasUser: !!user,
-    userId: user?.id,
-    hasProfile: !!profile,
-    isLoggingOut: isLoggingOut
-  });
 
   useEffect(() => {
-    const mountTime = Date.now()
-    console.log(`🏠 [${mountTime}] LandingPage: useEffect STARTING`)
-    
     let isMounted = true
-    console.log(`🏠 [${mountTime}] LandingPage: About to create Supabase client`)
     const supabase = createClient()
-    console.log(`🏠 [${mountTime}] LandingPage: Supabase client created`)
-    
-    // Check cookies and storage
-    if (typeof window !== 'undefined') {
-      const cookies = document.cookie.split('; ').filter(c => c.includes('supabase'))
-      const storageKeys = Object.keys(localStorage).filter(k => k.includes('supabase'))
-      console.log(`🏠 [${mountTime}] LandingPage: Storage check`, {
-        cookies: cookies.length,
-        cookieNames: cookies.map(c => c.split('=')[0]),
-        localStorageKeys: storageKeys.length,
-        keys: storageKeys
-      })
-    }
     
     // Get initial user and profile
     const getUser = async () => {
-      const getUserStartTime = Date.now()
-      console.log(`🏠 [${getUserStartTime}] LandingPage: getUser() STARTING`)
-      console.log(`🏠 [${getUserStartTime}] LandingPage: About to call supabase.auth.getUser()`)
+      const { data: { user: initialUser } } = await supabase.auth.getUser()
       
-      try {
-        const { data: { user: initialUser } } = await supabase.auth.getUser()
-        const getUserEndTime = Date.now()
-        console.log(`🏠 [${getUserEndTime}] LandingPage: getUser() COMPLETED (took ${getUserEndTime - getUserStartTime}ms)`, {
-          hasUser: !!initialUser,
-          userId: initialUser?.id,
-          email: initialUser?.email
-        })
+      if (!isMounted) return
+      setUser(initialUser)
+      
+      // Fetch profile if user exists
+      if (initialUser) {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('user_id', initialUser.id)
+          .single()
         
-        if (!isMounted) {
-          console.log(`🏠 [${getUserEndTime}] LandingPage: Component unmounted, skipping state update`)
-          return
+        if (!isMounted) return
+        
+        if (error) {
+          console.error('Error fetching profile:', error)
+        } else if (profileData) {
+          setProfile(profileData)
         }
-        
-        setUser(initialUser)
-        console.log(`🏠 [${getUserEndTime}] LandingPage: User state set`)
-        
-        // Fetch profile if user exists
-        if (initialUser) {
-          console.log(`🏠 [${Date.now()}] LandingPage: Fetching profile for user ${initialUser.id}`)
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('user_id', initialUser.id)
-            .single()
-          
-          const profileEndTime = Date.now()
-          console.log(`🏠 [${profileEndTime}] LandingPage: Profile fetch completed`, {
-            hasProfile: !!profileData,
-            error: error?.message
-          })
-          
-          if (!isMounted) {
-            console.log(`🏠 [${profileEndTime}] LandingPage: Component unmounted after profile fetch`)
-            return
-          }
-          
-          if (error) {
-            console.error('🏠 Error fetching profile:', error)
-          } else if (profileData) {
-            setProfile(profileData)
-            console.log(`🏠 [${profileEndTime}] LandingPage: Profile state set`)
-          }
-        }
-      } catch (error) {
-        console.error(`🏠 [${Date.now()}] LandingPage: getUser() ERROR:`, error)
       }
     }
     
-    console.log(`🏠 [${mountTime}] LandingPage: Calling getUser()`)
     getUser()
 
     // Listen ONLY for sign out events to update UI
-    console.log(`🏠 [${mountTime}] LandingPage: Setting up auth state change listener`)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, _session) => {
-        console.log(`🏠 [${Date.now()}] LandingPage: Auth state changed`, {
-          event: event,
-          isMounted: isMounted,
-          hasSession: !!_session
-        })
-        
-        if (!isMounted) {
-          console.log(`🏠 [${Date.now()}] LandingPage: Ignoring auth change, component unmounted`)
-          return
-        }
+        if (!isMounted) return
         
         // Only handle SIGNED_OUT event to clear state
         if (event === 'SIGNED_OUT') {
-          console.log(`🏠 [${Date.now()}] LandingPage: SIGNED_OUT event, clearing state`)
           setUser(null)
           setProfile(null)
         }
       }
     )
-    console.log(`🏠 [${mountTime}] LandingPage: Auth state change listener set up`)
 
     return () => {
-      const unmountTime = Date.now()
-      console.log(`🏠 [${unmountTime}] LandingPage: CLEANUP starting (mounted for ${unmountTime - mountTime}ms)`)
       isMounted = false
       subscription.unsubscribe()
-      console.log(`🏠 [${unmountTime}] LandingPage: CLEANUP complete - subscription unsubscribed`)
     }
   }, [])
 
