@@ -28,6 +28,11 @@ function SignupPageContent() {
         await handleSignInWithGoogle(response.credential);
         // Assuming successful handleSignInWithGoogle navigates or updates state elsewhere
       } catch (error) {
+        // Next.js throws NEXT_REDIRECT as a mechanism to perform redirects in Server Actions
+        // This is expected behavior, not an error - don't catch it
+        if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+          throw error; // Re-throw to allow redirect to proceed
+        }
         console.error("Error calling handleSignInWithGoogle server action:", error);
         setErrorMessage('Google sign-in failed. Please try again.');
       }

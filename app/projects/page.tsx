@@ -47,38 +47,66 @@ export default function ProjectsPage() {
       console.log(`ProjectsPage: initializeData START (attempt #${currentAttempt})`);
       try {
         // 1. Fetch initial user
-        const { data: { user: initialUser } } = await supabase.auth.getUser();
-        if (!isMounted) return;
+        console.log("ProjectsPage: About to call supabase.auth.getUser()...");
+        const userResponse = await supabase.auth.getUser();
+        console.log("ProjectsPage: getUser() response received:", userResponse);
+        
+        const initialUser = userResponse.data?.user || null;
+        console.log("ProjectsPage: Parsed user:", initialUser ? {
+          id: initialUser.id,
+          email: initialUser.email,
+          role: initialUser.role,
+          created_at: initialUser.created_at
+        } : "NULL");
+        
+        if (!isMounted) {
+          console.log("ProjectsPage: Component unmounted after getUser, aborting");
+          return;
+        }
+        
         setUser(initialUser);
-        console.log("User fetched:", initialUser?.id);
+        console.log("ProjectsPage: User state set");
 
         // 2. Fetch initial profile if user exists
         if (initialUser) {
+          console.log(`ProjectsPage: Fetching profile for user ${initialUser.id}...`);
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('first_name, last_name')
             .eq('user_id', initialUser.id)
             .single();
+          
+          console.log("ProjectsPage: Profile fetch result:", { profileData, profileError });
+          
           if (isMounted) {
             setProfile(profileError ? null : profileData);
+            console.log("ProjectsPage: Profile state set:", profileError ? "NULL (error)" : profileData);
           }
         } else {
+          console.log("ProjectsPage: No user, setting profile to null");
           if (isMounted) setProfile(null);
         }
 
         // 3. Initialize store
-        console.log("Initializing store...");
+        console.log("ProjectsPage: Initializing store...");
         await initializeStore();
-        console.log("Store initialized");
+        console.log("ProjectsPage: Store initialized successfully");
         
         // Fetch Supabase-backed project list
+        console.log("ProjectsPage: Loading project list...");
         await loadProjectList();
-        console.log("Projects loaded");
-        if (!isMounted) return;
+        console.log("ProjectsPage: Projects loaded successfully");
+        
+        if (!isMounted) {
+          console.log("ProjectsPage: Component unmounted after loading projects, aborting");
+          return;
+        }
 
         // 4. Now set up listener for subsequent changes
+        console.log("ProjectsPage: Setting up auth state change listener...");
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (_event, session) => {
+            console.log("ProjectsPage: Auth state changed, event:", _event);
             const currentUser = session?.user ?? null;
             
             if (isMounted) {
@@ -101,9 +129,15 @@ export default function ProjectsPage() {
           }
         );
         authSubscription = subscription;
+        console.log("ProjectsPage: Auth state change listener set up successfully");
 
       } catch (error) {
-        console.error("Initialization or data fetching failed:", error);
+        console.error("ProjectsPage: Initialization or data fetching failed:", error);
+        console.error("ProjectsPage: Error details:", {
+          name: error instanceof Error ? error.name : 'Unknown',
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
         if (isMounted) {
           setUser(null);
           setProfile(null);
@@ -111,24 +145,30 @@ export default function ProjectsPage() {
       } finally {
         // 5. Set loading false after all initial setup attempts
         if (isMounted) {
-          console.log("Initialization complete, stopping loading");
+          console.log("ProjectsPage: Initialization complete, stopping loading");
           setIsLoading(false);
+        } else {
+          console.log("ProjectsPage: Component unmounted, not setting loading state");
         }
       }
     };
 
+    console.log("ProjectsPage: Setting loading to true and calling initializeData...");
     setIsLoading(true);
     initializeData();
 
     // Cleanup function
     return () => {
-      console.log(`Unmounting (attempt #${currentAttempt})`);
+      console.log(`ProjectsPage: Unmounting (attempt #${currentAttempt})`);
       isMounted = false;
       if (authSubscription) {
+        console.log("ProjectsPage: Unsubscribing from auth listener");
         authSubscription.unsubscribe();
       }
     };
   }, []); // Empty dependency array ensures this runs only once on mount
+
+  console.log("ProjectsPage: Render - isLoading:", isLoading, "user:", user?.id, "projects count:", projects.length);
 
   const handleCreateProject = async () => {
     // Prompt for project name or use a default
