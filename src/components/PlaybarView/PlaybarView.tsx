@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import type { User } from '@supabase/supabase-js'; // Import User type
 import LogInButton from '../AuthButtons/LogInButton'; // Import new component
 import SignUpButton from '../AuthButtons/SignUpButton'; // Import new component
+import Link from 'next/link';
 
 // Define props including the user
 interface PlaybarViewProps {
@@ -43,6 +44,15 @@ const PlaybarView: React.FC<PlaybarViewProps> = ({ user }) => { // Destructure u
       onClick={handlePlaybarClick}
     >
     <div className="flex items-center space-x-3">
+      <Link href="/projects" legacyBehavior>
+        <a className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1 cursor-pointer ml-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Projects
+        </a>
+      </Link>
+
       <Button
         variant="ghost"
         size="icon"
@@ -51,8 +61,6 @@ const PlaybarView: React.FC<PlaybarViewProps> = ({ user }) => { // Destructure u
       >
         <PanelLeft className="h-5 w-5" />
       </Button>
-
-      <div className={styles.divider}></div>
 
       <div className={styles.controlsContainer}>
         <Button
@@ -97,6 +105,10 @@ const PlaybarView: React.FC<PlaybarViewProps> = ({ user }) => { // Destructure u
           <Repeat className="h-5 w-5 fill-current" />
         </Button>
       </div>
+    </div>
+
+    <div className="flex-1 flex items-center justify-center">
+      <h1 className="text-lg font-medium text-white">Cabin Visuals</h1>
     </div>
 
     <div className={styles.rightControls}>
