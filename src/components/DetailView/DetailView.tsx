@@ -43,7 +43,7 @@ function DetailView() {
     >
       <div className={styles.trackInfo}>
         <span className={styles.trackLabel}>
-          {selectedTrack !== null ? `Track ${selectedTrack}` : "No Track Selected"}
+          {"Track Editor"}
         </span>
       </div>
       <div className={styles.tabContainer}>
