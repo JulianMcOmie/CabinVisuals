@@ -416,7 +416,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
         {/* End Drag Overlay */}
       </DndContext>
 
-      <div className="relative">
+      <div>
         <button
           className="w-full py-2 border border-dashed rounded-md text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
           style={{ borderColor: "#555" }}
@@ -427,7 +427,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
 
         {showEffectsMenu && (
           <div
-            className="absolute left-0 right-0 mt-1 rounded-md shadow-lg z-20 border"
+            className="mt-1 rounded-md shadow-lg border"
             style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border }}
           >
             {/* ... Effect selection menu ... */}
