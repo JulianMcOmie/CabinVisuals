@@ -141,7 +141,10 @@ export default function LandingPage() {
                   </div>
                 )}
                 <DropdownMenuSeparator className="bg-gray-800" />
-                <DropdownMenuItem className="flex items-center cursor-pointer text-white hover:bg-gray-700">
+                <DropdownMenuItem 
+                  className="flex items-center cursor-pointer text-white hover:bg-gray-700"
+                  onSelect={() => window.open('https://discord.gg/WhKZbH8nnV', '_blank')}
+                >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   <span>Discord Community</span>
                 </DropdownMenuItem>
