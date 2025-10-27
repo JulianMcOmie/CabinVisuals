@@ -198,10 +198,19 @@ export function useTrackGestures({
          if (wasCopyDrag && (dragOperation === 'move' || dragOperation === 'start' || dragOperation === 'end')) {
             // Generate new ID for the copy
             const newBlockId = `block-${crypto.randomUUID()}`;
-            // Create the final block to add with new ID and potentially adjusted notes/position
+            
+            // FIX: Generate new IDs for all notes in the copied block
+            // Otherwise Supabase will UPDATE existing notes instead of creating new ones
+            const duplicatedNotes = blockToUpdateOrAdd.notes.map(note => ({
+                ...note,
+                id: `${newBlockId}-note-${crypto.randomUUID()}`
+            }));
+            
+            // Create the final block to add with new ID and duplicated notes
             const blockToAdd: MIDIBlock = {
                 ...blockToUpdateOrAdd,
                 id: newBlockId,
+                notes: duplicatedNotes
             };
             // Add the new block to the target track
             addMidiBlock(finalTargetTrackId ?? originalDragTrackId, blockToAdd);
