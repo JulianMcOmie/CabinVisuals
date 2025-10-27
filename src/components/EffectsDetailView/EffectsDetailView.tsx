@@ -355,7 +355,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
       className="flex-1 p-4 overflow-auto text-white"
     >
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium">Effects Chain for Track "{track.name}"</h3>
+        <h3 className="text-lg font-medium">Effects Chain for Track &quot;{track.name}&quot;</h3>
       </div>
 
       <DndContext
