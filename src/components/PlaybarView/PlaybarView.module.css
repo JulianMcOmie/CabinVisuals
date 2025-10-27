@@ -117,6 +117,8 @@
   border: 1px solid var(--border);
   font-family: monospace;
   color: rgb(209, 213, 219);
+  min-width: 4rem;
+  text-align: center;
 }
 
 .bpmContainer {

@@ -42,6 +42,7 @@ const PlaybarView: React.FC<PlaybarViewProps> = ({ user }) => { // Destructure u
     <div
       className={styles.playbarContainer}
       onClick={handlePlaybarClick}
+      style={{ position: 'relative' }}
     >
     <div className="flex items-center space-x-3">
       <Link href="/projects" legacyBehavior>
@@ -107,7 +108,7 @@ const PlaybarView: React.FC<PlaybarViewProps> = ({ user }) => { // Destructure u
       </div>
     </div>
 
-    <div className="flex-1 flex items-center justify-center">
+    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
       <h1 className="text-lg font-medium text-white">Cabin Visuals</h1>
     </div>
 
