@@ -11,11 +11,21 @@ interface InstrumentDetailViewProps {
 }
 
 function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
-  const { setSelectedWindow } = useStore();
+  const { setSelectedWindow, availableInstruments } = useStore();
   
   if (!track || !track.synthesizer) {
     return null;
   } 
+
+  // Find the instrument name by matching the constructor
+  const getSynthesizerName = () => {
+    const synthConstructor = track.synthesizer.constructor;
+    for (const category of Object.values(availableInstruments)) {
+      const found = category.find(inst => inst.constructor === synthConstructor);
+      if (found) return found.name;
+    }
+    return track.synthesizer.constructor.name; // Fallback
+  };
 
   // This handler now simply closes the detail view if clicked outside specific controls
   const handleViewClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -38,7 +48,7 @@ function InstrumentDetailView({ track }: InstrumentDetailViewProps) {
     >
       <div className={styles.contentPanel}>
         <h3 className={styles.heading}>
-          {track.synthesizer.constructor.name}
+          {getSynthesizerName()}
         </h3>
         
         {/* Render Synthesizer Settings */}
