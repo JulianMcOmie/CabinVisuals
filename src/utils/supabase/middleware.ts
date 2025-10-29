@@ -76,7 +76,7 @@ export async function updateSession(request: NextRequest) {
   if (user && isAuthRoute) {
       console.log(`Middleware: Authenticated user accessing auth route ${pathname}. Redirecting to projects.`);
       const url = request.nextUrl.clone();
-      url.pathname = '/projects'; // Changed from /alpha
+      url.pathname = '/projects';
       return NextResponse.redirect(url);
   }
 
