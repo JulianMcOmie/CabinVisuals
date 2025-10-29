@@ -122,7 +122,7 @@ const PlaybarView: React.FC<PlaybarViewProps> = ({ user }) => { // Destructure u
       )}
 
       <div className={styles.beatDisplay}>
-        {currentBeat}
+        {currentBeat.toFixed(2)}
       </div>
 
       <div className={styles.bpmContainer}>
