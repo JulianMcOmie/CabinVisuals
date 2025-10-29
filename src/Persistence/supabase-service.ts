@@ -5,7 +5,6 @@ import { createClient } from '@/utils/supabase/client';
 
 // Define TypeScript interfaces representing the structure of your application's data.
 // These should match how data is used in Zustand and UI components (e.g., using camelCase).
-// You can copy or adapt these from your existing persistence-service.ts if they exist.
 export interface ProjectMetadata {
     id: string;
     name: string;

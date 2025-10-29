@@ -14,9 +14,6 @@ import { EffectSlice, EffectDefinition, EffectCategories, availableEffectsData, 
 import { UISlice, UIState, createUISlice, SelectedWindowType } from './uiSlice';
 import { ProjectSlice, createProjectSlice, ProjectMetadata } from './projectSlice';
 
-// Import utils (no longer need persistence-service - using Supabase now)
-import { deserializeSynth, deserializeEffect } from '@/utils/persistenceUtils';
-
 // --- Constructor Mappings --- 
 
 export const synthesizerConstructors = new Map<string, new (...args: any[]) => SynthesizerInstance>();

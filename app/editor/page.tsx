@@ -17,16 +17,9 @@ import useStore from '../../src/store/store';
 import { loadAudioFile } from '../../src/lib/idbHelper';
 import { initializeStore } from '../../src/store/store';
 import styles from './editor.module.css';
-import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '../../src/utils/supabase/client';
-//import { logout } from './actions';
 import type { User } from '@supabase/supabase-js';
-
-interface PanelRef {
-  collapse: () => void;
-  expand: () => void;
-}
 
 function EditorPageContent() {
   const [isLoading, setIsLoading] = useState(true);
