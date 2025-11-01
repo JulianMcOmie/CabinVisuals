@@ -26,6 +26,10 @@ Object.values(availableInstrumentsData).flat().forEach((inst: InstrumentDefiniti
         // Primary: register by stable id for persistence
         synthesizerConstructors.set(inst.id, inst.constructor);
         // Back-compat: also allow constructor.name
+    if (inst.constructor) {
+        // Primary: register by stable id for persistence
+        synthesizerConstructors.set(inst.id, inst.constructor);
+        // Back-compat: also allow constructor.name
         synthesizerConstructors.set(inst.constructor.name, inst.constructor);
         // Reverse lookup for serialization
         synthIdByConstructor.set(inst.constructor as SynthConstructor, inst.id);
@@ -38,6 +42,10 @@ try {
 export const effectConstructors = new Map<string, EffectConstructor>();
 export const effectIdByConstructor = new Map<EffectConstructor, string>();
 Object.values(availableEffectsData).flat().forEach((effect: EffectDefinition) => {
+    if (effect.constructor) {
+        // Primary: register by stable id for persistence
+        effectConstructors.set(effect.id, effect.constructor);
+        // Back-compat: also allow constructor.name
     if (effect.constructor) {
         // Primary: register by stable id for persistence
         effectConstructors.set(effect.id, effect.constructor);
