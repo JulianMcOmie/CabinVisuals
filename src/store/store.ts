@@ -22,6 +22,9 @@ Object.values(availableInstrumentsData).flat().forEach((inst: InstrumentDefiniti
         synthesizerConstructors.set(inst.constructor.name, inst.constructor);
     }
 });
+try {
+    console.log('[DEBUG] synthesizerConstructors keys:', Array.from(synthesizerConstructors.keys()));
+} catch {}
 
 export const effectConstructors = new Map<string, new (...args: any[]) => EffectInstance>();
 Object.values(availableEffectsData).flat().forEach((effect: EffectDefinition) => {
@@ -29,6 +32,9 @@ Object.values(availableEffectsData).flat().forEach((effect: EffectDefinition) =>
         effectConstructors.set(effect.constructor.name, effect.constructor);
     }
 });
+try {
+    console.log('[DEBUG] effectConstructors keys:', Array.from(effectConstructors.keys()));
+} catch {}
 
 // --- Combined AppState Definition ---
 

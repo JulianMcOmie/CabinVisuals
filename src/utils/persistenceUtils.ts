@@ -177,7 +177,7 @@ export function serializeEffect(instance: Effect, trackId: string, order: number
          id: instance.id,
          trackId: trackId,
          order: order,
-         type: constructorName,
+        type: constructorName,
          settings: settings,
      };
 
