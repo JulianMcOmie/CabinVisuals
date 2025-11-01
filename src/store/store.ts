@@ -16,20 +16,35 @@ import { ProjectSlice, createProjectSlice, ProjectMetadata } from './projectSlic
 
 // --- Constructor Mappings --- 
 
-export const synthesizerConstructors = new Map<string, new (...args: any[]) => SynthesizerInstance>();
+type SynthConstructor = new (...args: any[]) => SynthesizerInstance;
+type EffectConstructor = new (...args: any[]) => EffectInstance;
+
+export const synthesizerConstructors = new Map<string, SynthConstructor>();
+export const synthIdByConstructor = new Map<SynthConstructor, string>();
 Object.values(availableInstrumentsData).flat().forEach((inst: InstrumentDefinition) => {
-    if (inst.constructor) { // Check if constructor exists
+    if (inst.constructor) {
+        // Primary: register by stable id for persistence
+        synthesizerConstructors.set(inst.id, inst.constructor);
+        // Back-compat: also allow constructor.name
         synthesizerConstructors.set(inst.constructor.name, inst.constructor);
+        // Reverse lookup for serialization
+        synthIdByConstructor.set(inst.constructor as SynthConstructor, inst.id);
     }
 });
 try {
     console.log('[DEBUG] synthesizerConstructors keys:', Array.from(synthesizerConstructors.keys()));
 } catch {}
 
-export const effectConstructors = new Map<string, new (...args: any[]) => EffectInstance>();
+export const effectConstructors = new Map<string, EffectConstructor>();
+export const effectIdByConstructor = new Map<EffectConstructor, string>();
 Object.values(availableEffectsData).flat().forEach((effect: EffectDefinition) => {
-    if (effect.constructor) { // Check if constructor exists
+    if (effect.constructor) {
+        // Primary: register by stable id for persistence
+        effectConstructors.set(effect.id, effect.constructor);
+        // Back-compat: also allow constructor.name
         effectConstructors.set(effect.constructor.name, effect.constructor);
+        // Reverse lookup for serialization
+        effectIdByConstructor.set(effect.constructor as EffectConstructor, effect.id);
     }
 });
 try {
