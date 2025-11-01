@@ -17,9 +17,15 @@ import { ProjectSlice, createProjectSlice, ProjectMetadata } from './projectSlic
 // --- Constructor Mappings --- 
 
 export const synthesizerConstructors = new Map<string, new (...args: any[]) => SynthesizerInstance>();
+export const synthIdByConstructor = new Map<Function, string>();
 Object.values(availableInstrumentsData).flat().forEach((inst: InstrumentDefinition) => {
-    if (inst.constructor) { // Check if constructor exists
+    if (inst.constructor) {
+        // Primary: register by stable id for persistence
+        synthesizerConstructors.set(inst.id, inst.constructor);
+        // Back-compat: also allow constructor.name
         synthesizerConstructors.set(inst.constructor.name, inst.constructor);
+        // Reverse lookup for serialization
+        synthIdByConstructor.set(inst.constructor, inst.id);
     }
 });
 try {
@@ -27,9 +33,15 @@ try {
 } catch {}
 
 export const effectConstructors = new Map<string, new (...args: any[]) => EffectInstance>();
+export const effectIdByConstructor = new Map<Function, string>();
 Object.values(availableEffectsData).flat().forEach((effect: EffectDefinition) => {
-    if (effect.constructor) { // Check if constructor exists
+    if (effect.constructor) {
+        // Primary: register by stable id for persistence
+        effectConstructors.set(effect.id, effect.constructor);
+        // Back-compat: also allow constructor.name
         effectConstructors.set(effect.constructor.name, effect.constructor);
+        // Reverse lookup for serialization
+        effectIdByConstructor.set(effect.constructor, effect.id);
     }
 });
 try {

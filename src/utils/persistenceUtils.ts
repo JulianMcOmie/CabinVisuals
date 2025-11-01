@@ -3,7 +3,7 @@ import { TrackData, MidiBlockData, MidiNoteData, SynthData, EffectData } from '@
 import Synthesizer from '@/lib/Synthesizer';
 import Effect from '@/lib/Effect';
 
-import { synthesizerConstructors, effectConstructors } from '../store/store';
+import { synthesizerConstructors, effectConstructors, synthIdByConstructor, effectIdByConstructor } from '../store/store';
 import BasicSynthesizer from '@/lib/synthesizers/BasicSynthesizer';
 import ScaleEffect from '@/lib/effects/ScaleEffect';
 
@@ -97,11 +97,15 @@ export function serializeSynth(instance: Synthesizer, trackId: string): SynthDat
         settings[key] = property.value;
     });
 
+    // Resolve stable type ID from constructor reference; fallback to constructor name for legacy
+    const stableTypeId = synthIdByConstructor.get(instance.constructor as any) || constructorName;
+
     // Debug logging for synth serialization
     try {
         console.log('[DEBUG] serializeSynth ->', {
             trackId,
-            type: constructorName,
+            type: stableTypeId,
+            ctorName: constructorName,
             settingsKeys: Object.keys(settings),
             settings,
         });
@@ -109,7 +113,7 @@ export function serializeSynth(instance: Synthesizer, trackId: string): SynthDat
 
     return {
         trackId: trackId,
-        type: constructorName,
+        type: stableTypeId,
         settings: settings,
     };
 }
@@ -173,11 +177,14 @@ export function serializeEffect(instance: Effect, trackId: string, order: number
         settings[key] = property.value;
      });
 
+    // Resolve stable type ID from constructor reference; fallback to constructor name for legacy
+    const stableEffectTypeId = effectIdByConstructor.get(instance.constructor as any) || constructorName;
+
     const result = {
          id: instance.id,
          trackId: trackId,
          order: order,
-        type: constructorName,
+        type: stableEffectTypeId,
          settings: settings,
      };
 
@@ -187,7 +194,7 @@ export function serializeEffect(instance: Effect, trackId: string, order: number
             id: instance.id,
             trackId,
             order,
-            type: constructorName,
+            type: stableEffectTypeId,
             settingsKeys: Object.keys(settings),
         });
     } catch {}

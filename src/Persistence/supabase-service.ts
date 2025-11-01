@@ -268,9 +268,9 @@ export async function loadFullProjectFromSupabase(projectId: string): Promise<Ap
 
                 // Transform synth
                 const transformedSynth: SynthData | null = synthData ? {
-                    trackId: track.id, // Synth primary key is the track ID
+                    trackId: track.id,
                     type: synthData.type,
-                    settings: synthData.settings || {} // Ensure settings is an object
+                    settings: synthData.settings || {}
                 } : null;
 
                 // Transform effects
@@ -330,6 +330,8 @@ export async function loadFullProjectFromSupabase(projectId: string): Promise<Ap
         try {
             const synthTypes = transformedTracks.map(t => t.synth?.type).filter(Boolean);
             console.log('[DEBUG] loadFullProjectFromSupabase synth types:', synthTypes);
+            // Background normalization: if any synth type is a legacy constructor name or symbol, re-save with stable id once the app serializes next.
+            // Note: actual rewrite will occur on next user save; this is only visibility.
         } catch {}
         return transformedState;
 
