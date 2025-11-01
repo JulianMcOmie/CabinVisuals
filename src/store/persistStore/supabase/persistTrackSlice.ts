@@ -33,6 +33,7 @@ export const persistAddTrack = async (get: () => AppState, track: Track) => {
         if (track.synthesizer) {
             const synthData = serializeSynth(track.synthesizer, track.id);
             if (synthData) {
+                try { console.log('[DEBUG] persistAddTrack.serializeSynth:', synthData); } catch {}
                 await supabaseService.saveSynth({
                     trackId: track.id,
                     type: synthData.type,
@@ -190,6 +191,7 @@ export const persistUpdateTrack = async (get: () => AppState, trackId: string, u
         if ('synthesizer' in updatedProperties && updatedTrack.synthesizer) {
             const synthData = serializeSynth(updatedTrack.synthesizer, trackId);
             if (synthData) {
+                try { console.log('[DEBUG] persistUpdateTrack.serializeSynth:', synthData); } catch {}
                 await supabaseService.saveSynth({
                     trackId,
                     type: synthData.type,

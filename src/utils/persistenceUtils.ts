@@ -97,6 +97,16 @@ export function serializeSynth(instance: Synthesizer, trackId: string): SynthDat
         settings[key] = property.value;
     });
 
+    // Debug logging for synth serialization
+    try {
+        console.log('[DEBUG] serializeSynth ->', {
+            trackId,
+            type: constructorName,
+            settingsKeys: Object.keys(settings),
+            settings,
+        });
+    } catch {}
+
     return {
         trackId: trackId,
         type: constructorName,
@@ -105,6 +115,8 @@ export function serializeSynth(instance: Synthesizer, trackId: string): SynthDat
 }
 
 export function deserializeSynth(data: { type: string; settings: any }): Synthesizer | null {
+    // Debug logging for synth deserialization input
+    try { console.log('[DEBUG] deserializeSynth input:', data); } catch {}
     let Constructor = synthesizerConstructors.get(data.type);
     
     if (!Constructor) {
@@ -116,6 +128,7 @@ export function deserializeSynth(data: { type: string; settings: any }): Synthes
     try {
         const instance = new Constructor(); // Pass settings to constructor if needed/supported
         applySettings(instance, data.settings);
+        try { console.log('[DEBUG] deserializeSynth resolved constructor:', instance.constructor.name); } catch {}
         return instance;
     } catch (error) {
         console.error(`Error deserializing synthesizer type ${data.type}:`, error);
@@ -155,21 +168,36 @@ export function serializeEffect(instance: Effect, trackId: string, order: number
            return null;
       }
 
-     const settings: Record<string, any> = {};
+    const settings: Record<string, any> = {};
      instance.properties.forEach((property, key) => {
         settings[key] = property.value;
      });
 
-     return {
+    const result = {
          id: instance.id,
          trackId: trackId,
          order: order,
          type: constructorName,
          settings: settings,
      };
+
+    // Debug logging for effect serialization
+    try {
+        console.log('[DEBUG] serializeEffect ->', {
+            id: instance.id,
+            trackId,
+            order,
+            type: constructorName,
+            settingsKeys: Object.keys(settings),
+        });
+    } catch {}
+
+    return result;
 }
 
 export function deserializeEffect(data: EffectData): Effect | null {
+    // Debug logging for effect deserialization input
+    try { console.log('[DEBUG] deserializeEffect input:', data); } catch {}
      let Constructor = effectConstructors.get(data.type);
      
      if (!Constructor) {
@@ -181,6 +209,7 @@ export function deserializeEffect(data: EffectData): Effect | null {
      try {
          const instance = new Constructor(data.id); 
          applySettings(instance, data.settings);
+        try { console.log('[DEBUG] deserializeEffect resolved constructor:', instance.constructor.name); } catch {}
          return instance;
      } catch (error) {
          console.error(`Error deserializing effect type ${data.type}:`, error);
@@ -197,6 +226,14 @@ export function deserializeEffect(data: EffectData): Effect | null {
 // --- Helper to apply settings --- 
 export const applySettings = (instance: any, settings: Record<string, any>) => {
     if (!instance || !settings) return;
+
+    // Debug log properties being applied
+    try {
+        console.log('[DEBUG] applySettings ->', instance?.constructor?.name, {
+            keys: Object.keys(settings || {}),
+            settings,
+        });
+    } catch {}
 
     // Prefer setPropertyValue if available (as defined in base classes)
     if (typeof instance.setPropertyValue === 'function') {

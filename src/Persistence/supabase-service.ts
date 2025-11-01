@@ -327,6 +327,10 @@ export async function loadFullProjectFromSupabase(projectId: string): Promise<Ap
         };
 
         console.log("Transformed project state:", transformedState);
+        try {
+            const synthTypes = transformedTracks.map(t => t.synth?.type).filter(Boolean);
+            console.log('[DEBUG] loadFullProjectFromSupabase synth types:', synthTypes);
+        } catch {}
         return transformedState;
 
     } catch (transformError) {
@@ -395,6 +399,7 @@ export async function saveSynth(synth: SynthData): Promise<boolean> {
         type: synth.type,
         settings: synth.settings
     };
+    try { console.log('[DEBUG] saveSynth payload:', dbData); } catch {}
     const { error } = await supabase.from('track_synths').upsert(dbData);
     if (error) { console.error(`Error saving synth for track ${synth.trackId}:`, error); return false; }
     console.log(`Synth for track ${synth.trackId} saved.`); return true;
