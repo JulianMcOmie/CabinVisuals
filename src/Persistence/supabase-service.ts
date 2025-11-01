@@ -2,6 +2,7 @@
 
 // Import the Supabase client creator function (adjust path as needed)
 import { createClient } from '@/utils/supabase/client';
+import { synthesizerConstructors, effectConstructors, synthIdByConstructor, effectIdByConstructor } from '@/store/store';
 
 // Define TypeScript interfaces representing the structure of your application's data.
 // These should match how data is used in Zustand and UI components (e.g., using camelCase).
@@ -321,6 +322,45 @@ export async function loadFullProjectFromSupabase(projectId: string): Promise<Ap
         }); // End map tracks
 
         // Assemble the final application state structure
+        // Normalize legacy type names to stable IDs (and persist fixes)
+        try {
+            const normalizationPromises: Promise<any>[] = [];
+            transformedTracks.forEach(t => {
+                // Normalize synth type
+                if (t.synth && t.synth.type) {
+                    const ctor = synthesizerConstructors.get(t.synth.type);
+                    if (ctor) {
+                        const stable = synthIdByConstructor.get(ctor as any);
+                        if (stable && stable !== t.synth.type) {
+                            console.log('[DEBUG] Normalizing synth type', { trackId: t.id, from: t.synth.type, to: stable });
+                            t.synth.type = stable;
+                            normalizationPromises.push(saveSynth({ trackId: t.synth.trackId, type: t.synth.type, settings: t.synth.settings }));
+                        }
+                    }
+                }
+                // Normalize effect types
+                if (t.effects && t.effects.length) {
+                    t.effects.forEach((e, idx) => {
+                        if (!e?.type) return;
+                        const eCtor = effectConstructors.get(e.type);
+                        if (eCtor) {
+                            const stableE = effectIdByConstructor.get(eCtor as any);
+                            if (stableE && stableE !== e.type) {
+                                console.log('[DEBUG] Normalizing effect type', { effectId: e.id, from: e.type, to: stableE });
+                                e.type = stableE;
+                                normalizationPromises.push(saveEffect({ id: e.id, trackId: e.trackId, type: e.type, settings: e.settings, order: e.order }));
+                            }
+                        }
+                    });
+                }
+            });
+            if (normalizationPromises.length) {
+                await Promise.allSettled(normalizationPromises);
+            }
+        } catch (normErr) {
+            console.warn('Type normalization encountered an issue:', normErr);
+        }
+
         const transformedState: AppProjectState = {
              projectSettings: transformedSettings,
              tracks: transformedTracks

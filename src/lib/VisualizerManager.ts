@@ -23,6 +23,9 @@ class VisualizerManager {
   private objectStates: Map<string, VisualObjectProperties> = new Map();
   // Set to track active state keys this frame for cleanup
   private activeStateKeysThisFrame: Set<string> = new Set();
+  // Throttled warning state for missing sourceNoteId
+  private missingNoteWarnCount: number = 0;
+  private lastMissingNoteWarnTs: number = 0;
 
   // Constructor takes TimeManager and initial tracks
   constructor(timeManager: TimeManager, initialTracks: Track[]) {
@@ -106,7 +109,14 @@ class VisualizerManager {
             properties: currentProperties 
           });
         } else {
-           console.warn('VisualObject missing sourceNoteId, skipping state tracking.');
+           // Throttle noisy warnings (many visuals per frame)
+           this.missingNoteWarnCount += 1;
+           const now = Date.now();
+           if (now - this.lastMissingNoteWarnTs > 2000) {
+             console.warn(`[Visualizer] ${this.missingNoteWarnCount} visuals missing sourceNoteId in last 2s; skipping state tracking.`);
+             this.missingNoteWarnCount = 0;
+             this.lastMissingNoteWarnTs = now;
+           }
         }
       });
 
