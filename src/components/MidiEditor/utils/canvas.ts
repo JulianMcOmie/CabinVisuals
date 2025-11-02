@@ -60,18 +60,6 @@ export const drawMidiEditor = (
   // 0. Clear canvas (important!)
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-  // 1. Calculate Visible Beat Range
-  const startBeatVisible = scrollX / pixelsPerBeat;
-  const endBeatVisible = (scrollX + canvasWidth) / pixelsPerBeat;
-
-  // 2. Calculate Visible Pitch Range (Note Numbers)
-  const startNoteYVisible = scrollY;
-  const endNoteYVisible = scrollY + canvasHeight;
-  // Optional: Convert Y range to note value range if needed for grid line optimization
-  // const highestNoteVisible = ... calculation based on startNoteYVisible ...
-  // const lowestNoteVisible = ... calculation based on endNoteYVisible ..
-
-
   drawGrid(ctx, canvasWidth, canvasHeight, numMeasures, pixelsPerBeat, pixelsPerSemitone, scrollX, scrollY);
 
   drawMidiBlock(ctx, blockStartBeat, blockDuration, pixelsPerBeat, pixelsPerSemitone, scrollX, scrollY, canvasWidth, canvasHeight);
