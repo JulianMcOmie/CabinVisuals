@@ -17,6 +17,7 @@ const MIN_VIEWPORT_MEASURES = 8; // Minimum measures to allow zooming out to see
 const EXTRA_RENDER_MEASURES = 8; // Render this many extra measures beyond content or min viewport
 const HEADER_HEIGHT = 40; // Define header height as a constant
 const PLAYHEAD_WIDTH = 2; // Width of the playhead line in pixels (must match CSS)
+const PLAYHEAD_SEEK_SNAP = 0.05; // Playhead seek snapping granularity (in beats). Set to 0 for continuous.
 
 function TimelineView() {
   const { 
@@ -79,9 +80,11 @@ function TimelineView() {
     const mouseXInScrolledContent = mouseXRelative + timelineContentRef.current.scrollLeft;
 
     const rawTargetBeat = Math.max(0, (mouseXInScrolledContent - SIDEBAR_WIDTH) / effectivePixelsPerBeat);
-    const quantizedTargetBeat = Math.round(rawTargetBeat); // Quantize to nearest beat
+    const targetBeat = PLAYHEAD_SEEK_SNAP > 0
+      ? Math.round(rawTargetBeat / PLAYHEAD_SEEK_SNAP) * PLAYHEAD_SEEK_SNAP
+      : rawTargetBeat;
 
-    seekTo(quantizedTargetBeat); // Use quantized beat
+    seekTo(targetBeat);
 
   }, [isDragging, seekTo, effectivePixelsPerBeat]);
 
@@ -96,21 +99,37 @@ function TimelineView() {
   const handlePlayheadMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     // Only drag on left click
     if (event.button !== 0) return;
-    event.preventDefault(); 
+    event.preventDefault();
+    // Immediately set playhead to cursor on mousedown to avoid initial lag
+    if (timelineContentRef.current) {
+      const containerRect = timelineContentRef.current.getBoundingClientRect();
+      const mouseXRelative = event.clientX - containerRect.left;
+      const mouseXInScrolledContent = mouseXRelative + timelineContentRef.current.scrollLeft;
+      const rawTargetBeat = Math.max(0, (mouseXInScrolledContent - SIDEBAR_WIDTH) / effectivePixelsPerBeat);
+      const targetBeat = PLAYHEAD_SEEK_SNAP > 0
+        ? Math.round(rawTargetBeat / PLAYHEAD_SEEK_SNAP) * PLAYHEAD_SEEK_SNAP
+        : rawTargetBeat;
+      seekTo(targetBeat);
+    }
     setIsDragging(true);
   };
 
   // Add/Remove global listeners when dragging state changes
   useEffect(() => {
     if (isDragging) {
+      // Set cursor globally during drag to prevent flickering
+      document.body.style.cursor = 'ew-resize';
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     } else {
+      // Reset cursor when drag ends
+      document.body.style.cursor = '';
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     }
 
     return () => {
+      document.body.style.cursor = '';
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };

@@ -11,6 +11,7 @@ const quantizeBeat = (beat: number): number => {
 // PIXELS_PER_BEAT is now calculated from props
 const BEATS_PER_MEASURE = 4;
 const HEADER_HEIGHT = 40;
+const PLAYHEAD_SEEK_SNAP = 0; // Playhead seek snapping granularity (in beats). Set to 0 for continuous.
 const TOP_SECTION_HEIGHT = HEADER_HEIGHT / 2;
 const HANDLE_PIXEL_THRESHOLD = 10; // Pixel sensitivity for grabbing handles
 const MIN_LABEL_SPACING_PIXELS = 40; // Minimum pixels between measure/beat labels
@@ -112,13 +113,16 @@ function MeasuresHeader({
     const overlayRect = overlayRef.current.getBoundingClientRect();
     const mouseX = event.clientX - overlayRect.left;
     const targetBeatRaw = calculateBeatFromX(mouseX);
-    const targetBeatQuantized = Math.round(targetBeatRaw); // Quantize
-    seekTo(targetBeatQuantized); // Use quantized beat
+    const targetBeat = PLAYHEAD_SEEK_SNAP > 0
+      ? Math.round(targetBeatRaw / PLAYHEAD_SEEK_SNAP) * PLAYHEAD_SEEK_SNAP
+      : targetBeatRaw;
+    seekTo(targetBeat);
   }, [isSeeking, seekTo, calculateBeatFromX]);
 
   const handleSeekEnd = useCallback(() => {
     if (isSeeking) {
       setIsSeeking(false);
+      setCursorStyle('pointer'); // Reset cursor after seeking
     }
   }, [isSeeking]);
 
@@ -274,8 +278,12 @@ function MeasuresHeader({
     } else {
       // --- Bottom Half: Initiate Seeking ---
       event.preventDefault();
+      setCursorStyle('ew-resize'); // Set cursor for seeking
+      const targetBeat = PLAYHEAD_SEEK_SNAP > 0
+        ? Math.round(clickedBeatRaw / PLAYHEAD_SEEK_SNAP) * PLAYHEAD_SEEK_SNAP
+        : clickedBeatRaw;
+      seekTo(targetBeat); // Immediately seek to cursor position
       setIsSeeking(true);
-      seekTo(clickedBeatQuantized); // Use quantized beat for initial seek
     }
   };
 
@@ -283,10 +291,10 @@ function MeasuresHeader({
   const handleOverlayMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
       // Only update cursor if not currently dragging anything
       if (isResizingProject) {
-        setCursorStyle('ew-resize');
-        return;
+        return; // Don't update cursor during resize
       }
-      if (loopDragState.type !== null || isSeeking) return;
+      if (loopDragState.type !== null) return; // Don't update cursor during loop drag
+      if (isSeeking) return; // Don't update cursor during seeking
 
       const mouseY = event.nativeEvent.offsetY;
       const mouseX = event.nativeEvent.offsetX;
@@ -364,12 +372,15 @@ function MeasuresHeader({
     if (isResizingProject) {
         currentMoveHandler = handleProjectResizeMove;
         currentEndHandler = handleProjectResizeEnd;
+        document.body.style.cursor = 'ew-resize';
     } else if (loopDragState.type) {
         currentMoveHandler = handleLoopMove;
         currentEndHandler = handleLoopEnd;
+        // Cursor already set by overlay
     } else if (isSeeking) {
         currentMoveHandler = handleSeekMove;
         currentEndHandler = handleSeekEnd;
+        document.body.style.cursor = 'ew-resize'; // Set global cursor during seeking
     }
 
     if (currentMoveHandler) {
@@ -385,6 +396,10 @@ function MeasuresHeader({
       }
       if (currentEndHandler) {
         window.removeEventListener('mouseup', currentEndHandler);
+      }
+      // Reset cursor when any drag ends
+      if (isResizingProject || isSeeking) {
+        document.body.style.cursor = '';
       }
     };
   }, [
