@@ -115,7 +115,6 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
   const effectiveBlockHeight = effectiveTrackHeight - 2 * effectiveBlockVerticalPadding;
   const actualSongBeats = numMeasures * 4;
 
-  // Use the custom hook for *all* gesture and interaction handling
   const {
     handleStartEdge,
     handleEndEdge,
