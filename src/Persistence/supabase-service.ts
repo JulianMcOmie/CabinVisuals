@@ -3,6 +3,9 @@
 // Import the Supabase client creator function (adjust path as needed)
 import { createClient } from '@/utils/supabase/client';
 import { synthesizerConstructors, effectConstructors, synthIdByConstructor, effectIdByConstructor } from '@/store/store';
+import { v4 as uuidv4 } from 'uuid';
+import BasicSynthesizer from '@/lib/synthesizers/BasicSynthesizer';
+import { serializeSynth } from '@/utils/persistenceUtils';
 
 // Define TypeScript interfaces representing the structure of your application's data.
 // These should match how data is used in Zustand and UI components (e.g., using camelCase).
@@ -161,7 +164,92 @@ export async function createSupabaseProject(name: string): Promise<string | null
             return null;
         }
 
-        console.log(`Successfully created Supabase project: ${projectId}`);
+        // Create initial track with synthesizer, MIDI block, and note
+        const trackId = uuidv4();
+        const blockId = uuidv4();
+        const noteId = uuidv4();
+
+        // Create the track
+        const { error: trackError } = await supabase
+            .from('tracks')
+            .insert({
+                id: trackId,
+                project_id: projectId,
+                user_id: userId,
+                name: 'Track 1',
+                is_muted: false,
+                is_soloed: false,
+                order: 0
+            });
+
+        if (trackError) {
+            console.error("Error creating initial track:", trackError);
+            // Clean up if track creation failed
+            await supabase.from('projects').delete().eq('id', projectId);
+            return null;
+        }
+
+        // Create the default synthesizer for the track
+        const defaultSynth = new BasicSynthesizer();
+        const synthData = serializeSynth(defaultSynth, trackId);
+        
+        if (synthData) {
+            const { error: synthError } = await supabase
+                .from('track_synths')
+                .insert({
+                    track_id: trackId,
+                    user_id: userId,
+                    type: synthData.type,
+                    settings: synthData.settings
+                });
+
+            if (synthError) {
+                console.error("Error creating initial synthesizer:", synthError);
+                // Clean up if synth creation failed
+                await supabase.from('projects').delete().eq('id', projectId);
+                return null;
+            }
+        }
+
+        // Create the MIDI block starting at beat 0, ending at beat 4
+        const { error: blockError } = await supabase
+            .from('midi_blocks')
+            .insert({
+                id: blockId,
+                track_id: trackId,
+                user_id: userId,
+                start_beat: 0,
+                end_beat: 4
+            });
+
+        if (blockError) {
+            console.error("Error creating initial MIDI block:", blockError);
+            // Clean up if block creation failed
+            await supabase.from('projects').delete().eq('id', projectId);
+            return null;
+        }
+
+        // Create a MIDI note (middle C, pitch 60, starting at beat 0, duration 1 beat)
+        const { error: noteError } = await supabase
+            .from('midi_notes')
+            .insert({
+                id: noteId,
+                block_id: blockId,
+                user_id: userId,
+                start_beat: 0,
+                duration: 1,
+                velocity: 80,
+                pitch: 60
+            });
+
+        if (noteError) {
+            console.error("Error creating initial MIDI note:", noteError);
+            // Clean up if note creation failed
+            await supabase.from('projects').delete().eq('id', projectId);
+            return null;
+        }
+
+        console.log(`Successfully created Supabase project: ${projectId} with initial track, MIDI block, and note`);
         return projectId;
     } catch (error) {
         console.error("Error creating Supabase project:", error);
