@@ -228,13 +228,12 @@ export async function createSupabaseProject(name: string): Promise<string | null
             return null;
         }
 
-        // Create four MIDI notes in ascending order (C major arpeggio)
-        // C4 (60), E4 (64), G4 (67), C5 (72)
+
         const initialNotes = [
-            { id: uuidv4(), startBeat: 0, pitch: 40 }, // C4
-            { id: uuidv4(), startBeat: 1, pitch: 60 }, // E4
-            { id: uuidv4(), startBeat: 2, pitch: 80 }, // G4
-            { id: uuidv4(), startBeat: 3, pitch: 100 }, // C5
+            { id: uuidv4(), startBeat: 0, pitch: 40 },
+            { id: uuidv4(), startBeat: 1, pitch: 60 },
+            { id: uuidv4(), startBeat: 2, pitch: 80 },
+            { id: uuidv4(), startBeat: 3, pitch: 100 },
         ];
 
         const notesToInsert = initialNotes.map(note => ({
