@@ -164,10 +164,9 @@ export async function createSupabaseProject(name: string): Promise<string | null
             return null;
         }
 
-        // Create initial track with synthesizer, MIDI block, and note
+        // Create initial track with synthesizer, MIDI block, and notes
         const trackId = uuidv4();
         const blockId = uuidv4();
-        const noteId = uuidv4();
 
         // Create the track
         const { error: trackError } = await supabase
@@ -229,27 +228,37 @@ export async function createSupabaseProject(name: string): Promise<string | null
             return null;
         }
 
-        // Create a MIDI note (middle C, pitch 60, starting at beat 0, duration 1 beat)
-        const { error: noteError } = await supabase
-            .from('midi_notes')
-            .insert({
-                id: noteId,
-                block_id: blockId,
-                user_id: userId,
-                start_beat: 0,
-                duration: 1,
-                velocity: 80,
-                pitch: 60
-            });
+        // Create four MIDI notes in ascending order (C major arpeggio)
+        // C4 (60), E4 (64), G4 (67), C5 (72)
+        const initialNotes = [
+            { id: uuidv4(), startBeat: 0, pitch: 40 }, // C4
+            { id: uuidv4(), startBeat: 1, pitch: 60 }, // E4
+            { id: uuidv4(), startBeat: 2, pitch: 80 }, // G4
+            { id: uuidv4(), startBeat: 3, pitch: 100 }, // C5
+        ];
 
-        if (noteError) {
-            console.error("Error creating initial MIDI note:", noteError);
-            // Clean up if note creation failed
+        const notesToInsert = initialNotes.map(note => ({
+            id: note.id,
+            block_id: blockId,
+            user_id: userId,
+            start_beat: note.startBeat,
+            duration: 1,
+            velocity: 80,
+            pitch: note.pitch
+        }));
+
+        const { error: notesError } = await supabase
+            .from('midi_notes')
+            .insert(notesToInsert);
+
+        if (notesError) {
+            console.error("Error creating initial MIDI notes:", notesError);
+            // Clean up if notes creation failed
             await supabase.from('projects').delete().eq('id', projectId);
             return null;
         }
 
-        console.log(`Successfully created Supabase project: ${projectId} with initial track, MIDI block, and note`);
+        console.log(`Successfully created Supabase project: ${projectId} with initial track, MIDI block, and notes`);
         return projectId;
     } catch (error) {
         console.error("Error creating Supabase project:", error);
