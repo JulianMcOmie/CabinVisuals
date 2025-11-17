@@ -84,19 +84,15 @@ export const createTimeSlice: StateCreator<
            audioManager.context.resume().then(() => {
                console.log("AudioContext resumed successfully.");
                 if (isAudioLoaded) {
-                    const offset = timeManager.beatToTime(startBeat); // Use potentially adjusted startBeat
-                    const startTime = audioManager.context!.currentTime + 0.05;
-                    audioManager.play(startTime, offset);
+                    audioManager.play();
                 }
            }).catch(err => console.error("Failed to resume AudioContext:", err));
       } else if (isAudioLoaded && audioManager.context) {
-          const offset = timeManager.beatToTime(startBeat); // Use potentially adjusted startBeat
-          const startTime = audioManager.context.currentTime + 0.05;
-          audioManager.play(startTime, offset);
+          audioManager.play();
       } else if (!isAudioLoaded) {
           console.warn("Play called but no audio loaded.");
       } else {
-           console.warn("Play called but AudioContext not available or in unexpected state.");
+          console.warn("Play called but AudioContext not available or in unexpected state.");
       }
 
       timeManager.seekTo(startBeat);
@@ -119,7 +115,7 @@ export const createTimeSlice: StateCreator<
       void saveSettingsToSupabase();
     },
     setBPM: (bpm: number) => {
-      const { audioManager, isPlaying, isAudioLoaded, currentBeat } = get();
+      const { audioManager, isPlaying, isAudioLoaded } = get();
       const wasPlaying = isPlaying;
 
       if (wasPlaying) {
@@ -133,11 +129,7 @@ export const createTimeSlice: StateCreator<
 
       if (wasPlaying) {
           timeManager.play();
-          if (isAudioLoaded && audioManager.context) {
-              const offset = timeManager.beatToTime(currentBeat);
-              const startTime = audioManager.context.currentTime + 0.05;
-              audioManager.play(startTime, offset);
-          }
+          audioManager.play();
       }
     },
     setNumMeasures: (measures: number) => {
@@ -145,21 +137,12 @@ export const createTimeSlice: StateCreator<
         void saveSettingsToSupabase();
     },
     seekTo: (beat: number) => {
-      const { audioManager, isPlaying, isAudioLoaded } = get();
-      const targetTime = timeManager.beatToTime(beat);
-      
-      timeManager.seekTo(beat);
-      set({ currentBeat: beat });
-
-      if (isAudioLoaded && audioManager.context) {
-          if (isPlaying) {
-              audioManager.stop(); 
-              const startTime = audioManager.context.currentTime + 0.05;
-              audioManager.play(startTime, targetTime); 
-          } else {
-              audioManager.seek(targetTime);
-          }
-      }
+        const { audioManager } = get();
+        const targetTime = timeManager.beatToTime(beat);
+        
+        timeManager.seekTo(beat);
+        audioManager.seekTo(targetTime);
+        set({ currentBeat: beat });
     },
     // --- Loop Action Implementations ---
     toggleLoop: () => {
