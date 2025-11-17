@@ -23,7 +23,7 @@ export const createAudioSlice: StateCreator<
   [],
   [],
   AudioSlice
-> = (set, get) => {
+> = (set) => {
     const audioManager = new AudioManager(); // Initialize AudioManager here
     
     // Set up the progress callback

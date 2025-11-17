@@ -1,4 +1,3 @@
-import { Track, ColorRange } from "../types";
 
 export type UIType = 'slider' | 'numberInput' | 'dropdown' | 'color' | 'colorRange';
 

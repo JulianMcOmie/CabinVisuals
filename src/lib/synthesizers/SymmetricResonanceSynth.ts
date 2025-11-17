@@ -1,5 +1,5 @@
 import Synthesizer from '../Synthesizer';
-import { MIDIBlock, VisualObject, MIDINote, VisualObjectProperties } from '../types';
+import { MIDIBlock, VisualObject } from '../types';
 import { Property } from '../properties/Property';
 import VisualObjectEngine, { MappingContext, MappingUtils, NoteContext, InstanceData, ADSRConfigFn } from '../VisualObjectEngine';
 import * as THREE from 'three';

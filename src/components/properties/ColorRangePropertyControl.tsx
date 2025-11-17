@@ -2,16 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Property } from '../../lib/properties/Property';
 import { ColorRange } from '../../lib/types';
 
-// Define colors matching page.tsx
-const COLORS = {
-  accent: "#5a8ea3", // Subtle blue-gray
-  highlight: "#c8a45b", // Muted gold/amber
-  background: "#1e1e1e", // Dark background
-  surface: "#252525", // Slightly lighter surface
-  border: "#3a3a3a", // Border color
-  activeBg: "#2d3540", // Active element background
-};
-
 interface Props {
     property: Property<ColorRange>;
     onChange: (value: ColorRange) => void;

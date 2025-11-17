@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Track, MIDIBlock } from '../../lib/types';
 import useStore from '../../store/store';
 // Removed MidiBlockView import
-import { useTrackGestures, UseTrackGesturesProps } from './useTrackGestures'; // Import the new hook and its props type
+import { useTrackGestures } from './useTrackGestures'; // Import the new hook
 
 
 // Padding/geometry constants (relative to track height)
@@ -473,7 +473,6 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
     // Calculate actual offsets considering scroll
     const actualOffsetX = offsetX + scrollLeft;
     const actualOffsetY = offsetY + scrollTop;
-    const clickedBeat = actualOffsetX / effectivePixelsPerBeat;
     // Use actualOffsetY to determine track index
     const trackIndex = Math.floor(actualOffsetY / effectiveTrackHeight);
 
@@ -605,14 +604,14 @@ const TrackTimelineView = forwardRef<TrackTimelineViewHandle, TrackTimelineViewP
           selectBlock(null);
       }
     },
-    triggerDoubleClick: ({ clientX, clientY, actualOffsetX, actualOffsetY, trackId }) => {
+    triggerDoubleClick: ({ clientX, clientY, actualOffsetX, trackId }) => {
         setSelectedWindow('timelineView');
         if (!trackId) return;
         const clickedBeat = actualOffsetX / effectivePixelsPerBeat;
         // Pass necessary info, mock event if hook expects it
         handleDoubleClick({ clientX, clientY } as React.MouseEvent, trackId, clickedBeat);
     },
-    triggerContextMenu: ({ clientX, clientY, actualOffsetX, actualOffsetY, trackId, blockId }) => {
+    triggerContextMenu: ({ clientX, clientY, trackId, blockId }) => {
         setSelectedWindow('timelineView');
         // Mock event with needed properties
         const mockEvent = { clientX, clientY, preventDefault: () => {}, stopPropagation: () => {} };

@@ -1,5 +1,5 @@
-import { ChevronDown, Disc3, SquareIcon } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import { ChevronDown, Disc3 } from 'lucide-react';
+import React, { useState } from 'react';
 import styles from './AccordionMenu.module.css'; // Import the CSS module
 
 

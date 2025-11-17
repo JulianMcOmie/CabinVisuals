@@ -206,7 +206,6 @@ export default function TestSupabasePage() {
     try {
       const projects = await supabaseService.getSupabaseProjectList();
       if (projects.length > 0) {
-        const projectId = projects[0].id;
         const testBlock = {
           id: crypto.randomUUID(),
           trackId: crypto.randomUUID(), // We'll need a real track ID for this to work

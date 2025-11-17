@@ -497,23 +497,17 @@ function MeasuresHeader({
 
     // Determine subdivision level based on pixels per beat
     let subdivisionLevel: 'beat' | 'measure' | 'measure_2' | 'measure_4' | 'sub_beat' = 'measure';
-    let beatStep = BEATS_PER_MEASURE; // Default to measures
 
     if (effectivePixelsPerBeat > 150) {
         subdivisionLevel = 'sub_beat';
-        beatStep = 0.25; // Show quarter notes
     } else if (effectivePixelsPerBeat > 50) {
         subdivisionLevel = 'beat';
-        beatStep = 1; // Show individual beats
     } else if (effectivePixelsPerBeat > 25) {
         subdivisionLevel = 'measure';
-        beatStep = BEATS_PER_MEASURE; // Show measures
     } else if (effectivePixelsPerBeat > 12) {
         subdivisionLevel = 'measure_2';
-        beatStep = BEATS_PER_MEASURE * 2; // Show every 2 measures
     } else {
         subdivisionLevel = 'measure_4';
-        beatStep = BEATS_PER_MEASURE * 4; // Show every 4 measures
     }
 
     ctx.fillStyle = LABEL_TEXT_COLOR;

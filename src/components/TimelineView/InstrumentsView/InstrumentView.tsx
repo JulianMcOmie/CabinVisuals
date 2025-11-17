@@ -111,12 +111,12 @@ function InstrumentView({
       }
   };
 
-  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseUp = () => {
       mouseDownRef.current = false;
       potentialDragRef.current = null;
   };
 
-  const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseLeave = () => {
       if (mouseDownRef.current && !dragStartedRef.current) {
            mouseDownRef.current = false;
            potentialDragRef.current = null;

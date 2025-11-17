@@ -1,6 +1,5 @@
 import { VisualObject } from './types';
 import { Property } from './properties/Property';
-import { v4 as uuidv4 } from 'uuid';
 /**
  * Abstract base class for all visual effects.
  * Effects take a stream of VisualObjects and modify them based on their properties and the current time/bpm.

@@ -1,18 +1,16 @@
 import { create } from 'zustand';
 
 // Import Slice types and creators
-import { TimeSlice, TimeState, createTimeSlice } from './timeSlice';
+import { TimeSlice, createTimeSlice } from './timeSlice';
 import { AudioSlice, createAudioSlice } from './audioSlice';
 // Import types from trackSlice's dependencies
-import { Track as TrackType, MIDIBlock as ClipType, MIDINote } from '@/lib/types';
 import EffectInstance from '@/lib/Effect';
 import SynthesizerInstance from '@/lib/Synthesizer';
-
-import { TrackSlice, TrackState, createTrackSlice } from './trackSlice';
-import { InstrumentSlice, InstrumentDefinition, InstrumentCategories, availableInstrumentsData, createInstrumentSlice } from './instrumentSlice';
-import { EffectSlice, EffectDefinition, EffectCategories, availableEffectsData, createEffectSlice } from './effectSlice';
-import { UISlice, UIState, createUISlice, SelectedWindowType } from './uiSlice';
-import { ProjectSlice, createProjectSlice, ProjectMetadata } from './projectSlice';
+import { TrackSlice, createTrackSlice } from './trackSlice';
+import { InstrumentSlice, InstrumentDefinition, availableInstrumentsData, createInstrumentSlice } from './instrumentSlice';
+import { EffectSlice, EffectDefinition, availableEffectsData, createEffectSlice } from './effectSlice';
+import { UISlice, createUISlice } from './uiSlice';
+import { ProjectSlice, createProjectSlice } from './projectSlice';
 
 // --- Constructor Mappings --- 
 

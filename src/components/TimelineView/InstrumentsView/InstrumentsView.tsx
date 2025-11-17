@@ -3,7 +3,6 @@ import { Track } from '../../../lib/types';
 import InstrumentView from './InstrumentView';
 import './InstrumentsView.css';
 import useStore from '../../../store/store';
-import { SelectedWindowType } from '../../../store/uiSlice'; // Import type if needed
 
 interface InstrumentsViewProps {
   tracks: Track[];

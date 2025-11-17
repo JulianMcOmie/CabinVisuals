@@ -20,11 +20,9 @@ import {
   useSensors,
   DragEndEvent,
   DragOverlay,
-  DragStartEvent,
-  DragCancelEvent
+  DragStartEvent
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -59,7 +57,6 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
   } = useStore();
 
   // State for adding new effects
-  const [selectedEffectToAdd, setSelectedEffectToAdd] = useState<string>('');
   const [showEffectsMenu, setShowEffectsMenu] = useState(false);
 
   // State to track collapsed state of effects
@@ -101,7 +98,6 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     if (definition) {
       const newEffectInstance = new definition.constructor(uuidv4());
       addEffectToTrack(track.id, newEffectInstance);
-      setSelectedEffectToAdd('');
       setShowEffectsMenu(false);
     }
   };
@@ -188,7 +184,7 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     setActiveId(null); // Clear active ID on drag end
   }
 
-  function handleDragCancel(event: DragCancelEvent) {
+  function handleDragCancel() {
       setActiveId(null); // Clear active ID on drag cancel
   }
   // --- End Drag Event Handlers ---
@@ -200,7 +196,6 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     index: number; // Keep index for property controls
     trackId: string; // Keep trackId for remove action
     collapsed: boolean;
-    isDragging?: boolean; // Optional: for potential styling differences in overlay
     onToggleCollapse: (id: string) => void;
     onRemove: (trackId: string, index: number) => void;
     getEffectName: (effect: Effect) => string;
@@ -214,7 +209,6 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
     index,
     trackId,
     collapsed,
-    isDragging,
     onToggleCollapse,
     onRemove,
     getEffectName,
@@ -403,7 +397,6 @@ function EffectsDetailView({ track }: EffectsDetailViewProps) {
               index={activeEffectIndex} // Pass the correct index for the active item
               trackId={track.id}
               collapsed={!!collapsedEffects[activeEffect.id]} // Use collapsed state for the active item
-              isDragging={true} // Indicate it's being dragged (for potential styling)
               onToggleCollapse={() => {}} // No-op for overlay
               onRemove={() => {}} // No-op for overlay
               getEffectName={getEffectName}

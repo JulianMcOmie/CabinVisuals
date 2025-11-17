@@ -2,21 +2,15 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import useStore from '../../store/store';
-import { MIDIBlock, MIDINote, Track } from '../../lib/types';
-
-import PianoRollHeader from './components/PianoRollHeader';
-import PianoKeys from './components/PianoKeys';
+import { MIDIBlock, Track } from '../../lib/types';
 
 import {
   KEY_COUNT,
   BEATS_PER_MEASURE,
-  PIXELS_PER_BEAT,
-  PIXELS_PER_SEMITONE,
 } from './utils/constants';
 
 import {
   getCoordsAndDerived,
-  debounce
 } from './utils/utils';
 
 import { drawMidiEditor } from './utils/canvas';

@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from 'react'
 import { updatePassword } from './actions'
 import { createClient } from '../../../src/utils/supabase/client'
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import Link from 'next/link';
 
 function UpdatePasswordFormInternal() {

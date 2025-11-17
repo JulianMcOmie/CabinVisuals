@@ -1,5 +1,5 @@
 import Effect from '../Effect';
-import { VisualObject, VisualObjectProperties } from '../types';
+import { VisualObject } from '../types';
 import { Property } from '../properties/Property';
 import * as THREE from 'three';
 

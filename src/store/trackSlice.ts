@@ -214,7 +214,7 @@ export const createTrackSlice: StateCreator<
           .find(b => b.id === updatedBlockData.id);
         const prevNoteIds = new Set((prevBlock?.notes || []).map(n => String(n.id)));
         const nextNoteIds = new Set((updatedBlockData.notes || []).map(n => String(n.id)));
-        const removedNoteIds: string[] = Array.from(prevNoteIds).filter(id => !nextNoteIds.has(id));
+        Array.from(prevNoteIds).filter(id => !nextNoteIds.has(id)); // removedNoteIds - track removed notes
 
         set((state) => {
             let trackUpdated = false;
@@ -573,7 +573,6 @@ export const createTrackSlice: StateCreator<
         const notes2: MIDINote[] = [];
 
         blockToSplit.notes.forEach(note => {
-          const noteEndBeat = note.startBeat + note.duration;
           if (note.startBeat < splitBeat) {
             // Note starts before split point, goes to block 1
             const newDuration = Math.min(note.duration, splitBeat - note.startBeat);

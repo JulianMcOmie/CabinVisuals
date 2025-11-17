@@ -126,9 +126,6 @@ export const useMidiEditorInteractions = ({
             const coords = getCoordsAndDerivedCallback(e);
             if (!coords) return;
 
-            const { x, y, scrolledX, scrolledY } = coords;
-            const currentBlockWidth = blockDuration * currentPixelsPerBeat;
-
             if (currentDragOp === 'select' && currentSelectionBox) {
                 // console.log("currentDragOp === 'select' && currentSelectionBox");
                 setSelectionBox({

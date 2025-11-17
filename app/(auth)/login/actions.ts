@@ -34,7 +34,7 @@ export async function handleSignInWithGoogle(idToken: string) {
   }
 
   console.log("Attempting signInWithIdToken...");
-  const { data, error } = await supabase.auth.signInWithIdToken({
+  const { error } = await supabase.auth.signInWithIdToken({
     provider: 'google',
     token: idToken,
   });

@@ -1,3 +1,3 @@
-import AccordionMenu, { AccordionItem, AccordionCategory } from './AccordionMenu';
+import AccordionMenu from './AccordionMenu';
 
 export default AccordionMenu;

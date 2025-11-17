@@ -76,6 +76,6 @@ export const createInstrumentSlice: StateCreator<
   [],
   [],
   InstrumentSlice
-> = (set, get) => ({
+> = () => ({
   availableInstruments: availableInstrumentsData,
 }); 
