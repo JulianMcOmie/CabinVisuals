@@ -48,9 +48,7 @@ export class AudioManager {
     }
 
     async loadAudio(audioData: ArrayBuffer, fileName: string = ''): Promise<{ duration: number }> {
-        if (!this.audioContext) {
-            throw new Error("AudioContext is not initialized.");
-        }
+        if (!this.audioContext) { throw new Error("AudioContext is not initialized."); }
         
         // Initial progress: starting
         this.updateProgress(0);
@@ -146,52 +144,63 @@ export class AudioManager {
             console.warn("AudioManager: Cannot play - audio not loaded or context unavailable.");
             return;
         }
+
+        const startPlayback = (scheduledWhen: number) => {
+            // Stop existing node if playing
+            if (this.sourceNode) {
+                try {
+                    this.sourceNode.stop(0); // Stop immediately
+                    this.sourceNode.disconnect();
+                } catch(e) { /* ignore errors if already stopped */ }
+                this.sourceNode = null;
+            }
+
+            // Determine the correct starting offset
+            let effectiveOffset = offset;
+            if (this.pausedAt !== null && this.duration !== null) {
+                // Resuming from pause
+                effectiveOffset = (this.pausedAt - this.startTime + this.startOffset) % this.duration;
+            }
+
+            // Ensure offset is within valid range [0, duration]
+            const validOffset = Math.max(0, Math.min(effectiveOffset, this.duration ?? Infinity));
+
+            this.sourceNode = this.audioContext!.createBufferSource();
+            this.sourceNode.buffer = this.audioBuffer!;
+            this.sourceNode.connect(this.audioContext!.destination!);
+
+            this.startTime = scheduledWhen; // Record scheduled start time from context perspective
+            this.startOffset = validOffset; // Record where in the buffer we started
+            this.pausedAt = null; // Clear pause state
+
+            console.log(`AudioManager: Starting playback at context time ${scheduledWhen.toFixed(3)} with buffer offset ${validOffset.toFixed(3)}`);
+            this.sourceNode.start(scheduledWhen, validOffset);
+
+            this.sourceNode.onended = () => {
+                 // Only log/handle if it wasn't manually stopped (i.e., not paused)
+                 if (this.pausedAt === null && this.sourceNode) {
+                     console.log("AudioManager: Playback ended naturally or was stopped externally.");
+                     this.sourceNode.disconnect();
+                     this.sourceNode = null;
+                    // Maybe notify store that playback stopped? Handled by timeManager for now.
+                 }
+            };
+        };
+
         if (this.audioContext.state === 'suspended') {
-             console.warn("AudioManager: AudioContext is suspended. Cannot play.");
-             // Attempt to resume - might fail if not triggered by user gesture
-             this.audioContext.resume().catch(err => console.error("Failed to resume context:", err));
+             console.warn("AudioManager: AudioContext is suspended. Attempting to resume before playback.");
+             this.audioContext.resume()
+                 .then(() => {
+                     // After resuming, ensure `when` is not in the past
+                     const now = this.audioContext!.currentTime;
+                     const adjustedWhen = when <= now ? now + 0.01 : when;
+                     startPlayback(adjustedWhen);
+                 })
+                 .catch(err => console.error("Failed to resume context:", err));
              return;
         }
 
-        // Stop existing node if playing
-        if (this.sourceNode) {
-            try {
-                 this.sourceNode.stop(0); // Stop immediately
-                 this.sourceNode.disconnect();
-            } catch(e) { /* ignore errors if already stopped */ }
-            this.sourceNode = null;
-        }
-
-        // Determine the correct starting offset
-        let effectiveOffset = offset;
-        if (this.pausedAt !== null && this.duration !== null) {
-            // Resuming from pause
-            effectiveOffset = (this.pausedAt - this.startTime + this.startOffset) % this.duration;
-        }
-
-        // Ensure offset is within valid range [0, duration]
-        const validOffset = Math.max(0, Math.min(effectiveOffset, this.duration ?? Infinity));
-
-        this.sourceNode = this.audioContext.createBufferSource();
-        this.sourceNode.buffer = this.audioBuffer;
-        this.sourceNode.connect(this.audioContext.destination);
-
-        this.startTime = when; // Record scheduled start time from context perspective
-        this.startOffset = validOffset; // Record where in the buffer we started
-        this.pausedAt = null; // Clear pause state
-
-        console.log(`AudioManager: Starting playback at context time ${when.toFixed(3)} with buffer offset ${validOffset.toFixed(3)}`);
-        this.sourceNode.start(when, validOffset);
-
-        this.sourceNode.onended = () => {
-             // Only log/handle if it wasn't manually stopped (i.e., not paused)
-             if (this.pausedAt === null && this.sourceNode) {
-                 console.log("AudioManager: Playback ended naturally or was stopped externally.");
-                 this.sourceNode.disconnect();
-                 this.sourceNode = null;
-                // Maybe notify store that playback stopped? Handled by timeManager for now.
-             }
-        };
+        startPlayback(when);
     }
 
     // Returns the playback time (in seconds) where pause occurred
