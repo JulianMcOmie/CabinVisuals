@@ -89,7 +89,6 @@ const drawGrid = (
   // console.log('scrollX', scrollX);
   // console.log('scrollY', scrollY);
   const totalBeats = numMeasures * BEATS_PER_MEASURE;
-  const totalHeight = (KEY_COUNT ?? 128) * pixelsPerSemitone; // Use effective key count
 
   // --- Draw Horizontal Lines (Pitch) ---
   const startKey = Math.max(0, Math.floor(scrollY / pixelsPerSemitone));

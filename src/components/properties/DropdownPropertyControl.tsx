@@ -1,5 +1,5 @@
 import React from 'react';
-import { Property, DropdownMetadata, DropdownOption } from '../../lib/properties/Property';
+import { Property, DropdownMetadata } from '../../lib/properties/Property';
 
 interface DropdownPropertyControlProps<T> {
   property: Property<T>;

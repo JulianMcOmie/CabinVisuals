@@ -436,7 +436,7 @@ export async function loadFullProjectFromSupabase(projectId: string): Promise<Ap
                 }
                 // Normalize effect types
                 if (t.effects && t.effects.length) {
-                    t.effects.forEach((e, idx) => {
+                    t.effects.forEach((e) => {
                         if (!e?.type) return;
                         const eCtor = effectConstructors.get(e.type);
                         if (eCtor) {

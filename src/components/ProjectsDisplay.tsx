@@ -1,6 +1,5 @@
 "use client"
-import Image from "next/image"
-import { LogOut, ExternalLink, Plus, FileText, MessageSquare } from "lucide-react"
+import { LogOut, ExternalLink, Plus, FileText } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,9 +12,7 @@ import { ProjectMetadata } from '../store/projectSlice'; // Import the type
 import type { User } from '@supabase/supabase-js'; // Import User type
 import { logout } from "../../app/(auth)/logout/actions"; // Corrected relative path
 import { useState } from "react"; // Import useState
-import Link from "next/link"; // Import Link
 import { createClient } from "../utils/supabase/client"; // Correct the import path for the client-side helper
-import { usePathname } from "next/navigation"
 import LogInButton from "./AuthButtons/LogInButton";
 import SignUpButton from "./AuthButtons/SignUpButton";
 
@@ -55,7 +52,6 @@ export default function ProjectsDisplay({
 
   const [isLoggingOut, setIsLoggingOut] = useState(false); // Add loading state
   const userInitials = getInitials(profile?.first_name, profile?.last_name);
-  const currentPath = usePathname(); // Get current path
 
   // Define the async handler for logout
   const handleLogout = async () => {

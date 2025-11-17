@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import useStore from '../../store/store';
 import styles from './PlaybarView.module.css';
 import { Repeat, Upload, Play, Pause, Square, PanelLeft } from 'lucide-react';
@@ -27,7 +27,6 @@ const PlaybarView: React.FC<PlaybarViewProps> = ({ user }) => { // Destructure u
     setBPM, 
     loopEnabled,
     toggleLoop,
-    isInstrumentSidebarVisible,
     toggleInstrumentSidebar,
     setSelectedWindow
   } = useStore();

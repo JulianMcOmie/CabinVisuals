@@ -1,7 +1,6 @@
 import { StateCreator } from 'zustand';
 import TimeManager from '@/lib/TimeManager';
 import { AppState } from './store'; // Import the combined AppState
-import { AudioManager } from '@/lib/AudioManager'; // Need AudioManager for cross-slice access
 import * as SupabasePersist from './persistStore/supabase/persistProjectSettings';
 
 // Time Slice

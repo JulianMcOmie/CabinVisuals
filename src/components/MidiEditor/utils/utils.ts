@@ -1,7 +1,5 @@
 import { MIDINote } from '../../../lib/types';
 import {
-  PIXELS_PER_BEAT,
-  PIXELS_PER_SEMITONE,
   KEY_COUNT,
   LOWEST_NOTE,
   RESIZE_HANDLE_WIDTH

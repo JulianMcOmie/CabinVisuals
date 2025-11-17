@@ -11,7 +11,6 @@ import {
     KEY_COUNT,
     BEATS_PER_MEASURE
 } from '../utils/constants';
-import { debounce } from '../utils/utils'; // Import debounce from utils.ts
 
 // --- Define Vertical Zoom constants locally --- 
 const MIN_PIXELS_PER_SEMITONE = 5; // Example minimum height

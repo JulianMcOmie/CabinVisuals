@@ -54,12 +54,6 @@ export function useTrackGestures({
   // Destructure scroll props
   scrollLeft,
   scrollTop,
-  // Destructure visible dimensions
-  timelineVisibleWidth,
-  timelineVisibleHeight,
-  // Add missing props back
-  numMeasures,
-  renderMeasures,
 }: UseTrackGesturesProps) {
   // Calculate effective values based on zoom
   const effectivePixelsPerBeat = pixelsPerBeatBase * horizontalZoom;

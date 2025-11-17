@@ -69,7 +69,7 @@ export default function LandingPage() {
 
     // Listen ONLY for sign out events to update UI
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, _session) => {
+      (event) => {
         if (!isMounted) return
         
         // Only handle SIGNED_OUT event to clear state

@@ -8,10 +8,6 @@ const logError = (action: string, error: any) => {
     console.error(`Supabase Persistence Error [${action}]:`, error);
 };
 
-const _ensureUuid = (id: string | undefined): string => {
-    return id && uuidValidate(id) ? id : uuidv4();
-};
-
 // --- Persistence Functions ---
 
 export const persistAddTrack = async (get: () => AppState, track: Track) => {

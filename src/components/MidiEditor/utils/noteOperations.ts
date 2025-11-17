@@ -26,7 +26,7 @@ export const createNewNote = (
   
   // Create a new note
   return {
-    id: generateNoteId(blockId),
+    id: generateNoteId(),
     startBeat: snappedBeat,
     duration: 1, // Default to 1 beat
     velocity: 100,
@@ -70,7 +70,7 @@ export const duplicateNotes = (
     .filter(note => selectedNoteIds.includes(note.id))
     .map(note => ({ 
       ...note,
-      id: generateNoteId(block.id)
+      id: generateNoteId()
     }));
   
   return {

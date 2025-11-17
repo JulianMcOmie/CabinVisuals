@@ -1,6 +1,6 @@
 import TimeManager from './TimeManager';
 // Remove TrackManager import if unused elsewhere, keep types
-import { VisualObject, Track, VisualObjectProperties, MIDINote } from './types'; // Add Track type
+import { VisualObject, Track, VisualObjectProperties } from './types'; // Add Track type
 
 // Define interface for visual objects to be rendered
 export interface VisualObject3D {

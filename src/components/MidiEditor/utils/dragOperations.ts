@@ -2,9 +2,7 @@ import { MIDIBlock, MIDINote } from '../../../lib/types';
 import { 
   GRID_SNAP,
   KEY_COUNT,
-  LOWEST_NOTE,
-  PIXELS_PER_BEAT,
-  PIXELS_PER_SEMITONE
+  LOWEST_NOTE
 } from './constants';
 import { duplicateNotes, moveSelectedNotes, resizeNotesFromStart, resizeNotesFromEnd } from './noteOperations';
 

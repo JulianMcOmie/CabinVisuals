@@ -1,4 +1,4 @@
-import { Track, MIDIBlock, MIDINote } from '@/lib/types';
+import { Track, MIDIBlock } from '@/lib/types';
 import { TrackData, MidiBlockData, MidiNoteData, SynthData, EffectData } from '@/Persistence/supabase-service';
 import Synthesizer from '@/lib/Synthesizer';
 import Effect from '@/lib/Effect';

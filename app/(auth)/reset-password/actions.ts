@@ -2,7 +2,6 @@
 
 import { createClient } from '../../../src/utils/supabase/server' // Updated path
 import { headers } from 'next/headers'
-import { redirect } from 'next/navigation' // Import redirect
 
 export async function requestPasswordReset(formData: FormData) {
   const email = formData.get('email') as string;

@@ -29,7 +29,7 @@ function DetailView() {
       if (detailViewMode !== 'effects') {
         setDetailViewMode('effects');
       }
-    } catch (err) {
+    } catch {
       // Silently ignore invalid data
     }
   };

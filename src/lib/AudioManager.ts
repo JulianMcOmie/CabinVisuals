@@ -57,7 +57,7 @@ export class AudioManager {
         if (this.sourceNode) {
             try {
                 this.sourceNode.stop();
-            } catch (e) { /* Ignore if already stopped */ }
+            } catch { /* Ignore if already stopped */ }
             this.sourceNode.disconnect();
             this.sourceNode = null;
         }
@@ -151,7 +151,7 @@ export class AudioManager {
                 try {
                     this.sourceNode.stop(0); // Stop immediately
                     this.sourceNode.disconnect();
-                } catch(e) { /* ignore errors if already stopped */ }
+                } catch { /* ignore errors if already stopped */ }
                 this.sourceNode = null;
             }
 

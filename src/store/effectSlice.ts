@@ -67,7 +67,7 @@ export const createEffectSlice: StateCreator<
   [], // No middleware for this slice
   [], // No devtools options specific to this slice
   EffectSlice
-> = (set, get) => ({
+> = () => ({
   // Initial state
   availableEffects: availableEffectsData,
 

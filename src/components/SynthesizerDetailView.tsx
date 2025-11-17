@@ -3,7 +3,6 @@
 import React from 'react';
 import useStore from '../store/store';
 import { Track } from '../lib/types';
-import Synthesizer from '../lib/Synthesizer';
 import { Property } from '../lib/properties/Property';
 
 // Import Property Controls

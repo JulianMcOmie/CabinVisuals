@@ -10,12 +10,9 @@ import styles from './audioloader.module.css';
 
 const AudioLoader: React.FC = () => {
     const loadAudioAction = useStore(state => state.loadAudio);
-    const isAudioLoaded = useStore(state => state.isAudioLoaded);
-    const audioDuration = useStore(state => state.audioDuration);
     const audioFileName = useStore(state => state.audioFileName);
     const clearAudio = useStore(state => state.clearAudio);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const loadingProgress = useStore(state => state.loadingProgress);
     
@@ -28,7 +25,6 @@ const AudioLoader: React.FC = () => {
         if (!file) return;
 
         setIsLoading(true);
-        setError(null);
 
         const fileToPersist = file;
 
@@ -37,7 +33,6 @@ const AudioLoader: React.FC = () => {
         reader.onload = async (e) => {
             const arrayBuffer = e.target?.result as ArrayBuffer;
             if (!arrayBuffer) {
-                setError('Failed to read file.');
                 setIsLoading(false);
                 return;
             }
@@ -54,14 +49,12 @@ const AudioLoader: React.FC = () => {
 
             } catch (err) {
                 console.error("Error loading audio:", err);
-                setError(err instanceof Error ? err.message : 'An unknown error occurred during audio loading.');
             } finally {
                 setIsLoading(false);
             }
         };
 
         reader.onerror = () => {
-            setError('Error reading file.');
             setIsLoading(false);
         };
 
