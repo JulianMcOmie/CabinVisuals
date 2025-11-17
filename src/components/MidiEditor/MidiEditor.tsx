@@ -95,8 +95,6 @@ function MidiEditor({ block, track }: MidiEditorProps) {
 
   const blockStartBeat = block.startBeat;
   const blockDuration = block.endBeat - block.startBeat;
-  const blockWidth = blockDuration * pixelsPerBeat;
-  const blockHeight = KEY_COUNT * pixelsPerSemitone;
 
   const totalGridWidth = numMeasures * BEATS_PER_MEASURE * pixelsPerBeat;
   const totalGridHeight = KEY_COUNT * pixelsPerSemitone;
