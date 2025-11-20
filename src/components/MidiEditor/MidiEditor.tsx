@@ -90,7 +90,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
   const blockStartBeat = block.startBeat;
   const blockDuration = block.endBeat - block.startBeat;
 
-  const totalGridWidth = numMeasures * BEATS_PER_MEASURE * pixelsPerBeat;
+  const totalGridWidth = numMeasures * BEATS_PER_MEASURE * pixelsPerBeat; 
   const totalGridHeight = KEY_COUNT * pixelsPerSemitone;
   
   // Wrap getCoordsAndDerived in useCallback to ensure stable reference for dependencies
