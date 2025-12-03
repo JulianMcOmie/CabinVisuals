@@ -1,5 +1,5 @@
 "use client"
-import { LogOut, ExternalLink, Plus, FileText } from "lucide-react"
+import { LogOut, ExternalLink, Plus, FileText, X } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,7 @@ import { useState } from "react"; // Import useState
 import { createClient } from "../utils/supabase/client"; // Correct the import path for the client-side helper
 import LogInButton from "./AuthButtons/LogInButton";
 import SignUpButton from "./AuthButtons/SignUpButton";
+import useStore from '../store/store'; // Import useStore to access deleteProject
 
 // Define a type for the profile data (adjust fields as needed)
 interface ProfileData {
@@ -52,6 +53,17 @@ export default function ProjectsDisplay({
 
   const [isLoggingOut, setIsLoggingOut] = useState(false); // Add loading state
   const userInitials = getInitials(profile?.first_name, profile?.last_name);
+  const deleteProject = useStore((state) => state.deleteProject); // Get deleteProject action
+
+  // Handler for deleting a project
+  const handleDeleteProject = async (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation(); // Prevent triggering the card's onClick
+    
+    // Confirm before deleting
+    if (window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+      await deleteProject(projectId);
+    }
+  };
 
   // Define the async handler for logout
   const handleLogout = async () => {
@@ -168,6 +180,15 @@ export default function ProjectsDisplay({
                     <div className={styles.cardIconPlaceholder}>
                     <FileText className={styles.cardIcon} />
                     </div>
+                    {/* Delete button - appears on hover */}
+                    <button
+                      className={styles.deleteButton}
+                      onClick={(e) => handleDeleteProject(e, project.id)}
+                      aria-label="Delete project"
+                      title="Delete project"
+                    >
+                      <X className={styles.deleteIcon} />
+                    </button>
                 </div>
                 <div className={styles.cardContent}>
                     {/* Use project name from props */}

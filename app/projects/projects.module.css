@@ -242,6 +242,42 @@
   justify-content: center; /* Center icon horizontally */
 }
 
+/* Delete Button */
+.deleteButton {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(220, 38, 38, 0.9); /* Red background */
+  border-radius: 9999px; /* Fully rounded */
+  border: none;
+  cursor: pointer;
+  opacity: 0; /* Hidden by default */
+  transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 10;
+}
+
+/* Show delete button on card hover */
+.projectCard:hover .deleteButton {
+  opacity: 1;
+}
+
+.deleteButton:hover {
+  transform: scale(1.1);
+  background-color: rgba(239, 68, 68, 1); /* Brighter red on hover */
+  box-shadow: 0 0 15px rgba(220, 38, 38, 0.6); /* Red glow */
+}
+
+.deleteIcon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: white;
+}
+
 /* Remove styles specific to the img tag */
 /* .cardImage { ... } */
 
