@@ -202,59 +202,169 @@ function MidiEditor({ block, track }: MidiEditorProps) {
       setSelectedWindow('midiEditor');
   }
   
+  const [isDraggingRuler, setIsDraggingRuler] = useState(false);
+
+  const updatePlayheadFromRuler = (clientX: number, rulerElement: HTMLElement) => {
+    const rect = rulerElement.getBoundingClientRect();
+    const clickX = clientX - rect.left;
+    const beat = (clickX + scrollX) / pixelsPerBeat;
+    const snappedBeat = Math.round(beat * 4) / 4; // Snap to quarter beats
+    const maxBeat = numMeasures * BEATS_PER_MEASURE;
+    seekTo(Math.max(0, Math.min(snappedBeat, maxBeat)));
+  };
+
+  const handleBeatRulerMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingRuler(true);
+    updatePlayheadFromRuler(e.clientX, e.currentTarget);
+  };
+
+  useEffect(() => {
+    if (!isDraggingRuler) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rulerElement = editorRef.current?.querySelector('[data-beat-ruler="true"]') as HTMLElement;
+      if (rulerElement) {
+        updatePlayheadFromRuler(e.clientX, rulerElement);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingRuler(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingRuler, scrollX, pixelsPerBeat, numMeasures, seekTo]);
+
   return (
     <div
         ref={editorRef}
         className="midi-editor relative border border-gray-700 rounded-md"
-        style={{ overflow: 'hidden', height: '100%', }}
+        style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}
         onClick={handleEditorClick}
     >
-        {/* Canvas Layer (Bottom) - Positioned absolutely to fill parent */}
-        <canvas
-            ref={canvasRef} 
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              display: 'block',
-              zIndex: 1, // Lower z-index
-              pointerEvents: 'none' // Ignore mouse events
-              // width/height are set programmatically in useEffect
-            }}
-          />
-
-        {/* Scrollable Grid Layer (Top) - Positioned absolutely to fill parent */}
-        <div
-            className="piano-roll-grid"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%', // Fill parent width
-              height: '100%',// Fill parent height
-              overflow: 'scroll',
-              zIndex: 2, // Higher z-index
-              backgroundColor: 'transparent' // Allows canvas to show through
-            }}
-            onScroll={handleGridScroll}
-            ref={scrollContainerRef}
-          >
-            {/* Sizer & Interaction Div (Inside Scrollable Grid) - MUST NOT be absolute */}
-            <div className="invisible-spacer"
-                ref={invisibleSpacerRef}
-                onMouseDown={handleCanvasMouseDown}
-                onMouseUp={handleCanvasMouseUp}
-                onMouseMove={handleCanvasMouseMove}
-                onContextMenu={handleCanvasContextMenu}
-                style={{
-                  position: 'relative', // Or static (default) - NOT absolute
-                  width: `${totalGridWidth}px`, // `${totalGridWidth}px`, // Full scrollable width
-                  height: `${totalGridHeight}px`,  // Full scrollable height
-                  backgroundColor: 'transparent',
-                  cursor: hoverCursor,
-                }}
-            />
+        {/* Beat Ruler at the top */}
+        <div 
+          data-beat-ruler="true"
+          style={{
+            height: '30px',
+            backgroundColor: '#1a1a1a',
+            borderBottom: '1px solid #444',
+            position: 'relative',
+            overflow: 'hidden',
+            flexShrink: 0,
+            cursor: 'pointer',
+            userSelect: 'none'
+          }}
+          onMouseDown={handleBeatRulerMouseDown}
+        >
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            height: '100%',
+            transform: `translateX(-${scrollX}px)`,
+            pointerEvents: 'none'
+          }}>
+            {/* Render beat markers */}
+            {Array.from({ length: numMeasures * BEATS_PER_MEASURE + 1 }).map((_, beatIndex) => {
+              const isMeasureStart = beatIndex % BEATS_PER_MEASURE === 0;
+              const measureNumber = Math.floor(beatIndex / BEATS_PER_MEASURE) + 1;
+              return (
+                <div
+                  key={`beat-${beatIndex}`}
+                  style={{
+                    position: 'absolute',
+                    left: `${beatIndex * pixelsPerBeat}px`,
+                    top: 0,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  {/* Measure number label for measure starts */}
+                  {isMeasureStart && (
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#aaa',
+                      paddingLeft: '4px',
+                      paddingTop: '2px',
+                      userSelect: 'none'
+                    }}>
+                      {measureNumber}
+                    </div>
+                  )}
+                  {/* Tick mark */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    width: '1px',
+                    height: isMeasureStart ? '12px' : '6px',
+                    backgroundColor: isMeasureStart ? '#888' : '#555'
+                  }} />
+                </div>
+              );
+            })}
           </div>
+        </div>
+
+        {/* Main editor area */}
+        <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
+          {/* Canvas Layer (Bottom) - Positioned absolutely to fill parent */}
+          <canvas
+              ref={canvasRef} 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                display: 'block',
+                zIndex: 1, // Lower z-index
+                pointerEvents: 'none' // Ignore mouse events
+                // width/height are set programmatically in useEffect
+              }}
+            />
+
+          {/* Scrollable Grid Layer (Top) - Positioned absolutely to fill parent */}
+          <div
+              className="piano-roll-grid"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%', // Fill parent width
+                height: '100%',// Fill parent height
+                overflow: 'scroll',
+                zIndex: 2, // Higher z-index
+                backgroundColor: 'transparent' // Allows canvas to show through
+              }}
+              onScroll={handleGridScroll}
+              ref={scrollContainerRef}
+            >
+              {/* Sizer & Interaction Div (Inside Scrollable Grid) - MUST NOT be absolute */}
+              <div className="invisible-spacer"
+                  ref={invisibleSpacerRef}
+                  onMouseDown={handleCanvasMouseDown}
+                  onMouseUp={handleCanvasMouseUp}
+                  onMouseMove={handleCanvasMouseMove}
+                  onContextMenu={handleCanvasContextMenu}
+                  style={{
+                    position: 'relative', // Or static (default) - NOT absolute
+                    width: `${totalGridWidth}px`, // `${totalGridWidth}px`, // Full scrollable width
+                    height: `${totalGridHeight}px`,  // Full scrollable height
+                    backgroundColor: 'transparent',
+                    cursor: hoverCursor,
+                  }}
+              />
+            </div>
+        </div>
     </div>
   );
 }
