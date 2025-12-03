@@ -128,6 +128,25 @@ export const createProjectSlice: StateCreator<
                 tracks: hydratedTracks,
                 isLoadingProject: false,
             }));
+
+            // Auto-select initial track and MIDI block for newly created projects
+            // A new project has exactly 1 track with 1 MIDI block starting at beat 0
+            if (hydratedTracks.length === 1 && hydratedTracks[0].midiBlocks.length === 1) {
+                const firstTrack = hydratedTracks[0];
+                const firstBlock = firstTrack.midiBlocks[0];
+                
+                // Check if this looks like a newly created project (block starts at beat 0)
+                if (firstBlock.startBeat === 0) {
+                    console.log('Auto-selecting initial track and MIDI block for new project');
+                    set({
+                        selectedTrackId: firstTrack.id,
+                        selectedBlockId: firstBlock.id,
+                        selectedTrack: firstTrack,
+                        selectedBlock: firstBlock,
+                        detailViewMode: 'midi',
+                    });
+                }
+            }
         } catch (error) {
             console.error('loadProject: Failed to load project from Supabase:', error);
             set({ currentLoadedProjectId: null, tracks: [], isLoadingProject: false, loadError: 'Failed to load project.' });
