@@ -203,4 +203,4 @@ export default function ProjectsDisplay({
       </main>
     </div>
   )
-} 
+}
