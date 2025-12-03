@@ -25,7 +25,8 @@ interface MidiEditorProps {
 
 function MidiEditor({ block, track }: MidiEditorProps) {
   const { 
-    updateMidiBlock, 
+    updateMidiBlock,
+    moveMidiBlock,
     selectNotes: storeSelectNotes, 
     setSelectedWindow,
     selectedWindow,
@@ -117,6 +118,7 @@ function MidiEditor({ block, track }: MidiEditorProps) {
     selectedNoteIds,
     setSelectedNoteIds, 
     updateMidiBlock,
+    moveMidiBlock,
     storeSelectNotes,
     seekTo,
     selectedWindow,

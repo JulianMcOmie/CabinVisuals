@@ -26,6 +26,7 @@ interface UseMidiEditorInteractionsProps {
     selectedNoteIds: string[];
     setSelectedNoteIds: (ids: string[]) => void;
     updateMidiBlock: (trackId: string, block: MIDIBlock) => void;
+    moveMidiBlock: (blockId: string, oldTrackId: string, newTrackId: string, newStartBeat: number, newEndBeat: number) => void;
     storeSelectNotes: (notes: MIDINote[]) => void;
     seekTo: (beat: number) => void;
     selectedWindow: string | null;
@@ -52,8 +53,8 @@ interface UseMidiEditorInteractionsReturn {
 }
 
 // Define types locally within the hook
-type CursorType = 'default' | 'move' | 'w-resize' | 'e-resize' | 'ew-resize' | 'col-resize';
-type DragOperation = 'none' | 'move' | 'start' | 'end' | 'select' | 'resize-start' | 'resize-end' | 'drag-playhead';
+type CursorType = 'default' | 'move' | 'w-resize' | 'e-resize' | 'ew-resize' | 'col-resize' | 'grab' | 'grabbing';
+type DragOperation = 'none' | 'move' | 'start' | 'end' | 'select' | 'resize-start' | 'resize-end' | 'drag-playhead' | 'move-block';
 
 export const useMidiEditorInteractions = ({
     block,
@@ -61,6 +62,7 @@ export const useMidiEditorInteractions = ({
     selectedNoteIds,
     setSelectedNoteIds,
     updateMidiBlock,
+    moveMidiBlock,
     storeSelectNotes,
     seekTo,
     selectedWindow,
@@ -166,6 +168,44 @@ export const useMidiEditorInteractions = ({
                 return;
             }
 
+            if (currentDragOp === 'move-block' && currentInitialBlockState) {
+                // Calculate the beat offset from the drag movement
+                // Use pixel-based delta since we're in screen coordinates
+                const deltaX = e.clientX - dragStart.clientX;
+                const beatOffset = deltaX / currentPixelsPerBeat;
+                
+                // Calculate new start and end beats based on initial state
+                let newStartBeat = currentInitialBlockState.startBeat + beatOffset;
+                
+                // Snap to grid
+                newStartBeat = Math.round(newStartBeat / GRID_SNAP) * GRID_SNAP;
+                
+                // Ensure block doesn't go before beat 0
+                newStartBeat = Math.max(0, newStartBeat);
+                
+                // Calculate new end beat while maintaining duration
+                const duration = currentInitialBlockState.endBeat - currentInitialBlockState.startBeat;
+                let newEndBeat = newStartBeat + duration;
+                
+                // Ensure block doesn't exceed total measures
+                const maxBeat = numMeasuresRef.current * BEATS_PER_MEASURE;
+                if (newEndBeat > maxBeat) {
+                    newStartBeat = maxBeat - duration;
+                    newEndBeat = maxBeat;
+                }
+                
+                // Update block position if changed (using updateMidiBlock to avoid track changes during drag)
+                if (newStartBeat !== currentBlock.startBeat) {
+                    const updatedBlock = {
+                        ...currentBlock,
+                        startBeat: newStartBeat,
+                        endBeat: newEndBeat
+                    };
+                    updateMidiBlock(trackId, updatedBlock);
+                }
+                return;
+            }
+
             if (!dragNoteId) {
                 // console.log("!dragNoteId");
                 return;
@@ -211,6 +251,7 @@ export const useMidiEditorInteractions = ({
             const currentSelectedNoteIds = selectedNoteIdsRef.current;
             const currentPixelsPerBeat = pixelsPerBeatRef.current;
             const currentPixelsPerSemitone = pixelsPerSemitoneRef.current;
+            const currentInitialBlockState = initialBlockStateRef.current;
 
             if (currentDragOp === 'select' && mouseDownButton === 0) {
                 // console.log("currentDragOp === 'select' && mouseDownButton === 0");
@@ -249,6 +290,11 @@ export const useMidiEditorInteractions = ({
             } else if ((currentDragOp === 'resize-start' || currentDragOp === 'resize-end')) {
                 // console.log("currentDragOp === 'resize-start' || currentDragOp === 'resize-end'");
                 setInitialBlockState(null);
+            } else if (currentDragOp === 'move-block') {
+                // Block move is complete, no additional action needed
+                // The position was already updated during drag with updateMidiBlock
+                setInitialBlockState(null);
+                setHoverCursor('grab');
             }
 
             setDragNoteId(null);
@@ -291,7 +337,7 @@ export const useMidiEditorInteractions = ({
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [
-        trackId, updateMidiBlock, setSelectedNoteIds, storeSelectNotes, seekTo, 
+        trackId, updateMidiBlock, moveMidiBlock, setSelectedNoteIds, storeSelectNotes, seekTo, 
         selectedWindow, numMeasures,
         getCoordsAndDerivedCallback,
         dragStart, dragNoteId, clickOffset, initialDragStates, mouseDownButton, copiedNotes, setCopiedNotes
@@ -314,6 +360,26 @@ export const useMidiEditorInteractions = ({
 
         const { x, y, scrolledX, scrolledY } = coords;
         const currentBlockWidth = blockDuration * currentPixelsPerBeat;
+
+        // Check if clicking on the green header (top 6 pixels of the block)
+        const blockStartX_px = blockStartBeat * currentPixelsPerBeat;
+        const blockEndX_px = blockStartX_px + currentBlockWidth;
+        const GREEN_HEADER_HEIGHT = 6;
+        
+        if (e.button === 0 && 
+            scrolledX >= blockStartX_px && 
+            scrolledX <= blockEndX_px && 
+            scrolledY >= 0 && 
+            scrolledY <= GREEN_HEADER_HEIGHT) {
+            // Clicking on the green header - initiate block move
+            setDragOperation('move-block');
+            setDragStart({ clientX: e.clientX, clientY: e.clientY, elementX: scrolledX, elementY: scrolledY });
+            setInitialBlockState({ ...currentBlock });
+            setIsDragging(false);
+            setHoverCursor('grabbing');
+            e.stopPropagation();
+            return;
+        }
 
         if (e.button === 0) {
             // console.log("e.button === 0 FIRST");
@@ -447,6 +513,19 @@ export const useMidiEditorInteractions = ({
         const currentSelectedNoteIds = selectedNoteIdsRef.current;
         const currentBlockWidth = blockDuration * currentPixelsPerBeat;
 
+        // Check if hovering over the green header (top 6 pixels of the block)
+        const blockStartX_px = blockStartBeat * currentPixelsPerBeat;
+        const blockEndX_px = blockStartX_px + currentBlockWidth;
+        const GREEN_HEADER_HEIGHT = 6;
+        
+        if (scrolledX >= blockStartX_px && 
+            scrolledX <= blockEndX_px && 
+            scrolledY >= 0 && 
+            scrolledY <= GREEN_HEADER_HEIGHT) {
+            setHoverCursor('grab');
+            return;
+        }
+
         const playheadX = currentBeatRef.current * currentPixelsPerBeat;
         if (scrolledX >= playheadX - PLAYHEAD_DRAG_WIDTH / 2 && scrolledX <= playheadX + PLAYHEAD_DRAG_WIDTH / 2) {
             // console.log("playead within range");
@@ -454,8 +533,6 @@ export const useMidiEditorInteractions = ({
             return;
         }
 
-        const blockStartX_px = blockStartBeat * currentPixelsPerBeat;
-        const blockEndX_px = blockStartX_px + currentBlockWidth;
         let isOverEdge = false;
         if (scrolledX >= blockStartX_px - BLOCK_RESIZE_HANDLE_WIDTH / 2 && scrolledX <= blockStartX_px + BLOCK_RESIZE_HANDLE_WIDTH / 2) {
             // console.log("resize-start within range");
