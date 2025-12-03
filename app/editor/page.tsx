@@ -28,6 +28,9 @@ function EditorPageContent() {
   const isInstrumentSidebarVisible = useStore((state) => state.isInstrumentSidebarVisible);
   const loadAudioAction = useStore((state) => state.loadAudio);
   const loadProject = useStore((state) => state.loadProject);
+  const isPlaying = useStore((state) => state.isPlaying);
+  const play = useStore((state) => state.play);
+  const pause = useStore((state) => state.pause);
   const supabase = createClient();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -91,6 +94,35 @@ function EditorPageContent() {
     };
     loadInitialData();
   }, [loadAudioAction, searchParams, loadProject, router]);
+
+  // Global spacebar handler for play/pause
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if spacebar is pressed
+      if (e.code === 'Space' || e.key === ' ') {
+        // Prevent default spacebar behavior (page scroll)
+        // But allow it if user is typing in an input/textarea
+        const target = e.target as HTMLElement;
+        const isTyping = target.tagName === 'INPUT' || 
+                        target.tagName === 'TEXTAREA' || 
+                        target.isContentEditable;
+        
+        if (!isTyping) {
+          e.preventDefault();
+          if (isPlaying) {
+            pause();
+          } else {
+            play();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isPlaying, play, pause]);
 
   if (isLoading) {
       return (
